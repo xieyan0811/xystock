@@ -1,0 +1,7 @@
+chroma_cache
+.pytest_cache
+config.toml
+*.ipynb
+*.csv
+*.log
+data/

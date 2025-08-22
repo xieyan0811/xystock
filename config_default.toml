@@ -1,0 +1,21 @@
+[LLM_OPENAI]
+# OpenAI API 配置
+API_KEY = "sk-"
+BASE_URL = ""
+TIMEOUT = 60  # 请求超时时间（秒）
+MAX_RETRIES = 3  # 最大重试次数
+
+# 默认模型配置
+DEFAULT_MODEL = "gpt-4o"
+DEFAULT_TEMPERATURE = 0.7
+
+[LLM_LOGGING]
+# Token使用记录配置
+USAGE_LOG_FILE = "logs/openai_usage.csv"
+ENABLE_LOGGING = true
+LOG_LEVEL = "INFO"
+
+[LLM_CACHE]
+# 缓存配置（可选）
+ENABLE_CACHE = false
+CACHE_TTL = 3600  # 缓存时间（秒）
