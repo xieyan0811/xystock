@@ -63,7 +63,8 @@ class OpenAIClient:
             self.usage_logger = None
         
         # 默认参数
-        self.default_model = openai_config.get('DEFAULT_MODEL', 'gpt-4o')
+        self.default_model = openai_config.get('DEFAULT_MODEL', 'deepseek-chat')
+        self.inference_model = openai_config.get('INFERENCE_MODEL', 'deepseek-chat')
         self.default_temperature = openai_config.get('DEFAULT_TEMPERATURE', 0.7)
         
         logger.info("OpenAI 客户端初始化完成")
@@ -71,6 +72,7 @@ class OpenAIClient:
     def ask(self, 
             prompt: str, 
             model: Optional[str] = None, 
+            model_type: Optional[str] = "default",  # 新增: 选择模型类型
             temperature: Optional[float] = None, 
             max_tokens: Optional[int] = None,
             system_message: Optional[str] = None,
@@ -82,7 +84,8 @@ class OpenAIClient:
         
         Args:
             prompt: 用户输入
-            model: 模型名称
+            model: 模型名称，会覆盖model_type
+            model_type: 模型类型，'default'使用分析模型，'inference'使用推理模型
             temperature: 温度参数
             max_tokens: 最大token数
             system_message: 系统消息
@@ -95,8 +98,14 @@ class OpenAIClient:
         """
         start_time = time.time()
         
-        # 使用默认值
-        model = model or self.default_model
+        # 根据model_type选择默认模型
+        if model is None:
+            if model_type == "inference":
+                model = self.inference_model
+            else:
+                model = self.default_model
+                
+        # 使用默认温度
         temperature = temperature or self.default_temperature
         
         try:
@@ -188,7 +197,8 @@ class OpenAIClient:
     
     def chat(self, 
              messages: List[Dict[str, str]], 
-             model: Optional[str] = None, 
+             model: Optional[str] = None,
+             model_type: Optional[str] = "default",  # 新增: 选择模型类型
              temperature: Optional[float] = None,
              max_tokens: Optional[int] = None,
              json_mode: bool = False,
@@ -199,6 +209,7 @@ class OpenAIClient:
         Args:
             messages: 消息列表
             model: 模型名称
+            model_type: 模型类型，'default'使用分析模型，'inference'使用推理模型
             temperature: 温度参数
             max_tokens: 最大token数
             json_mode: 是否强制返回JSON格式
@@ -210,6 +221,7 @@ class OpenAIClient:
         return self.ask(
             prompt="",  # 这里prompt为空，因为使用messages
             model=model,
+            model_type=model_type,
             temperature=temperature,
             max_tokens=max_tokens,
             messages=messages,
@@ -247,12 +259,17 @@ if __name__ == "__main__":
         # 创建客户端
         client = OpenAIClient()
         
-        # 简单问答
-        print("=== 简单问答测试 ===")
-        response = client.ask("用一句话评价AAPL股票", debug=True)
-        print(f"回复: {response}")
+        # 简单问答 - 使用默认分析模型
+        print("=== 默认分析模型测试 ===")
+        response = client.ask("用一句话详细评价AAPL股票", debug=True)
+        print(f"分析模型回复: {response}")
         
-        # 多轮对话测试
+        # 简单问答 - 使用推理模型
+        print("=== 推理模型测试 ===")
+        response = client.ask("用一句话评价AAPL股票", model_type="inference", debug=True)
+        print(f"推理模型回复: {response}")
+        
+        # 多轮对话测试 - 使用默认分析模型
         print("\n=== 多轮对话测试 ===")
         messages = [
             {"role": "system", "content": "你是一个专业的股票分析师"},

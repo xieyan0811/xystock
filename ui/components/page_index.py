@@ -5,8 +5,16 @@
 import streamlit as st
 from datetime import datetime
 
-
 def display_technical_indicators(tech_data):
+    st.markdown("""
+    <style>
+    /* 调整 metric 组件的 value 字体大小 */
+    [data-testid="stMetricValue"] {
+        font-size: 1.4rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     """显示技术指标分析卡片"""
     st.subheader("技术指标分析")
     
@@ -315,6 +323,8 @@ def display_market_summary(result_data):
 
 def display_index_analysis_result(result_data):
     """显示指数分析结果"""
+    # 应用自定义样式
+    
     if not result_data:
         st.error("未获取到指数数据")
         return
@@ -390,6 +400,7 @@ def query_index_data(index_name: str):
 
 def main():
     """指数分析页面主函数"""
+    
     # 显示查询界面
     selected_index, query_btn = show_index_query_interface()
     

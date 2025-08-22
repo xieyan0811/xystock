@@ -22,7 +22,8 @@ from providers.risk_metrics import calculate_portfolio_risk
 from providers.news_tools import get_stock_news_by_akshare
 from providers.stock_tools import explain_cyq_data
 from ui.components.page_index import display_technical_indicators
-from providers.stock_tools import get_indicators
+from providers.stock_tools import get_stock_name, get_market_info, get_indicators
+from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
 
 def display_stock_info(stock_code, market_type):
     """
@@ -45,9 +46,9 @@ def display_stock_info(stock_code, market_type):
     # 显示加载中
     with st.spinner(f"正在加载{market_type} {stock_code} ({stock_name})的数据..."):
         try:
-            # 根据市场类型决定是否显示筹码分析
+            # 根据市场类型决定标签页配置
             if market_type == "港股" or market_type == "指数":
-                # 港股不显示筹码分析
+                # 港股和指数显示3个标签页（基本信息包含基本面分析）
                 tab1, tab2, tab3 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯"])
                 
                 with tab1:
@@ -59,7 +60,7 @@ def display_stock_info(stock_code, market_type):
                 with tab3:
                     display_news(stock_code)
             else:
-                # A股、指数、基金等显示全部标签页
+                # A股、基金等显示4个标签页（基本信息包含基本面分析）
                 tab1, tab2, tab3, tab4 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析"])
                 
                 with tab1:
@@ -158,9 +159,112 @@ def display_basic_info(stock_code):
                 st.caption(f"数据更新时间: {realtime_data.timestamp}")
         else:
             st.warning(f"未能获取到股票 {stock_code} 的实时数据")
+        
+        # === 基本面分析部分 - 合并到基本信息中 ===
+        st.divider()  # 添加分隔线
+        st.subheader("基本面分析")
+        
+        try:
+            # 使用简化版基本面数据获取函数
+            from providers.stock_tools import get_stock_name, get_market_info
+            
+            # 获取股票名称和市场信息
+            market_info = get_market_info(stock_code)
+            stock_name_fundamental = get_stock_name(stock_code, 'stock')
+            
+            # 获取基本面数据（这里实际上就是上面已经获取的stock_info）
+            fundamental_data = data_manager.get_stock_info(stock_code)
+            
+            # 初始化session_state
+            if "ai_fundamental_report" not in st.session_state:
+                st.session_state.ai_fundamental_report = {}
+                
+            # 检查是否需要执行AI基本面分析
+            if st.session_state.get('run_fundamental_ai_for', '') == stock_code:
+                # 重置触发状态，避免重复分析
+                st.session_state['run_fundamental_ai_for'] = ''
+                
+                with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
+                    try:
+                        # 生成基本面分析报告
+                        fundamental_report, timestamp = generate_fundamental_analysis_report(
+                            stock_code=stock_code,
+                            stock_name=stock_name_fundamental,
+                            market_info=market_info,
+                            fundamental_data=fundamental_data
+                        )
+                        
+                        # 保存分析报告到session_state
+                        st.session_state.ai_fundamental_report[stock_code] = {
+                            "report": fundamental_report,
+                            "timestamp": timestamp
+                        }
+                        
+                    except ImportError as e:
+                        st.error(f"加载AI基本面分析模块失败: {str(e)}")
+                        st.info("请确保已安装必要的依赖和正确配置API密钥")
+                        
+                    except Exception as e:
+                        st.error(f"AI基本面分析失败: {str(e)}")
+                        st.info("请稍后再试或联系管理员")
+            
+            # 显示AI基本面分析报告(如果有)
+            if stock_code in st.session_state.ai_fundamental_report:
+                with st.expander("🤖 AI 基本面分析报告", expanded=True):
+                    st.markdown(st.session_state.ai_fundamental_report[stock_code]["report"])
+                    st.caption(f"分析报告生成时间: {st.session_state.ai_fundamental_report[stock_code]['timestamp']}")
+                    
+        except Exception as e:
+            st.error(f"加载基本面分析数据失败: {str(e)}")
             
     except Exception as e:
         st.error(f"获取基本信息失败: {str(e)}")
+
+
+def run_ai_analysis(stock_code, df):
+    """
+    执行AI分析并返回分析报告
+    
+    Args:
+        stock_code: 股票代码
+        df: K线数据DataFrame
+        
+    Returns:
+        tuple: (分析报告文本, 时间戳)
+    """
+    try:
+        # 获取股票名称和市场信息
+        market_info = get_market_info(stock_code)
+        stock_name = get_stock_name(stock_code, 'stock')
+        
+        # 获取技术指标
+        indicators = get_indicators(df)
+        
+        # 生成分析报告
+        ai_report = generate_stock_analysis_report(
+            stock_code=stock_code,
+            stock_name=stock_name,
+            market_info=market_info,
+            df=df,
+            indicators=indicators
+        )
+        
+        # 生成时间戳
+        import datetime
+        now = datetime.datetime.now()
+        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        return ai_report, timestamp
+        
+    except ImportError as e:
+        st.error(f"加载AI分析模块失败: {str(e)}")
+        st.info("请确保已安装必要的依赖和正确配置API密钥")
+        return f"分析失败: {str(e)}", None
+        
+    except Exception as e:
+        st.error(f"AI分析失败: {str(e)}")
+        st.info("请稍后再试或联系管理员")
+        return f"分析失败: {str(e)}", None
 
 
 def display_market_trend(stock_code):
@@ -181,6 +285,31 @@ def display_market_trend(stock_code):
             # 转换为DataFrame
             df = pd.DataFrame([k.__dict__ for k in kline_data])
             df = df.sort_values('datetime')
+            
+            # 初始化session_state
+            if "ai_report" not in st.session_state:
+                st.session_state.ai_report = {}
+                
+            # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
+            if st.session_state.get('run_ai_for', '') == stock_code:
+                # 重置触发状态，避免重复分析
+                st.session_state['run_ai_for'] = ''
+                
+                with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
+                    # 执行AI分析
+                    report, timestamp = run_ai_analysis(stock_code, df)
+                    
+                    if timestamp:  # 如果分析成功
+                        st.session_state.ai_report[stock_code] = {
+                            "report": report,
+                            "timestamp": timestamp
+                        }
+            
+            # 显示AI分析报告(如果有)
+            if stock_code in st.session_state.ai_report:
+                with st.expander("🤖 AI 行情分析报告", expanded=True):
+                    st.markdown(st.session_state.ai_report[stock_code]["report"])
+                    st.caption(f"分析报告生成时间: {st.session_state.ai_report[stock_code]['timestamp']}")
             
             # 风险指标计算
             if len(df) >= 5:  # 确保有足够数据计算风险指标
@@ -316,6 +445,49 @@ def display_news(stock_code):
         if stock_data and 'company_news' in stock_data:
             news_data = stock_data['company_news']
             
+            # 初始化session_state
+            if "ai_news_report" not in st.session_state:
+                st.session_state.ai_news_report = {}
+                
+            # 检查是否需要执行AI新闻分析 (由app.py中的查询按钮和checkbox控制)
+            if st.session_state.get('run_news_ai_for', '') == stock_code:
+                # 重置触发状态，避免重复分析
+                st.session_state['run_news_ai_for'] = ''
+                
+                with st.spinner("🤖 AI正在分析相关新闻，请稍候..."):
+                    try:                        
+                        # 获取股票名称和市场信息
+                        market_info = get_market_info(stock_code)
+                        stock_name = get_stock_name(stock_code, 'stock')
+                        
+                        # 生成新闻分析报告
+                        news_report, timestamp = generate_news_analysis_report(
+                            stock_code=stock_code,
+                            stock_name=stock_name,
+                            market_info=market_info,
+                            news_data=news_data
+                        )
+                        
+                        # 保存分析报告到session_state
+                        st.session_state.ai_news_report[stock_code] = {
+                            "report": news_report,
+                            "timestamp": timestamp
+                        }
+                        
+                    except ImportError as e:
+                        st.error(f"加载AI新闻分析模块失败: {str(e)}")
+                        st.info("请确保已安装必要的依赖和正确配置API密钥")
+                        
+                    except Exception as e:
+                        st.error(f"AI新闻分析失败: {str(e)}")
+                        st.info("请稍后再试或联系管理员")
+            
+            # 显示AI新闻分析报告(如果有)
+            if stock_code in st.session_state.ai_news_report:
+                with st.expander("🤖 AI 新闻分析报告", expanded=True):
+                    st.markdown(st.session_state.ai_news_report[stock_code]["report"])
+                    st.caption(f"分析报告生成时间: {st.session_state.ai_news_report[stock_code]['timestamp']}")
+            
             # 显示新闻数量统计
             st.info(f"共获取到 {len(news_data)} 条相关新闻")
             
@@ -375,110 +547,175 @@ def display_chips_analysis(stock_code):
     st.subheader("筹码分析")
     
     try:
-        # 使用stock_tools模块中的explain_cyq_data函数
-        # 由于该函数本身是打印输出，我们需要改造一下来适应Streamlit
+        # 使用简化版筹码数据获取函数
+        from providers.stock_tools import get_chip_analysis_data, get_stock_name
         
-        import io
-        import contextlib
+        # 获取筹码分析数据
+        chip_data = get_chip_analysis_data(stock_code)
+        stock_name = get_stock_name(stock_code, 'stock')
         
-        # 获取函数输出
-        f = io.StringIO()
-        with contextlib.redirect_stdout(f):
-            latest = explain_cyq_data(stock_code)
-        
-        output = f.getvalue()
-        
-        if output:
-            # 显示筹码数据
-            st.text(output)
+        # 初始化session_state
+        if "ai_chip_report" not in st.session_state:
+            st.session_state.ai_chip_report = {}
             
-            if latest is not None:
-                # 用可视化方式显示筹码数据
-                with st.expander("筹码可视化", expanded=True):
-                    # 创建筹码区间的图表
-                    data = {
-                        '成本区间': [f"{latest['90成本-低']:.2f}-{latest['90成本-高']:.2f}", 
-                                  f"{latest['70成本-低']:.2f}-{latest['70成本-高']:.2f}"],
-                        '占比': [90, 70],
-                        '集中度': [latest['90集中度']*100, latest['70集中度']*100]
+        # 检查是否需要执行AI筹码分析 (由app.py中的查询按钮和checkbox控制)
+        if st.session_state.get('run_chip_ai_for', '') == stock_code:
+            # 重置触发状态，避免重复分析
+            st.session_state['run_chip_ai_for'] = ''
+            
+            with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
+                try:
+                    # 生成筹码分析报告
+                    chip_report, timestamp = generate_chip_analysis_report(
+                        stock_code=stock_code,
+                        stock_name=stock_name,
+                        chip_data=chip_data
+                    )
+                    
+                    # 保存分析报告到session_state
+                    st.session_state.ai_chip_report[stock_code] = {
+                        "report": chip_report,
+                        "timestamp": timestamp
                     }
                     
-                    df = pd.DataFrame(data)
+                except ImportError as e:
+                    st.error(f"加载AI筹码分析模块失败: {str(e)}")
+                    st.info("请确保已安装必要的依赖和正确配置API密钥")
                     
-                    # 显示筹码数据表格
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # 获取价格和集中度数据来绘制图表
-                    try:
-                        # 获取筹码数据
-                        cyq_data = ak.stock_cyq_em(stock_code)
-                        
-                        if not cyq_data.empty:
-                            # 绘制获利比例变化趋势
-                            st.subheader("获利比例变化趋势")
-                            
-                            # 使用plotly创建获利比例图表
-                            fig_profit = go.Figure()
-                            
-                            # 确保日期列是日期类型
-                            cyq_data['日期'] = pd.to_datetime(cyq_data['日期'])
-                            
-                            # 添加获利比例曲线
-                            fig_profit.add_trace(go.Scatter(
-                                x=cyq_data['日期'], 
-                                y=cyq_data['获利比例'],
-                                mode='lines',
-                                name='获利比例',
-                                line=dict(color='#4CAF50', width=2)
-                            ))
-                            
-                            # 设置图表布局
-                            fig_profit.update_layout(
-                                xaxis_title='日期',
-                                yaxis_title='获利比例 (%)',
-                                height=350,
-                                margin=dict(l=0, r=0, t=10, b=0),
-                                # 禁用滚轮缩放
-                                xaxis=dict(rangeslider=dict(visible=False)),
-                                yaxis=dict(fixedrange=True)
-                            )
-                            
-                            # 显示获利比例图表
-                            st.plotly_chart(fig_profit, use_container_width=True, config={"scrollZoom": False})
-                            
-                            # 绘制平均成本变化趋势
-                            st.subheader("平均成本变化趋势")
-                            
-                            # 使用plotly创建平均成本图表
-                            fig_cost = go.Figure()
-                            
-                            # 添加平均成本曲线
-                            fig_cost.add_trace(go.Scatter(
-                                x=cyq_data['日期'], 
-                                y=cyq_data['平均成本'],
-                                mode='lines',
-                                name='平均成本',
-                                line=dict(color='#1E88E5', width=2)
-                            ))
-                            
-                            # 设置图表布局
-                            fig_cost.update_layout(
-                                xaxis_title='日期',
-                                yaxis_title='平均成本',
-                                height=350,
-                                margin=dict(l=0, r=0, t=10, b=0),
-                                # 禁用滚轮缩放
-                                xaxis=dict(rangeslider=dict(visible=False)),
-                                yaxis=dict(fixedrange=True)
-                            )
-                            
-                            # 显示平均成本图表
-                            st.plotly_chart(fig_cost, use_container_width=True, config={"scrollZoom": False})
-                    except Exception as e:
-                        st.error(f"绘制筹码图表失败: {str(e)}")
-        else:
-            st.info("未能获取到筹码分析数据")
+                except Exception as e:
+                    st.error(f"AI筹码分析失败: {str(e)}")
+                    st.info("请稍后再试或联系管理员")
+                
+        # 显示AI筹码分析报告(如果有)
+        if stock_code in st.session_state.ai_chip_report:
+            with st.expander("🤖 AI 筹码分析报告", expanded=True):
+                st.markdown(st.session_state.ai_chip_report[stock_code]["report"])
+                st.caption(f"分析报告生成时间: {st.session_state.ai_chip_report[stock_code]['timestamp']}")
+        
+        # 检查是否有错误信息
+        if "error" in chip_data:
+            st.error(chip_data["error"])
+            return
             
+        # 基础筹码数据显示
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("获利比例", f"{chip_data['profit_ratio']:.2f}%")
+            
+            # 获利状态分析
+            if chip_data['profit_ratio'] > 70:
+                st.info("获利盘较重，上涨可能遇到抛售压力")
+            elif chip_data['profit_ratio'] < 30:
+                st.success("获利盘较轻，上涨阻力相对较小")
+            else:
+                st.info("获利盘适中")
+                
+        with col2:
+            st.metric("平均成本", f"{chip_data['avg_cost']:.2f}元")
+            
+            # 集中度状态分析
+            if chip_data['concentration_90'] < 0.1:
+                st.success("筹码高度集中，可能形成重要支撑/阻力")
+            elif chip_data['concentration_90'] > 0.2:
+                st.info("筹码较为分散，成本分布较广")
+            else:
+                st.info("筹码集中度适中")
+        
+        # 用可视化方式显示筹码数据
+        with st.expander("筹码分布数据", expanded=True):
+            # 创建筹码区间的图表
+            data = {
+                '成本区间': [f"{chip_data['cost_90_low']:.2f}-{chip_data['cost_90_high']:.2f}", 
+                         f"{chip_data['cost_70_low']:.2f}-{chip_data['cost_70_high']:.2f}"],
+                '占比': [90, 70],
+                '集中度': [chip_data['concentration_90']*100, chip_data['concentration_70']*100]
+            }
+            
+            df = pd.DataFrame(data)
+            
+            # 显示筹码数据表格
+            st.dataframe(df, use_container_width=True)
+            
+            # 显示关键价位
+            st.subheader("关键价格区间")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("支撑位", f"{chip_data['support_level']:.2f}元")
+            with col2:
+                st.metric("阻力位", f"{chip_data['resistance_level']:.2f}元")
+            with col3:
+                st.metric("成本中枢", f"{chip_data['cost_center']:.2f}元")
+        
+        # 获取历史数据绘制图表
+        try:
+            # 获取筹码数据
+            cyq_data = ak.stock_cyq_em(stock_code)
+            
+            if not cyq_data.empty:
+                # 绘制获利比例变化趋势
+                st.subheader("获利比例变化趋势")
+                
+                # 使用plotly创建获利比例图表
+                fig_profit = go.Figure()
+                
+                # 确保日期列是日期类型
+                cyq_data['日期'] = pd.to_datetime(cyq_data['日期'])
+                
+                # 添加获利比例曲线
+                fig_profit.add_trace(go.Scatter(
+                    x=cyq_data['日期'], 
+                    y=cyq_data['获利比例'],
+                    mode='lines',
+                    name='获利比例',
+                    line=dict(color='#4CAF50', width=2)
+                ))
+                
+                # 设置图表布局
+                fig_profit.update_layout(
+                    xaxis_title='日期',
+                    yaxis_title='获利比例 (%)',
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    # 禁用滚轮缩放
+                    xaxis=dict(rangeslider=dict(visible=False)),
+                    yaxis=dict(fixedrange=True)
+                )
+                
+                # 显示获利比例图表
+                st.plotly_chart(fig_profit, use_container_width=True, config={"scrollZoom": False})
+                
+                # 绘制平均成本变化趋势
+                st.subheader("平均成本变化趋势")
+                
+                # 使用plotly创建平均成本图表
+                fig_cost = go.Figure()
+                
+                # 添加平均成本曲线
+                fig_cost.add_trace(go.Scatter(
+                    x=cyq_data['日期'], 
+                    y=cyq_data['平均成本'],
+                    mode='lines',
+                    name='平均成本',
+                    line=dict(color='#1E88E5', width=2)
+                ))
+                
+                # 设置图表布局
+                fig_cost.update_layout(
+                    xaxis_title='日期',
+                    yaxis_title='平均成本',
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    # 禁用滚轮缩放
+                    xaxis=dict(rangeslider=dict(visible=False)),
+                    yaxis=dict(fixedrange=True)
+                )
+                
+                # 显示平均成本图表
+                st.plotly_chart(fig_cost, use_container_width=True, config={"scrollZoom": False})
+        except Exception as e:
+            st.error(f"绘制筹码图表失败: {str(e)}")
+    
     except Exception as e:
         st.error(f"加载筹码分析数据失败: {str(e)}")
 
@@ -512,6 +749,9 @@ def main():
             placeholder=f"请输入{market_type}代码或股票名称",
             help=f"输入{market_type}代码或股票名称进行查询"
         )
+        
+    # 设置AI分析选项
+    use_ai_analysis = st.checkbox("🤖 AI分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
     
     # 查询按钮
     col1, col2, col3 = st.columns([1, 1, 4])
@@ -538,6 +778,10 @@ def main():
                 st.info(f"已将输入 \"{stock_input.strip()}\" 识别为指数 {stock_name} ({stock_code})")
             else:
                 st.info(f"已将输入 \"{stock_input.strip()}\" 识别为{market_type} {stock_name} ({stock_code})")
+        
+        # 如果选择了AI分析，设置标志以便在显示行情走势时触发分析
+        if use_ai_analysis:
+            st.session_state['run_ai_for'] = stock_code
         
         # 调用显示函数
         display_stock_info(stock_code, market_type)

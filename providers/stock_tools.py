@@ -280,6 +280,64 @@ def explain_cyq_data(stock_code):
         print(f"获取筹码数据失败: {e}")
         return None
 
+def get_chip_analysis_data(stock_code):
+    """
+    获取股票筹码分析数据
+    
+    Args:
+        stock_code: 股票代码
+        
+    Returns:
+        dict: 包含筹码分布和关键指标的字典
+    """
+    try:
+        # 获取筹码数据
+        cyq_data = ak.stock_cyq_em(stock_code)
+        
+        if cyq_data is None or cyq_data.empty:
+            return {"error": f"无法获取 {stock_code} 的筹码数据"}
+        
+        # 获取最新数据
+        latest = cyq_data.iloc[-1]
+        
+        # 获取历史数据
+        historical_data = {
+            "dates": cyq_data['日期'].tolist()[-30:],  # 最近30天
+            "profit_ratio": cyq_data['获利比例'].tolist()[-30:],  # 获利比例
+            "avg_cost": cyq_data['平均成本'].tolist()[-30:],  # 平均成本
+        }
+        
+        # 构建筹码数据字典
+        chip_data = {
+            "latest_date": latest['日期'],
+            "profit_ratio": latest['获利比例'],
+            "avg_cost": latest['平均成本'],
+            "cost_90_low": latest['90成本-低'],
+            "cost_90_high": latest['90成本-高'],
+            "concentration_90": latest['90集中度'],
+            "cost_70_low": latest['70成本-低'],
+            "cost_70_high": latest['70成本-高'],
+            "concentration_70": latest['70集中度'],
+            "historical": historical_data,
+            
+            # 分析结果
+            "support_level": latest['90成本-低'],  # 支撑位
+            "resistance_level": latest['90成本-高'],  # 阻力位
+            "cost_center": latest['平均成本'],  # 成本中枢
+        }
+        
+        # 添加简单的分析指标
+        chip_data["analysis"] = {
+            "profit_status": "高获利" if latest['获利比例'] > 70 else ("低获利" if latest['获利比例'] < 30 else "中性获利"),
+            "concentration_status": "高度集中" if latest['90集中度'] < 0.1 else ("分散" if latest['90集中度'] > 0.2 else "适中"),
+            "risk_level": "高" if latest['获利比例'] > 80 and latest['90集中度'] < 0.15 else ("低" if latest['获利比例'] < 20 and latest['90集中度'] < 0.15 else "中"),
+        }
+        
+        return chip_data
+        
+    except Exception as e:
+        return {"error": f"获取筹码数据失败: {str(e)}"}
+
 from datetime import datetime, timedelta
 from stockstats import wrap
 
@@ -317,6 +375,32 @@ def _judge_macd_trend(stock_data) -> str:
             
     except:
         return "无法判断"
+
+def get_market_info(stock_code):
+    """
+    获取股票市场信息
+    
+    Args:
+        stock_code: 股票代码
+    
+    Returns:
+        dict: 包含市场类型、货币等信息的字典
+    """
+    # 简单判断市场类型
+    is_china = stock_code.isdigit() and len(stock_code) == 6
+    is_hk = '.HK' in stock_code or stock_code.startswith('HK')
+    is_us = not is_china and not is_hk
+    
+    market_info = {
+        'is_china': is_china,
+        'is_hk': is_hk,
+        'is_us': is_us,
+        'market_name': '中国A股' if is_china else ('港股' if is_hk else '美股'),
+        'currency_name': '人民币' if is_china else ('港币' if is_hk else '美元'),
+        'currency_symbol': '¥' if is_china else ('HK$' if is_hk else '$')
+    }
+    
+    return market_info
 
 def get_indicators(df):
     # 使用stockstats计算技术指标

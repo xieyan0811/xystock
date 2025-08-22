@@ -95,7 +95,7 @@ def main():
         # 添加侧边栏导航菜单
         menu = st.radio(
             "选择功能:",
-            ["📊 股票分析", "🔢 Token统计"],
+            ["📊 股票分析", "🔢 Token统计", "⚙️ 设置"],
             index=0,
             help="选择要使用的功能模块"
         )
@@ -112,6 +112,10 @@ def main():
         # 导入并显示Token统计页面
         from ui.components.page_token_stats import main as display_token_stats
         display_token_stats()
+    elif menu == "⚙️ 设置":
+        # 导入并显示设置页面
+        from ui.components.page_settings import main as display_settings
+        display_settings()
 
 
 def display_stock_analysis_page():
@@ -138,6 +142,12 @@ def display_stock_analysis_page():
         placeholder=f"请输入{market_type}代码",
         help=f"输入{market_type}代码进行查询"
     )
+    
+    # 添加AI分析选项
+    use_ai_analysis = st.checkbox("🤖 AI行情分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
+    use_ai_news_analysis = st.checkbox("📰 AI新闻分析", value=False, help="选中后将使用AI对股票相关新闻进行分析")
+    use_ai_chip_analysis = st.checkbox("🧮 AI筹码分析", value=False, help="选中后将使用AI对股票筹码分布进行分析")
+    use_ai_fundamental_analysis = st.checkbox("📊 AI基本面分析", value=False, help="选中后将使用AI对股票基本面数据进行深入分析")
     
     # 查询按钮
     col1, col2, col3 = st.columns([1, 1, 4])
@@ -180,6 +190,32 @@ def display_stock_analysis_page():
                         else:
                             # 调用普通股票数据获取函数并显示结果
                             from ui.components.page_stock import display_stock_info
+                            
+                            # 如果选择了AI分析，设置session_state参数
+                            if use_ai_analysis:
+                                if "ai_report" not in st.session_state:
+                                    st.session_state.ai_report = {}
+                                st.session_state['run_ai_for'] = stock_code.strip()
+                            
+                            # 如果选择了AI新闻分析，设置session_state参数
+                            if use_ai_news_analysis:
+                                if "ai_news_report" not in st.session_state:
+                                    st.session_state.ai_news_report = {}
+                                st.session_state['run_news_ai_for'] = stock_code.strip()
+                            
+                            # 如果选择了AI筹码分析，设置session_state参数
+                            if use_ai_chip_analysis:
+                                if "ai_chip_report" not in st.session_state:
+                                    st.session_state.ai_chip_report = {}
+                                st.session_state['run_chip_ai_for'] = stock_code.strip()
+                            
+                            # 如果选择了AI基本面分析，设置session_state参数
+                            if use_ai_fundamental_analysis:
+                                if "ai_fundamental_report" not in st.session_state:
+                                    st.session_state.ai_fundamental_report = {}
+                                st.session_state['run_fundamental_ai_for'] = stock_code.strip()
+                                
+                            # 显示股票信息
                             display_stock_info(stock_code.strip(), market_type)
                         
                         # 额外的展示选项

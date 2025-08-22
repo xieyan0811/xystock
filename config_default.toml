@@ -6,7 +6,8 @@ TIMEOUT = 60  # 请求超时时间（秒）
 MAX_RETRIES = 3  # 最大重试次数
 
 # 默认模型配置
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODEL = "deepseek-chat"
+INFERENCE_MODEL = "deepseek-chat"
 DEFAULT_TEMPERATURE = 0.7
 
 [LLM_LOGGING]

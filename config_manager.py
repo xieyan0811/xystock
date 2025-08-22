@@ -39,11 +39,12 @@ class ConfigManager:
         """获取默认配置"""
         return {
             'LLM_OPENAI': {
-                'API_KEY': os.getenv('OPENAI_API_KEY', ''),
-                'BASE_URL': '',
+                'API_KEY': os.getenv('OPENAI_API_KEY', 'sk-'),
+                'BASE_URL': 'https://api.deepseek.com',
                 'TIMEOUT': 60,
                 'MAX_RETRIES': 3,
-                'DEFAULT_MODEL': 'gpt-4o',
+                'DEFAULT_MODEL': 'deepseek-chat',
+                'INFERENCE_MODEL': 'deepseek-chat',
                 'DEFAULT_TEMPERATURE': 0.7
             },
             'LLM_LOGGING': {
