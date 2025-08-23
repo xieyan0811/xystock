@@ -122,7 +122,7 @@ class MarketIndicators:
             df_stocks = df_stocks.dropna(subset=['涨跌幅'])
             # 修复：将涨跌幅列转为float，避免字符串比较报错
             df_stocks["涨跌幅"] = pd.to_numeric(df_stocks["涨跌幅"], errors="coerce")
-            print(df_stocks)
+            #print(df_stocks)
             
             up_count = (df_stocks["涨跌幅"] > 0).sum()
             down_count = (df_stocks["涨跌幅"] < 0).sum()
@@ -147,21 +147,13 @@ class MarketIndicators:
             print(f"   ❌ 获取涨跌家数失败: {e}")
                 
         try:
-            # 2. 融资融券数据
+            # 2. 融资融券数据 - 沪深两市
             print("   获取融资融券...")
-            df_margin = ak.macro_china_market_margin_sh()
-            if not df_margin.empty:
-                latest_margin = df_margin.iloc[-1]
-                sentiment_data.update({
-                    'margin_balance': float(latest_margin.get('融资融券余额', 0)),
-                    'margin_buy_balance': float(latest_margin.get('融资余额', 0)),
-                    'margin_sell_balance': float(latest_margin.get('融券余额', 0)),
-                    'margin_date': str(latest_margin.get('日期', datetime.now().strftime('%Y-%m-%d'))),
-                })
-                print(f"      融资余额: {sentiment_data['margin_buy_balance']:.2f}")
-            
-        except Exception as e:
-            print(f"   ❌ 获取融资融券失败: {e}")
+            margin_data = self._get_margin_data_unified(include_historical=False)
+            sentiment_data.update(margin_data)
+            print(f"      上交所融资余额: {margin_data['margin_sh_buy']:.2f}亿")
+            print(f"      深交所融资余额: {margin_data['margin_sz_buy']:.2f}亿")
+            print(f"      两市融资余额合计: {margin_data['margin_buy_balance']:.2f}亿")
             
         except Exception as e:
             print(f"   ❌ 获取融资融券失败: {e}")
@@ -207,7 +199,7 @@ class MarketIndicators:
         print("   ✓ 估值指标获取完成")
         return valuation_data
     
-    def get_money_flow_indicators(self, debug=False) -> Dict:
+    def get_money_flow_indicators(self, debug=True) -> Dict:
         """
         获取资金流向指标
         
@@ -307,40 +299,35 @@ class MarketIndicators:
     
     def get_detailed_margin_data(self) -> Dict:
         """
-        获取详细融资融券数据
+        获取详细融资融券数据（沪深两市）
         
         Returns:
             包含详细融资融券数据的字典
         """
-        print("💳 获取详细融资融券数据...")
+        print("💳 获取详细融资融券数据（沪深两市）...")
         
         try:
-            # 上交所融资融券数据
-            df_margin_sh = ak.macro_china_market_margin_sh()
+            margin_data = self._get_margin_data_unified(include_historical=True)
             
-            if df_margin_sh.empty:
+            if margin_data['margin_buy_balance'] == 0:
                 return {}
             
-            # 获取最近数据
-            latest = df_margin_sh.iloc[-1]
-            prev_week = df_margin_sh.iloc[-7] if len(df_margin_sh) >= 7 else df_margin_sh.iloc[0]
-            
-            # 计算变化
-            margin_change = latest.get('融资余额', 0) - prev_week.get('融资余额', 0)
-            
             result = {
-                'latest_date': str(latest.get('日期', '')),
-                'margin_balance': float(latest.get('融资融券余额', 0)),
-                'margin_buy_balance': float(latest.get('融资余额', 0)),
-                'margin_sell_balance': float(latest.get('融券余额', 0)),
-                'weekly_change': float(margin_change),
-                'change_ratio': float(margin_change / prev_week.get('融资余额', 1) * 100) if prev_week.get('融资余额', 0) > 0 else 0,
-                'historical_data': df_margin_sh.tail(10)[['日期', '融资余额', '融券余额', '融资融券余额']].to_dict('records'),
+                'latest_date': margin_data['margin_date'],
+                'margin_balance': margin_data['margin_balance'],
+                'margin_buy_balance': margin_data['margin_buy_balance'],
+                'margin_sell_balance': margin_data['margin_sell_balance'],
+                'weekly_change': margin_data.get('weekly_change', 0),
+                'change_ratio': margin_data.get('change_ratio', 0),
+                'shanghai': margin_data.get('shanghai', {}),
+                'shenzhen': margin_data.get('shenzhen', {}),
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            print(f"   ✓ 融资余额: {result['margin_buy_balance']:.2f}")
-            print(f"   ✓ 周变化: {result['weekly_change']:+.2f}亿 ({result['change_ratio']:+.2f}%)")
+            print(f"   ✓ 上交所融资余额: {margin_data['margin_sh_buy']:.2f}亿")
+            print(f"   ✓ 深交所融资余额: {margin_data['margin_sz_buy']:.2f}亿")
+            print(f"   ✓ 两市融资余额合计: {result['margin_buy_balance']:.2f}亿")
+            print(f"   ✓ 两市周变化: {result['weekly_change']:+.2f}亿 ({result['change_ratio']:+.2f}%)")
             
             return result
             
@@ -348,6 +335,117 @@ class MarketIndicators:
             print(f"   ❌ 获取融资融券数据失败: {e}")
             return {}
 
+    def _get_margin_data_unified(self, include_historical: bool = False) -> Dict:
+        """
+        统一的融资融券数据获取方法（沪深两市）
+        
+        Args:
+            include_historical: 是否包含历史数据和变化趋势
+            
+        Returns:
+            包含融资融券数据的字典
+        """
+        result = {
+            'margin_balance': 0,
+            'margin_buy_balance': 0,
+            'margin_sell_balance': 0,
+            'margin_sh_balance': 0,
+            'margin_sh_buy': 0,
+            'margin_sh_sell': 0,
+            'margin_sz_balance': 0,
+            'margin_sz_buy': 0,
+            'margin_sz_sell': 0,
+            'margin_date': datetime.now().strftime('%Y-%m-%d'),
+        }
+        
+        sh_data = {}
+        sz_data = {}
+        
+        try:
+            # 获取上交所数据
+            df_margin_sh = ak.macro_china_market_margin_sh()
+            if not df_margin_sh.empty:
+                latest_sh = df_margin_sh.iloc[-1]
+                margin_sh_balance = float(latest_sh.get('融资融券余额', 0))
+                margin_sh_buy = float(latest_sh.get('融资余额', 0))
+                margin_sh_sell = float(latest_sh.get('融券余额', 0))
+                margin_date = str(latest_sh.get('日期', result['margin_date']))
+                
+                result.update({
+                    'margin_sh_balance': margin_sh_balance,
+                    'margin_sh_buy': margin_sh_buy,
+                    'margin_sh_sell': margin_sh_sell,
+                    'margin_date': margin_date,
+                })
+                
+                if include_historical:
+                    prev_week_sh = df_margin_sh.iloc[-7] if len(df_margin_sh) >= 7 else df_margin_sh.iloc[0]
+                    margin_change_sh = margin_sh_buy - prev_week_sh.get('融资余额', 0)
+                    
+                    sh_data = {
+                        'margin_balance': margin_sh_balance,
+                        'margin_buy_balance': margin_sh_buy,
+                        'margin_sell_balance': margin_sh_sell,
+                        'weekly_change': float(margin_change_sh),
+                        'change_ratio': float(margin_change_sh / prev_week_sh.get('融资余额', 1) * 100) if prev_week_sh.get('融资余额', 0) > 0 else 0,
+                        'historical_data': df_margin_sh.tail(10)[['日期', '融资余额', '融券余额', '融资融券余额']].to_dict('records'),
+                    }
+                
+        except Exception as e:
+            print(f"      ❌ 获取上交所融资融券失败: {e}")
+        
+        try:
+            # 获取深交所数据
+            df_margin_sz = ak.macro_china_market_margin_sz()
+            if not df_margin_sz.empty:
+                latest_sz = df_margin_sz.iloc[-1]
+                margin_sz_balance = float(latest_sz.get('融资融券余额', 0))
+                margin_sz_buy = float(latest_sz.get('融资余额', 0))
+                margin_sz_sell = float(latest_sz.get('融券余额', 0))
+                
+                result.update({
+                    'margin_sz_balance': margin_sz_balance,
+                    'margin_sz_buy': margin_sz_buy,
+                    'margin_sz_sell': margin_sz_sell,
+                })
+                
+                if include_historical:
+                    prev_week_sz = df_margin_sz.iloc[-7] if len(df_margin_sz) >= 7 else df_margin_sz.iloc[0]
+                    margin_change_sz = margin_sz_buy - prev_week_sz.get('融资余额', 0)
+                    
+                    sz_data = {
+                        'margin_balance': margin_sz_balance,
+                        'margin_buy_balance': margin_sz_buy,
+                        'margin_sell_balance': margin_sz_sell,
+                        'weekly_change': float(margin_change_sz),
+                        'change_ratio': float(margin_change_sz / prev_week_sz.get('融资余额', 1) * 100) if prev_week_sz.get('融资余额', 0) > 0 else 0,
+                        'historical_data': df_margin_sz.tail(10)[['日期', '融资余额', '融券余额', '融资融券余额']].to_dict('records'),
+                    }
+                
+        except Exception as e:
+            print(f"      ❌ 获取深交所融资融券失败: {e}")
+        
+        # 汇总两市数据
+        total_margin_balance = result['margin_sh_balance'] + result['margin_sz_balance']
+        total_margin_buy = result['margin_sh_buy'] + result['margin_sz_buy']
+        total_margin_sell = result['margin_sh_sell'] + result['margin_sz_sell']
+        
+        result.update({
+            'margin_balance': float(total_margin_balance),
+            'margin_buy_balance': float(total_margin_buy),
+            'margin_sell_balance': float(total_margin_sell),
+        })
+        
+        if include_historical:
+            total_weekly_change = sh_data.get('weekly_change', 0) + sz_data.get('weekly_change', 0)
+            result.update({
+                'weekly_change': float(total_weekly_change),
+                'change_ratio': float(total_weekly_change / (total_margin_buy - total_weekly_change) * 100) if (total_margin_buy - total_weekly_change) > 0 else 0,
+                'shanghai': sh_data,
+                'shenzhen': sz_data,
+            })
+        
+        return result
     
     def get_comprehensive_market_report(self, index_name: str = '上证指数') -> Dict:
         """

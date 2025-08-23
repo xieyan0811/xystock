@@ -173,7 +173,7 @@ class TestMarketIndicators(unittest.TestCase):
         """测试资金流向指标"""
         print(f"\n💸 测试资金流向指标...")
         
-        money_flow = self.market_collector.get_money_flow_indicators()
+        money_flow = self.market_collector.get_money_flow_indicators(debug=True)
         
         assert isinstance(money_flow, dict), "资金流向指标应返回字典类型"
         
@@ -419,7 +419,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         print("   步骤4: 获取市场情绪...")
         sentiment = self.market_collector.get_market_sentiment_indicators()
         valuation = self.market_collector.get_valuation_indicators()
-        money_flow = self.market_collector.get_money_flow_indicators()
+        money_flow = self.market_collector.get_money_flow_indicators(debug=True)
         
         available_modules = []
         if sentiment: available_modules.append("情绪")
@@ -469,7 +469,7 @@ def run_market_tests():
     
     # 导入检查
     try:
-        from data.market_tools import MarketIndicators
+        from providers.market_tools import MarketIndicators
         print("   ✓ 大盘分析模块导入成功")
     except ImportError as e:
         print(f"   ❌ 模块导入失败: {e}")
