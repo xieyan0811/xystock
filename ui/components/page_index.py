@@ -4,6 +4,15 @@
 
 import streamlit as st
 from datetime import datetime
+import sys
+import os
+
+# 添加项目根目录到Python路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
 
 def display_technical_indicators(tech_data):
     st.markdown("""
@@ -27,13 +36,13 @@ def display_technical_indicators(tech_data):
     with col1:
         latest_close = tech_data.get('latest_close', 0)
         if latest_close:
-            st.metric("当前点位", f"{latest_close:.2f}")
+            st.metric("当前点位", format_price(latest_close))
         else:
             st.metric("当前点位", "N/A")
     with col2:
         latest_volume = tech_data.get('latest_volume', 0)
         if latest_volume:
-            st.metric("成交量", f"{latest_volume:,.0f}")
+            st.metric("成交量", format_volume(latest_volume))
         else:
             st.metric("成交量", "N/A")
     with col3:
@@ -46,29 +55,29 @@ def display_technical_indicators(tech_data):
         ma_col1, ma_col2, ma_col3, ma_col4 = st.columns(4)
         with ma_col1:
             ma_5 = tech_data.get('ma_5')
-            st.metric("MA5", f"{ma_5:.2f}" if ma_5 else "N/A")
+            st.metric("MA5", format_price(ma_5) if ma_5 else "N/A")
         with ma_col2:
             ma_10 = tech_data.get('ma_10')
-            st.metric("MA10", f"{ma_10:.2f}" if ma_10 else "N/A")
+            st.metric("MA10", format_price(ma_10) if ma_10 else "N/A")
         with ma_col3:
             ma_20 = tech_data.get('ma_20')
-            st.metric("MA20", f"{ma_20:.2f}" if ma_20 else "N/A")
+            st.metric("MA20", format_price(ma_20) if ma_20 else "N/A")
         with ma_col4:
             ma_60 = tech_data.get('ma_60')
-            st.metric("MA60", f"{ma_60:.2f}" if ma_60 else "N/A")
+            st.metric("MA60", format_price(ma_60) if ma_60 else "N/A")
     
     # 技术指标
     with st.expander("🔢 技术指标", expanded=True):
         tech_col1, tech_col2, tech_col3 = st.columns(3)
         with tech_col1:
             rsi_14 = tech_data.get('rsi_14')
-            st.metric("RSI(14)", f"{rsi_14:.2f}" if rsi_14 else "N/A")
+            st.metric("RSI(14)", format_price(rsi_14) if rsi_14 else "N/A")
         with tech_col2:
             kdj_k = tech_data.get('kdj_k')
-            st.metric("KDJ-K", f"{kdj_k:.2f}" if kdj_k else "N/A")
+            st.metric("KDJ-K", format_price(kdj_k) if kdj_k else "N/A")
         with tech_col3:
             kdj_d = tech_data.get('kdj_d')
-            st.metric("KDJ-D", f"{kdj_d:.2f}" if kdj_d else "N/A")
+            st.metric("KDJ-D", format_price(kdj_d) if kdj_d else "N/A")
         
         # MACD指标
         macd_col1, macd_col2, macd_col3 = st.columns(3)
@@ -86,25 +95,25 @@ def display_technical_indicators(tech_data):
         boll_col1, boll_col2, boll_col3 = st.columns(3)
         with boll_col1:
             boll_upper = tech_data.get('boll_upper')
-            st.metric("布林上轨", f"{boll_upper:.2f}" if boll_upper else "N/A")
+            st.metric("布林上轨", format_price(boll_upper) if boll_upper else "N/A")
         with boll_col2:
             boll_middle = tech_data.get('boll_middle')
-            st.metric("布林中轨", f"{boll_middle:.2f}" if boll_middle else "N/A")
+            st.metric("布林中轨", format_price(boll_middle) if boll_middle else "N/A")
         with boll_col3:
             boll_lower = tech_data.get('boll_lower')
-            st.metric("布林下轨", f"{boll_lower:.2f}" if boll_lower else "N/A")
+            st.metric("布林下轨", format_price(boll_lower) if boll_lower else "N/A")
         
         # 其他技术指标
         other_col1, other_col2, other_col3 = st.columns(3)
         with other_col1:
             wr_14 = tech_data.get('wr_14')
-            st.metric("威廉指标", f"{wr_14:.2f}" if wr_14 else "N/A")
+            st.metric("威廉指标", format_price(wr_14) if wr_14 else "N/A")
         with other_col2:
             cci_14 = tech_data.get('cci_14')
-            st.metric("CCI指标", f"{cci_14:.2f}" if cci_14 else "N/A")
+            st.metric("CCI指标", format_price(cci_14) if cci_14 else "N/A")
         with other_col3:
             kdj_j = tech_data.get('kdj_j')
-            st.metric("KDJ-J", f"{kdj_j:.2f}" if kdj_j else "N/A")
+            st.metric("KDJ-J", format_price(kdj_j) if kdj_j else "N/A")
 
 
 def display_market_sentiment(sentiment_data):
@@ -119,36 +128,37 @@ def display_market_sentiment(sentiment_data):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         up_stocks = sentiment_data.get('up_stocks', 0)
-        st.metric("上涨家数", f"{up_stocks:,}" if up_stocks else "N/A", delta=None)
+        st.metric("上涨家数", format_large_number(up_stocks, 0) if up_stocks else "N/A", delta=None)
     with col2:
         down_stocks = sentiment_data.get('down_stocks', 0)
-        st.metric("下跌家数", f"{down_stocks:,}" if down_stocks else "N/A", delta=None)
+        st.metric("下跌家数", format_large_number(down_stocks, 0) if down_stocks else "N/A", delta=None)
     with col3:
         flat_stocks = sentiment_data.get('flat_stocks', 0)
-        st.metric("平盘家数", f"{flat_stocks:,}" if flat_stocks else "N/A", delta=None)
+        st.metric("平盘家数", format_large_number(flat_stocks, 0) if flat_stocks else "N/A", delta=None)
     with col4:
         up_ratio = sentiment_data.get('up_ratio', 0)
-        st.metric("上涨占比", f"{up_ratio*100:.1f}%" if up_ratio else "N/A")
+        st.metric("上涨占比", format_percentage(up_ratio*100) if up_ratio else "N/A")
     
     # 融资融券数据
     with st.expander("💳 融资融券数据", expanded=True):
         margin_col1, margin_col2, margin_col3 = st.columns(3)
         with margin_col1:
             margin_balance = sentiment_data.get('margin_balance')
-            st.metric("融资融券余额", f"{margin_balance:.2f}亿" if margin_balance else "N/A")
+            st.metric("融资融券余额", f"{format_large_number(margin_balance)}" if margin_balance else "N/A")
         with margin_col2:
             margin_buy = sentiment_data.get('margin_buy_balance')
-            st.metric("融资余额", f"{margin_buy:.2f}亿" if margin_buy else "N/A")
+            st.metric("融资余额", f"{format_large_number(margin_buy)}" if margin_buy else "N/A")
         with margin_col3:
             margin_sell = sentiment_data.get('margin_sell_balance')
-            st.metric("融券余额", f"{margin_sell:.2f}亿" if margin_sell else "N/A")
+            st.metric("融券余额", f"{format_large_number(margin_sell)}" if margin_sell else "N/A")
     
+        st.metric("统计时间", sentiment_data.get('margin_date', 'N/A'))
     # 市场统计
     with st.expander("📊 市场统计", expanded=False):
         stats_col1, stats_col2 = st.columns(2)
         with stats_col1:
             total_stocks = sentiment_data.get('total_stocks', 0)
-            st.metric("总股票数", f"{total_stocks:,}" if total_stocks else "N/A")
+            st.metric("总股票数", format_large_number(total_stocks, 0) if total_stocks else "N/A")
         with stats_col2:
             down_ratio = sentiment_data.get('down_ratio', 0)
             st.metric("下跌占比", f"{down_ratio*100:.1f}%" if down_ratio else "N/A")

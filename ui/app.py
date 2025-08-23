@@ -5,9 +5,7 @@ XY Stock 股票分析系统 - Streamlit Web界面
 import streamlit as st
 import sys
 import os
-import json
 from datetime import datetime
-from importlib import import_module
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,6 +14,11 @@ sys.path.append(project_root)
 # 导入本地股票数据提供者
 from ui.stock_provider import stock_data_provider
 from ui.config import MARKET_TYPES, STOCK_CODE_EXAMPLES
+from ui.components.page_settings import main as display_settings
+from ui.components.page_token_stats import main as display_token_stats
+from ui.components.page_stock import display_stock_info
+from providers.market_tools import MarketIndicators
+from providers.stock_tools import normalize_stock_input
 
 # 隐藏默认导航的CSS
 hide_default_nav = """
@@ -110,11 +113,9 @@ def main():
         display_stock_analysis_page()
     elif menu == "🔢 Token统计":
         # 导入并显示Token统计页面
-        from ui.components.page_token_stats import main as display_token_stats
         display_token_stats()
     elif menu == "⚙️ 设置":
         # 导入并显示设置页面
-        from ui.components.page_settings import main as display_settings
         display_settings()
 
 
@@ -174,10 +175,8 @@ def display_stock_analysis_page():
                         # 根据市场类型选择不同的查询方法
                         if market_type == "指数":
                             # 调用指数分析功能
-                            from providers.market_tools import MarketIndicators
                             market_collector = MarketIndicators()
-                            from providers.stock_tools import normalize_stock_input
-                            code,name = normalize_stock_input(stock_code.strip(), 'index')
+                            stock_code,name = normalize_stock_input(stock_code.strip(), 'index')
                             result = market_collector.get_comprehensive_market_report(name)
                             
                             if isinstance(result, dict):
@@ -188,9 +187,8 @@ def display_stock_analysis_page():
                                 st.success("查询成功！")
                                 st.code(str(result), language="text")
                         else:
-                            # 调用普通股票数据获取函数并显示结果
-                            from ui.components.page_stock import display_stock_info
-                            
+                            # 调用普通股票数据获取函数并显示结果                            
+                            stock_code,name = normalize_stock_input(stock_code.strip())
                             # 如果选择了AI分析，设置session_state参数
                             if use_ai_analysis:
                                 if "ai_report" not in st.session_state:

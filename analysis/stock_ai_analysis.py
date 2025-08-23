@@ -6,6 +6,15 @@
 from typing import Dict, Any, List, Tuple
 from llm.openai_client import OpenAIClient
 import datetime
+import sys
+import os
+
+# 添加项目根目录到Python路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
 
 def generate_stock_analysis_report(
     stock_code: str,
@@ -81,12 +90,12 @@ def generate_stock_analysis_report(
 
 1. 最新交易日数据：
 - 日期：{latest_data['datetime']}
-- 开盘价：{latest_data['open']:.2f}
-- 最高价：{latest_data['high']:.2f}
-- 最低价：{latest_data['low']:.2f}
-- 收盘价：{latest_data['close']:.2f}
-- 成交量：{latest_data['volume']}
-- 价格变化：{price_change:.2f}({price_change_pct:.2f}%)
+- 开盘价：{format_price(latest_data['open'])}
+- 最高价：{format_price(latest_data['high'])}
+- 最低价：{format_price(latest_data['low'])}
+- 收盘价：{format_price(latest_data['close'])}
+- 成交量：{format_volume(latest_data['volume'])}
+- 价格变化：{format_change(price_change, price_change_pct)}
 
 2. 技术指标数据：
 {indicators_data}
@@ -273,16 +282,16 @@ def generate_chip_analysis_report(
 
 **基础筹码数据:**
 - 最新日期: {chip_data.get('latest_date', '未知')}
-- 获利比例: {chip_data.get('profit_ratio', 0):.2f}%
-- 平均成本: {chip_data.get('avg_cost', 0):.2f}元
+- 获利比例: {format_percentage(chip_data.get('profit_ratio', 0) * 100)}
+- 平均成本: {format_price(chip_data.get('avg_cost', 0))}元
 
 **90%筹码分布:**
-- 成本区间: {chip_data.get('cost_90_low', 0):.2f} - {chip_data.get('cost_90_high', 0):.2f}元
-- 集中度: {chip_data.get('concentration_90', 0)*100:.2f}%
+- 成本区间: {format_price(chip_data.get('cost_90_low', 0))} - {format_price(chip_data.get('cost_90_high', 0))}元
+- 集中度: {format_percentage(chip_data.get('concentration_90', 0)*100)}
 
 **70%筹码分布:**
-- 成本区间: {chip_data.get('cost_70_low', 0):.2f} - {chip_data.get('cost_70_high', 0):.2f}元
-- 集中度: {chip_data.get('concentration_70', 0)*100:.2f}%
+- 成本区间: {format_price(chip_data.get('cost_70_low', 0))} - {format_price(chip_data.get('cost_70_high', 0))}元
+- 集中度: {format_percentage(chip_data.get('concentration_70', 0)*100)}
 
 **分析指标:**
 - 获利状态: {chip_data.get('analysis', {}).get('profit_status', '未知')}
@@ -290,9 +299,9 @@ def generate_chip_analysis_report(
 - 风险水平: {chip_data.get('analysis', {}).get('risk_level', '未知')}
 
 **技术参考位:**
-- 支撑位: {chip_data.get('support_level', 0):.2f}元
-- 阻力位: {chip_data.get('resistance_level', 0):.2f}元
-- 成本中枢: {chip_data.get('cost_center', 0):.2f}元
+- 支撑位: {format_price(chip_data.get('support_level', 0))}元
+- 阻力位: {format_price(chip_data.get('resistance_level', 0))}元
+- 成本中枢: {format_price(chip_data.get('cost_center', 0))}元
 
 请进行专业的筹码分析，包括主力行为判断、套牢盘分析、支撑压力位和交易建议。分析报告不超过500字。"""
         }
@@ -353,9 +362,9 @@ def generate_fundamental_analysis_report(
     stock_info_dict = {
         "股票代码": company_profile.symbol,
         "股票名称": company_profile.name,
-        "净利润": company_profile.net_profit,
-        "总市值": f"{company_profile.total_market_value:.2f}{currency_symbol}" if company_profile.total_market_value else None,
-        "流通市值": f"{company_profile.circulating_market_value:.2f}{currency_symbol}" if company_profile.circulating_market_value else None,
+        "净利润": format_large_number(company_profile.net_profit) if company_profile.net_profit else None,
+        "总市值": f"{format_market_value(company_profile.total_market_value)}{currency_symbol}" if company_profile.total_market_value else None,
+        "流通市值": f"{format_market_value(company_profile.circulating_market_value)}{currency_symbol}" if company_profile.circulating_market_value else None,
         "所处行业": company_profile.industry,
         "市盈率(动)": company_profile.pe_ratio,
         "市净率": company_profile.pb_ratio,

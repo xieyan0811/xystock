@@ -228,7 +228,7 @@ def explain_cyq_data(stock_code):
         print("=" * 50)
         
         # 基础指标
-        print(f"📈 获利比例: {latest['获利比例']:.2f}%")
+        print(f"📈 获利比例: {latest['获利比例']*100:.2f}%")
         if latest['获利比例'] > 0.7:
             print("   → 获利盘较重，上涨可能遇到抛售压力")
         elif latest['获利比例'] < 0.3:
@@ -241,7 +241,7 @@ def explain_cyq_data(stock_code):
         # 90%筹码分布
         print(f"\n🎯 90%筹码分布:")
         print(f"   成本区间: {latest['90成本-低']:.2f} - {latest['90成本-高']:.2f}元")
-        print(f"   集中度: {latest['90集中度']:.2f}%")
+        print(f"   集中度: {latest['90集中度']*100:.2f}%")
         
         range_90 = latest['90成本-高'] - latest['90成本-低']
         if latest['90集中度'] < 0.1:
@@ -254,7 +254,7 @@ def explain_cyq_data(stock_code):
         # 70%筹码分布
         print(f"\n🎯 70%筹码分布:")
         print(f"   成本区间: {latest['70成本-低']:.2f} - {latest['70成本-高']:.2f}元")
-        print(f"   集中度: {latest['70集中度']:.2f}%")
+        print(f"   集中度: {latest['70集中度']*100:.2f}%")
         
         # 交易策略建议
         print(f"\n💡 交易策略参考:")
@@ -328,9 +328,9 @@ def get_chip_analysis_data(stock_code):
         
         # 添加简单的分析指标
         chip_data["analysis"] = {
-            "profit_status": "高获利" if latest['获利比例'] > 70 else ("低获利" if latest['获利比例'] < 30 else "中性获利"),
+            "profit_status": "高获利" if latest['获利比例'] > 0.7 else ("低获利" if latest['获利比例'] < 0.3 else "中性获利"),
             "concentration_status": "高度集中" if latest['90集中度'] < 0.1 else ("分散" if latest['90集中度'] > 0.2 else "适中"),
-            "risk_level": "高" if latest['获利比例'] > 80 and latest['90集中度'] < 0.15 else ("低" if latest['获利比例'] < 20 and latest['90集中度'] < 0.15 else "中"),
+            "risk_level": "高" if latest['获利比例'] > 0.8 and latest['90集中度'] < 0.15 else ("低" if latest['获利比例'] < 0.2 and latest['90集中度'] < 0.15 else "中"),
         }
         
         return chip_data

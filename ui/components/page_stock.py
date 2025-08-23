@@ -4,12 +4,10 @@
 
 import sys
 import os
-import numpy as np
 import pandas as pd
 import streamlit as st
 import akshare as ak
 import plotly.graph_objects as go
-import plotly.express as px
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,10 +18,10 @@ if project_root not in sys.path:
 from providers.stock_data_fetcher import data_manager
 from providers.risk_metrics import calculate_portfolio_risk
 from providers.news_tools import get_stock_news_by_akshare
-from providers.stock_tools import explain_cyq_data
 from ui.components.page_index import display_technical_indicators
 from providers.stock_tools import get_stock_name, get_market_info, get_indicators
 from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
+from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
 
 def display_stock_info(stock_code, market_type):
     """
@@ -112,25 +110,25 @@ def display_basic_info(stock_code):
                         st.info(f"所属行业: {stock_info.industry}")
                     
                     if stock_info.total_market_value:
-                        st.write(f"总市值: {stock_info.total_market_value/100000000:.2f}亿")
+                        st.write(f"总市值: {format_market_value(stock_info.total_market_value)}")
                         
                     if stock_info.circulating_market_value:
-                        st.write(f"流通市值: {stock_info.circulating_market_value/100000000:.2f}亿")
+                        st.write(f"流通市值: {format_market_value(stock_info.circulating_market_value)}")
 
                 st.metric(
                     label="当前价格", 
-                    value=f"{realtime_data.current_price:.2f}",
-                    delta=f"{realtime_data.change:.2f} ({realtime_data.change_percent:.2f}%)"
+                    value=f"{format_price(realtime_data.current_price)}",
+                    delta=format_change(realtime_data.change, realtime_data.change_percent)
                 )
                 
-                st.metric("成交量", f"{realtime_data.volume:,}")
+                st.metric("成交量", format_volume(realtime_data.volume))
 
             with col2:
                 # 当日价格区间
-                st.write(f"**开盘价:** {realtime_data.open:.2f}")
-                st.write(f"**最高价:** {realtime_data.high:.2f}")
-                st.write(f"**最低价:** {realtime_data.low:.2f}")
-                st.write(f"**昨收价:** {realtime_data.prev_close:.2f}")
+                st.write(f"**开盘价:** {format_price(realtime_data.open)}")
+                st.write(f"**最高价:** {format_price(realtime_data.high)}")
+                st.write(f"**最低价:** {format_price(realtime_data.low)}")
+                st.write(f"**昨收价:** {format_price(realtime_data.prev_close)}")
                 
                 if stock_info:
                     # 估值指标
@@ -164,10 +162,11 @@ def display_basic_info(stock_code):
         st.divider()  # 添加分隔线
         st.subheader("基本面分析")
         
+        print("AAAAAAAAAAAAAAAAAa 1")
         try:
             # 使用简化版基本面数据获取函数
             from providers.stock_tools import get_stock_name, get_market_info
-            
+            print("AAAAAAAAAAAAAAAAAa 2")
             # 获取股票名称和市场信息
             market_info = get_market_info(stock_code)
             stock_name_fundamental = get_stock_name(stock_code, 'stock')
@@ -179,20 +178,25 @@ def display_basic_info(stock_code):
             if "ai_fundamental_report" not in st.session_state:
                 st.session_state.ai_fundamental_report = {}
                 
+            print("AAAAAAAAAAAAAAAAAa 3", st.session_state.get('run_fundamental_ai_for', ''), stock_code)
             # 检查是否需要执行AI基本面分析
             if st.session_state.get('run_fundamental_ai_for', '') == stock_code:
                 # 重置触发状态，避免重复分析
+                print("AAAAAAAAAAAAAAAAAa 4")
                 st.session_state['run_fundamental_ai_for'] = ''
                 
                 with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
+                    print("AAAAAAAAAAAAAAAAAa 5")
                     try:
                         # 生成基本面分析报告
+                        print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
                         fundamental_report, timestamp = generate_fundamental_analysis_report(
                             stock_code=stock_code,
-                            stock_name=stock_name_fundamental,
+                            stock_name=str(stock_name_fundamental),
                             market_info=market_info,
                             fundamental_data=fundamental_data
                         )
+                        print(fundamental_report)  # 调试用
                         
                         # 保存分析报告到session_state
                         st.session_state.ai_fundamental_report[stock_code] = {
@@ -418,11 +422,11 @@ def display_market_trend(stock_code):
             # 显示最近交易日信息
             last_row = df.iloc[-1]
             cols = st.columns(5)
-            cols[0].metric("开盘", f"{last_row['open']:.2f}")
-            cols[1].metric("最高", f"{last_row['high']:.2f}")
-            cols[2].metric("最低", f"{last_row['low']:.2f}")
-            cols[3].metric("收盘", f"{last_row['close']:.2f}")
-            cols[4].metric("成交量", f"{last_row['volume']:,}")
+            cols[0].metric("开盘", format_price(last_row['open']))
+            cols[1].metric("最高", format_price(last_row['high']))
+            cols[2].metric("最低", format_price(last_row['low']))
+            cols[3].metric("收盘", format_price(last_row['close']))
+            cols[4].metric("成交量", format_volume(last_row['volume']))
             
             indicators = get_indicators(df)
             display_technical_indicators(indicators)
@@ -601,18 +605,18 @@ def display_chips_analysis(stock_code):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.metric("获利比例", f"{chip_data['profit_ratio']:.2f}%")
+            st.metric("获利比例", format_percentage(chip_data['profit_ratio'] * 100))
             
             # 获利状态分析
-            if chip_data['profit_ratio'] > 70:
+            if chip_data['profit_ratio'] > 0.7:
                 st.info("获利盘较重，上涨可能遇到抛售压力")
-            elif chip_data['profit_ratio'] < 30:
+            elif chip_data['profit_ratio'] < 0.3:
                 st.success("获利盘较轻，上涨阻力相对较小")
             else:
                 st.info("获利盘适中")
                 
         with col2:
-            st.metric("平均成本", f"{chip_data['avg_cost']:.2f}元")
+            st.metric("平均成本", f"{format_price(chip_data['avg_cost'])}元")
             
             # 集中度状态分析
             if chip_data['concentration_90'] < 0.1:
@@ -626,8 +630,8 @@ def display_chips_analysis(stock_code):
         with st.expander("筹码分布数据", expanded=True):
             # 创建筹码区间的图表
             data = {
-                '成本区间': [f"{chip_data['cost_90_low']:.2f}-{chip_data['cost_90_high']:.2f}", 
-                         f"{chip_data['cost_70_low']:.2f}-{chip_data['cost_70_high']:.2f}"],
+                '成本区间': [f"{format_price(chip_data['cost_90_low'])}-{format_price(chip_data['cost_90_high'])}", 
+                         f"{format_price(chip_data['cost_70_low'])}-{format_price(chip_data['cost_70_high'])}"],
                 '占比': [90, 70],
                 '集中度': [chip_data['concentration_90']*100, chip_data['concentration_70']*100]
             }
@@ -641,11 +645,11 @@ def display_chips_analysis(stock_code):
             st.subheader("关键价格区间")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("支撑位", f"{chip_data['support_level']:.2f}元")
+                st.metric("支撑位", f"{format_price(chip_data['support_level'])}元")
             with col2:
-                st.metric("阻力位", f"{chip_data['resistance_level']:.2f}元")
+                st.metric("阻力位", f"{format_price(chip_data['resistance_level'])}元")
             with col3:
-                st.metric("成本中枢", f"{chip_data['cost_center']:.2f}元")
+                st.metric("成本中枢", f"{format_price(chip_data['cost_center'])}元")
         
         # 获取历史数据绘制图表
         try:
@@ -662,10 +666,10 @@ def display_chips_analysis(stock_code):
                 # 确保日期列是日期类型
                 cyq_data['日期'] = pd.to_datetime(cyq_data['日期'])
                 
-                # 添加获利比例曲线
+                # 添加获利比例曲线 (转换为百分比显示)
                 fig_profit.add_trace(go.Scatter(
                     x=cyq_data['日期'], 
-                    y=cyq_data['获利比例'],
+                    y=cyq_data['获利比例'] * 100,  # 转换为百分比
                     mode='lines',
                     name='获利比例',
                     line=dict(color='#4CAF50', width=2)

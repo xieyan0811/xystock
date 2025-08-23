@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import akshare as ak
+import efinance as ef
 from stockstats import wrap
 from typing import Dict, List, Optional, Union
 import warnings
@@ -33,7 +34,7 @@ class MarketIndicators:
             '科创50': '000688'
         }
         
-    def get_index_technical_indicators(self, index_name: str = '上证指数', period: int = 100) -> Dict:
+    def get_index_technical_indicators(self, index_name: str = '上证指数', period: int = 100):
         """
         获取指数技术指标
         
@@ -113,9 +114,15 @@ class MarketIndicators:
         sentiment_data = {}
         
         try:
-            # 1. 涨跌家数统计
+            # 1. 涨跌家数统计 - 使用efinance获取实时行情
             print("   获取涨跌家数...")
-            df_stocks = ak.stock_zh_a_spot_em()
+            df_stocks = ef.stock.get_realtime_quotes()
+            
+            # 过滤掉涨跌幅为空的数据
+            df_stocks = df_stocks.dropna(subset=['涨跌幅'])
+            # 修复：将涨跌幅列转为float，避免字符串比较报错
+            df_stocks["涨跌幅"] = pd.to_numeric(df_stocks["涨跌幅"], errors="coerce")
+            print(df_stocks)
             
             up_count = (df_stocks["涨跌幅"] > 0).sum()
             down_count = (df_stocks["涨跌幅"] < 0).sum()
@@ -134,6 +141,9 @@ class MarketIndicators:
             print(f"      上涨: {up_count} | 下跌: {down_count} | 平盘: {flat_count}")
             
         except Exception as e:
+            import traceback
+            
+            traceback.print_exc()
             print(f"   ❌ 获取涨跌家数失败: {e}")
                 
         try:
@@ -148,7 +158,10 @@ class MarketIndicators:
                     'margin_sell_balance': float(latest_margin.get('融券余额', 0)),
                     'margin_date': str(latest_margin.get('日期', datetime.now().strftime('%Y-%m-%d'))),
                 })
-                print(f"      融资余额: {sentiment_data['margin_buy_balance']:.2f}亿")
+                print(f"      融资余额: {sentiment_data['margin_buy_balance']:.2f}")
+            
+        except Exception as e:
+            print(f"   ❌ 获取融资融券失败: {e}")
             
         except Exception as e:
             print(f"   ❌ 获取融资融券失败: {e}")
@@ -246,20 +259,29 @@ class MarketIndicators:
         print(f"📈 获取涨跌幅排行榜(Top {top_n})...")
         
         try:
-            # 获取所有股票数据
-            df_all_stocks = ak.stock_zh_a_spot_em()
+            # 获取所有股票数据 - 使用efinance
+            df_all_stocks = ef.stock.get_realtime_quotes()
             
             if df_all_stocks.empty:
                 return {}
             
+            # 过滤掉涨跌幅为空的数据
+            df_all_stocks = df_all_stocks.dropna(subset=['涨跌幅'])
+            
             # 涨幅榜
-            top_gainers = df_all_stocks.nlargest(top_n, '涨跌幅')[['名称', '最新价', '涨跌幅', '成交额']]
+            top_gainers = df_all_stocks.nlargest(top_n, '涨跌幅')[['股票名称', '最新价', '涨跌幅', '成交额']]
+            # 重命名列以保持兼容性
+            top_gainers = top_gainers.rename(columns={'股票名称': '名称'})
             
             # 跌幅榜
-            top_losers = df_all_stocks.nsmallest(top_n, '涨跌幅')[['名称', '最新价', '涨跌幅', '成交额']]
+            top_losers = df_all_stocks.nsmallest(top_n, '涨跌幅')[['股票名称', '最新价', '涨跌幅', '成交额']]
+            # 重命名列以保持兼容性
+            top_losers = top_losers.rename(columns={'股票名称': '名称'})
             
             # 成交额排行
-            top_volume = df_all_stocks.nlargest(top_n, '成交额')[['名称', '最新价', '涨跌幅', '成交额']]
+            top_volume = df_all_stocks.nlargest(top_n, '成交额')[['股票名称', '最新价', '涨跌幅', '成交额']]
+            # 重命名列以保持兼容性
+            top_volume = top_volume.rename(columns={'股票名称': '名称'})
             
             result = {
                 'top_gainers': top_gainers.to_dict('records'),
@@ -317,7 +339,7 @@ class MarketIndicators:
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            print(f"   ✓ 融资余额: {result['margin_buy_balance']:.2f}亿")
+            print(f"   ✓ 融资余额: {result['margin_buy_balance']:.2f}")
             print(f"   ✓ 周变化: {result['weekly_change']:+.2f}亿 ({result['change_ratio']:+.2f}%)")
             
             return result
@@ -489,7 +511,7 @@ def display_market_report(report: Dict):
         print(f"\n😊 市场情绪指标:")
         print(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
         print(f"   上涨占比: {sentiment.get('up_ratio', 0)*100:.1f}%")
-        print(f"   融资余额: {sentiment.get('margin_buy_balance', 'N/A'):.2f}亿")
+        print(f"   融资余额: {sentiment.get('margin_buy_balance', 'N/A'):.2f}")
     
     # 估值水平
     valuation = report['valuation_indicators']
@@ -502,7 +524,7 @@ def display_market_report(report: Dict):
     money = report['money_flow_indicators']
     if money:
         print(f"\n💸 资金流向:")
-        print(f"   M2余额: {money.get('m2_amount', 'N/A'):.2f}万亿")
+        print(f"   M2余额: {money.get('m2_amount', 'N/A'):.2f}亿")
         print(f"   M2增速: {money.get('m2_growth', 'N/A'):.2f}%")
         print(f"   M1增速: {money.get('m1_growth', 'N/A'):.2f}%")
     

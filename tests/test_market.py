@@ -134,7 +134,7 @@ class TestMarketIndicators(unittest.TestCase):
             # 检查融资融券数据
             if 'margin_buy_balance' in sentiment:
                 margin_balance = sentiment['margin_buy_balance']
-                print(f"   ✓ 融资余额: {margin_balance:.2f}亿")
+                print(f"   ✓ 融资余额: {margin_balance:.2f}")
                 assert margin_balance >= 0, "融资余额不能为负"
             
             print(f"   ✓ 市场情绪指标获取成功，包含 {len(sentiment)} 个指标")
@@ -255,7 +255,7 @@ class TestMarketIndicators(unittest.TestCase):
                 weekly_change = margin_detail.get('weekly_change', 0)
                 change_ratio = margin_detail.get('change_ratio', 0)
                 
-                print(f"   ✓ 融资余额: {balance:.2f}亿")
+                print(f"   ✓ 融资余额: {balance:.2f}")
                 print(f"   ✓ 周变化: {weekly_change:+.2f}亿 ({change_ratio:+.2f}%)")
                 
                 # 验证数据合理性
