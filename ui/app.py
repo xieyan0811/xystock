@@ -15,7 +15,7 @@ from ui.components.page_settings import main as display_settings
 from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
 from ui.components.page_market_overview import display_market_overview
-from providers.stock_tools import normalize_stock_input
+from providers.stock_utils import normalize_stock_input
 
 def main():
     """主应用程序"""

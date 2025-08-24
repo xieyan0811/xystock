@@ -17,7 +17,7 @@ if project_root not in sys.path:
 from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
 from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.stock_tools import get_stock_name, get_market_info, get_indicators, normalize_stock_input
+from providers.stock_utils import get_stock_name, get_market_info, get_indicators, normalize_stock_input
 from providers.stock_data_fetcher import data_manager
 from providers.risk_metrics import calculate_portfolio_risk
 from providers.news_tools import get_stock_news_by_akshare
@@ -512,7 +512,7 @@ def display_chips_analysis(stock_code):
     
     try:
         # 使用简化版筹码数据获取函数
-        from providers.stock_tools import get_chip_analysis_data, get_stock_name
+        from providers.stock_utils import get_chip_analysis_data, get_stock_name
         
         # 获取筹码分析数据
         chip_data = get_chip_analysis_data(stock_code)

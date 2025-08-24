@@ -28,7 +28,7 @@ warnings.filterwarnings('ignore')
 import akshare as ak
 import pandas as pd
 import efinance as ef
-from providers.stock_tools import get_indicators
+from providers.stock_utils import get_indicators
 
 
 # =========================
