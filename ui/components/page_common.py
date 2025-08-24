@@ -21,7 +21,7 @@ def display_technical_indicators(tech_data):
     """, unsafe_allow_html=True)
 
     st.subheader("技术指标分析")
-    
+
     if not tech_data:
         st.warning("未获取到技术指标数据")
         return

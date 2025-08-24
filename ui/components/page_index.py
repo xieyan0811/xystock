@@ -3,6 +3,7 @@
 """
 
 import streamlit as st
+import datetime
 import sys
 import os
 
@@ -12,9 +13,13 @@ if project_root not in sys.path:
 
 from utils.format_utils import format_large_number, format_percentage
 from ui.components.page_common import display_technical_indicators
+from providers.market_tools import MarketIndicators
 
-def display_market_sentiment(sentiment_data):
+def display_market_sentiment(sentiment_data = None):
     """显示市场情绪指标卡片"""
+    
+    if sentiment_data is None:
+        sentiment_data = MarketIndicators().get_market_sentiment_indicators()
     
     st.subheader("市场情绪指标")
     
@@ -62,9 +67,12 @@ def display_market_sentiment(sentiment_data):
             st.metric("下跌占比", f"{down_ratio*100:.1f}%" if down_ratio else "N/A")
 
 
-def display_valuation_level(valuation_data):
+def display_valuation_level(valuation_data=None):
     """显示估值水平卡片"""
     
+    if valuation_data is None:
+        valuation_data = MarketIndicators().get_valuation_indicators()
+        
     st.subheader("估值水平")
     
     if not valuation_data:
@@ -119,9 +127,12 @@ def display_valuation_level(valuation_data):
             st.write(f"**股息水平:** {div_color} {div_level}")
 
 
-def display_money_flow(money_data):
+def display_money_flow(money_data=None):
     """显示资金流向卡片"""
     
+    if money_data is None:
+        money_data = MarketIndicators().get_money_flow_indicators()
+
     st.subheader("资金流向")
     
     if not money_data:
@@ -173,6 +184,37 @@ def display_market_summary(result_data):
     if not summary_data:
         st.info("综合摘要数据准备中...")
         return
+    
+    # 检查是否需要生成AI分析报告
+    if st.session_state.get('run_ai_index_for'):
+        stock_code_for_ai = st.session_state.get('run_ai_index_for')
+        
+        # 检查是否已经生成过这个股票的AI报告
+        if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
+            with st.spinner("🤖 AI正在分析指数数据..."):
+                try:
+                    from analysis.stock_ai_analysis import generate_index_analysis_report
+                    
+                    # 使用result_data作为市场报告数据
+                    ai_report, timestamp = generate_index_analysis_report(
+                        stock_code_for_ai,
+                        result_data.get('focus_index', stock_code_for_ai),
+                        result_data
+                    )
+                    
+                    # 保存AI报告到session_state
+                    if "ai_index_report" not in st.session_state:
+                        st.session_state.ai_index_report = {}
+                    st.session_state.ai_index_report[stock_code_for_ai] = {
+                        'report': ai_report,
+                        'timestamp': timestamp
+                    }
+                except Exception as e:
+                    st.error(f"AI分析失败: {str(e)}")
+        
+        # 清除标志
+        if 'run_ai_index_for' in st.session_state:
+            del st.session_state['run_ai_index_for']
     
     # 显示各个维度的摘要
     if 'technical_trend' in summary_data:
@@ -229,25 +271,56 @@ def display_market_summary(result_data):
         st.write(f"市场综合评级: {rating} (评分: {score:.1f}/{total_indicators})")
     else:
         st.write("市场综合评级: 数据不足")
-
-
-def display_index_info(result_data):
-    """显示指数分析结果"""
     
+    # 显示AI分析报告（如果有的话）
+    current_stock_code = result_data.get('focus_index', '')
+    if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
+        ai_data = st.session_state['ai_index_report'][current_stock_code]
+        
+        st.markdown("---")
+        st.subheader("🤖 AI深度分析")
+        
+        # 显示AI分析报告
+        with st.expander("📊 AI指数分析报告", expanded=True):
+            st.markdown(ai_data['report'])
+            st.caption(f"分析时间: {ai_data['timestamp']}")
+            
+            # 添加重新分析按钮
+            if st.button("🔄 重新生成AI分析", key="regenerate_ai_index"):
+                # 清除当前AI报告并重新生成
+                if current_stock_code in st.session_state['ai_index_report']:
+                    del st.session_state['ai_index_report'][current_stock_code]
+                st.session_state['run_ai_index_for'] = current_stock_code
+                st.rerun()
+
+
+def display_index_info(stock_code, stock_name):
+    """显示指数分析结果"""
+        
+    market_collector = MarketIndicators()
+    result_data = market_collector.get_comprehensive_market_report(stock_name)
+
     if not result_data:
         st.error("未获取到指数数据")
         return
     
+    if not isinstance(result_data, dict):
+        st.code(str(result_data), language="text")
+        return
+        
     # 显示报告基本信息
-    st.info(f"📊 **{result_data.get('focus_index', '未知指数')}** 综合分析报告")
-    st.caption(f"报告时间: {result_data.get('report_time', '未知')}")
+    report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    st.info(f"📊 **{stock_name}** 综合分析报告")
+    st.caption(f"报告时间: {report_time}")
     
     # 创建标签页
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 技术指标", "😊 市场情绪", "💰 估值水平", "💸 资金流向", "📋 综合摘要"])
     
     with tab1:
-        display_technical_indicators(result_data.get('technical_indicators', {}))
-    
+        # tech_data = market_collector.get_index_technical_indicators(stock_name)
+        tech_data = result_data.get('technical_indicators', {})
+        display_technical_indicators(tech_data)
+
     with tab2:
         display_market_sentiment(result_data.get('sentiment_indicators', {}))
     
@@ -256,7 +329,7 @@ def display_index_info(result_data):
     
     with tab4:
         display_money_flow(result_data.get('money_flow_indicators', {}))
-    
+
     with tab5:
         display_market_summary(result_data)
 

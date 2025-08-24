@@ -441,3 +441,97 @@ def generate_fundamental_analysis_report(
     except Exception as e:
         # 如果API调用失败，返回错误信息
         return f"生成基本面分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def generate_index_analysis_report(
+    stock_code: str,
+    stock_name: str,
+    market_report_data: Dict[str, Any]
+):
+    """
+    生成指数AI分析报告（精简版）
+    
+    Args:
+        stock_code: 指数代码
+        stock_name: 指数名称
+        market_report_data: 市场综合报告数据
+        
+    Returns:
+        Tuple[str, str]: (分析报告, 时间戳)
+    """
+    # 初始化OpenAI客户端
+    client = OpenAIClient()
+    
+    # 从market_tools模块导入报告格式化函数
+    try:
+        from providers.market_tools import get_market_report
+        market_report_text = get_market_report(market_report_data)
+    except Exception as e:
+        market_report_text = f"市场报告数据格式化失败: {str(e)}"
+    
+    # 构建分析提示（精简版）
+    system_message = f"""您是一位资深的市场分析师，专门提供简洁高效的A股指数分析。
+
+**要求：**
+- 简洁明了，避免冗长描述
+- 突出关键信号和核心结论
+- 提供直接可执行的建议
+- 控制总字数在800字以内
+
+**分析框架：**
+使用简短的段落和要点，重点关注实用性。"""
+
+    user_message = f"""基于以下数据，请对{stock_name}({stock_code})提供精简分析报告：
+
+{market_report_text}
+
+**报告格式要求：**
+
+## 📊 技术面（简述）
+- 趋势状态：[多头/空头/震荡]
+- 关键信号：[超买/超卖/中性] + [金叉/死叉]
+- 重要位置：支撑___ | 阻力___
+
+## 💭 情绪面（要点）
+- 市场状态：[过热/冷静/平衡]
+- 资金情况：融资余额及影响
+
+## 💰 估值面（核心）
+- PE水平：当前值及历史位置
+- 投资价值：[高/中/低]
+
+## 🏦 资金面（简要）
+- 流动性：M1/M2增速要点
+- 政策信号：对市场影响
+
+## 🎯 操作建议
+- 短期策略：[积极/谨慎/观望]
+- 仓位建议：具体比例
+- 关注要点：1-2个核心指标
+
+## ⚠️ 风险提示
+列出1-3个主要风险点
+
+请保持内容精炼，每个部分2-3句话即可，总字数控制在800字以内。"""
+
+    try:
+        # 调用OpenAI API
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ]
+        
+        response = client.chat(
+            messages=messages,
+            temperature=0.3,  # 降低温度，确保输出更简洁一致
+            model_type="default"
+        )
+        
+        # 生成时间戳
+        now = datetime.datetime.now()
+        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        return response, timestamp
+    except Exception as e:
+        # 如果API调用失败，返回错误信息
+        return f"生成指数分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')

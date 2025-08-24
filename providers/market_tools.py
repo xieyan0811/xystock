@@ -9,13 +9,14 @@ A股大盘指标数据收集模块
 5. 新闻情绪指标
 """
 
+import sys # for test
+sys.path.append('/app')
+
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import akshare as ak
 import efinance as ef
-from stockstats import wrap
-from typing import Dict, List, Optional, Union
+from typing import Dict
 import warnings
 warnings.filterwarnings('ignore')
 from providers.stock_tools import get_indicators
@@ -102,7 +103,7 @@ class MarketIndicators:
             print(f"   ❌ 获取{index_name}技术指标失败: {e}")
             return {}
     
-    def get_market_sentiment_indicators(self) -> Dict:
+    def get_market_sentiment_indicators(self):
         """
         获取市场情绪指标
         
@@ -164,7 +165,7 @@ class MarketIndicators:
         print("   ✓ 市场情绪指标获取完成")
         return sentiment_data
     
-    def get_valuation_indicators(self, debug=False) -> Dict:
+    def get_valuation_indicators(self, debug=False):
         """
         获取估值指标
         
@@ -199,7 +200,7 @@ class MarketIndicators:
         print("   ✓ 估值指标获取完成")
         return valuation_data
     
-    def get_money_flow_indicators(self, debug=True) -> Dict:
+    def get_money_flow_indicators(self, debug=True):
         """
         获取资金流向指标
         
@@ -227,7 +228,7 @@ class MarketIndicators:
                     'm1_growth': float(latest_m2.get('货币(M1)-同比增长', 0)),
                     'm2_date': str(latest_m2.get('月份', datetime.now().strftime('%Y-%m'))),
                 })
-                print(f"      M2余额: {money_flow_data['m2_amount']:.2f}万亿 | 同比增长: {money_flow_data['m2_growth']:.2f}%")
+                print(f"      M2余额: {money_flow_data['m2_amount']/10000:.2f}万亿 | 同比增长: {money_flow_data['m2_growth']:.2f}%")
 
         except Exception as e:
             print(f"   ❌ 获取M2数据失败: {e}")
@@ -237,67 +238,8 @@ class MarketIndicators:
         
         print("   ✓ 资金流向指标获取完成")
         return money_flow_data
-        
-    def get_stock_gainers_losers(self, top_n: int = 10) -> Dict:
-        """
-        获取涨跌幅排行榜
-        
-        Args:
-            top_n: 获取前N名
             
-        Returns:
-            包含涨跌幅排行的字典
-        """
-        print(f"📈 获取涨跌幅排行榜(Top {top_n})...")
-        
-        try:
-            # 获取所有股票数据 - 使用efinance
-            df_all_stocks = ef.stock.get_realtime_quotes()
-            
-            if df_all_stocks.empty:
-                return {}
-            
-            # 过滤掉涨跌幅为空的数据
-            df_all_stocks = df_all_stocks.dropna(subset=['涨跌幅'])
-            
-            # 涨幅榜
-            top_gainers = df_all_stocks.nlargest(top_n, '涨跌幅')[['股票名称', '最新价', '涨跌幅', '成交额']]
-            # 重命名列以保持兼容性
-            top_gainers = top_gainers.rename(columns={'股票名称': '名称'})
-            
-            # 跌幅榜
-            top_losers = df_all_stocks.nsmallest(top_n, '涨跌幅')[['股票名称', '最新价', '涨跌幅', '成交额']]
-            # 重命名列以保持兼容性
-            top_losers = top_losers.rename(columns={'股票名称': '名称'})
-            
-            # 成交额排行
-            top_volume = df_all_stocks.nlargest(top_n, '成交额')[['股票名称', '最新价', '涨跌幅', '成交额']]
-            # 重命名列以保持兼容性
-            top_volume = top_volume.rename(columns={'股票名称': '名称'})
-            
-            result = {
-                'top_gainers': top_gainers.to_dict('records'),
-                'top_losers': top_losers.to_dict('records'),
-                'top_volume': top_volume.to_dict('records'),
-                'market_stats': {
-                    'total_stocks': len(df_all_stocks),
-                    'up_stocks': int((df_all_stocks["涨跌幅"] > 0).sum()),
-                    'down_stocks': int((df_all_stocks["涨跌幅"] < 0).sum()),
-                    'flat_stocks': int((df_all_stocks["涨跌幅"] == 0).sum()),
-                },
-                'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            print(f"   ✓ 涨幅榜首: {top_gainers.iloc[0]['名称']} (+{top_gainers.iloc[0]['涨跌幅']:.2f}%)")
-            print(f"   ✓ 跌幅榜首: {top_losers.iloc[0]['名称']} ({top_losers.iloc[0]['涨跌幅']:.2f}%)")
-            
-            return result
-            
-        except Exception as e:
-            print(f"   ❌ 获取涨跌幅排行失败: {e}")
-            return {}
-    
-    def get_detailed_margin_data(self) -> Dict:
+    def get_detailed_margin_data(self):
         """
         获取详细融资融券数据（沪深两市）
         
@@ -335,7 +277,7 @@ class MarketIndicators:
             print(f"   ❌ 获取融资融券数据失败: {e}")
             return {}
 
-    def _get_margin_data_unified(self, include_historical: bool = False) -> Dict:
+    def _get_margin_data_unified(self, include_historical: bool = False):
         """
         统一的融资融券数据获取方法（沪深两市）
         
@@ -447,7 +389,7 @@ class MarketIndicators:
         
         return result
     
-    def get_comprehensive_market_report(self, index_name: str = '上证指数') -> Dict:
+    def get_comprehensive_market_report(self, index_name: str = '上证指数'):
         """
         获取综合市场报告
         
@@ -484,7 +426,7 @@ class MarketIndicators:
         
         return report
     
-    def _generate_market_summary(self, report: Dict) -> Dict:
+    def _generate_market_summary(self, report: Dict):
         """生成市场摘要"""
         summary = {}
         
@@ -515,7 +457,7 @@ class MarketIndicators:
         
         return summary
         
-    def _judge_rsi_level(self, rsi: float) -> str:
+    def _judge_rsi_level(self, rsi: float):
         """判断RSI水平"""
         if rsi >= 80:
             return "超买"
@@ -527,148 +469,289 @@ class MarketIndicators:
             return "弱势"
         else:
             return "超卖"
-
-def get_market_indicators_summary(index_name: str = '上证指数') -> Dict:
-    """
-    获取市场指标摘要（便捷函数）
-    
-    Args:
-        index_name: 指数名称
         
-    Returns:
-        市场指标摘要字典
-    """
-    collector = MarketIndicators()
-    return collector.get_comprehensive_market_report(index_name)
 
-
-def quick_market_analysis(index_name: str = '上证指数', show_details: bool = True) -> Dict:
+def get_market_report(report: Dict):
     """
-    快速市场分析（便捷函数）
-    
-    Args:
-        index_name: 指数名称
-        show_details: 是否显示详细报告
-        
-    Returns:
-        市场分析结果
-    """
-    collector = MarketIndicators()
-    
-    print(f"🚀 快速分析{index_name}市场状况...")
-    
-    # 获取综合报告
-    report = collector.get_comprehensive_market_report(index_name)
-    
-    # 如果需要显示详细信息
-    if show_details:
-        show_market_report(report)
-    
-    return report
-
-
-def get_market_rankings(top_n: int = 10) -> Dict:
-    """
-    获取市场排行榜（便捷函数）
-    
-    Args:
-        top_n: 排行榜数量
-        
-    Returns:
-        排行榜数据
-    """
-    collector = MarketIndicators()
-    return collector.get_stock_gainers_losers(top_n)
-
-
-def show_market_report(report: Dict):
-    """
-    美化显示市场报告
+    生成市场报告字符串
     
     Args:
         report: 市场报告字典
+        
+    Returns:
+        str: 格式化的市场报告字符串
     """
-    print(f"\n📊 A股市场综合报告")
-    print(f"🕐 报告时间: {report['report_time']}")
-    print(f"🎯 关注指数: {report['focus_index']}")
-    print("=" * 80)
+    lines = []
+    lines.append(f"\n📊 A股市场综合报告")
+    lines.append(f"🕐 报告时间: {report['report_time']}")
+    lines.append(f"🎯 关注指数: {report['focus_index']}")
+    lines.append("=" * 80)
     
     # 技术指标
     tech = report['technical_indicators']
     if tech:
-        print(f"\n📈 技术指标分析:")
-        print(f"   当前点位: {tech.get('latest_close', 'N/A'):.2f}")
-        print(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
-        print(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
-        print(f"   RSI(14): {tech.get('rsi_14', 'N/A'):.2f}")
-        print(f"   KDJ: K={tech.get('kdj_k', 'N/A'):.2f} D={tech.get('kdj_d', 'N/A'):.2f} J={tech.get('kdj_j', 'N/A'):.2f}")
+        lines.append(f"\n📈 技术指标分析:")
+        latest_close = tech.get('latest_close', 'N/A')
+        if isinstance(latest_close, (int, float)):
+            lines.append(f"   当前点位: {latest_close:.2f}")
+        else:
+            lines.append(f"   当前点位: {latest_close}")
+        lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
+        lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
+        rsi_14 = tech.get('rsi_14', 'N/A')
+        if isinstance(rsi_14, (int, float)):
+            lines.append(f"   RSI(14): {rsi_14:.2f}")
+        else:
+            lines.append(f"   RSI(14): {rsi_14}")
+        kdj_k = tech.get('kdj_k', 'N/A')
+        kdj_d = tech.get('kdj_d', 'N/A')
+        kdj_j = tech.get('kdj_j', 'N/A')
+        k_str = f"{kdj_k:.2f}" if isinstance(kdj_k, (int, float)) else str(kdj_k)
+        d_str = f"{kdj_d:.2f}" if isinstance(kdj_d, (int, float)) else str(kdj_d)
+        j_str = f"{kdj_j:.2f}" if isinstance(kdj_j, (int, float)) else str(kdj_j)
+        lines.append(f"   KDJ: K={k_str} D={d_str} J={j_str}")
     
     # 市场情绪
     sentiment = report['sentiment_indicators']
     if sentiment:
-        print(f"\n😊 市场情绪指标:")
-        print(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-        print(f"   上涨占比: {sentiment.get('up_ratio', 0)*100:.1f}%")
-        print(f"   融资余额: {sentiment.get('margin_buy_balance', 'N/A'):.2f}")
+        lines.append(f"\n😊 市场情绪指标:")
+        lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
+        up_ratio = sentiment.get('up_ratio', 0)
+        lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
+        margin_buy = sentiment.get('margin_buy_balance', 'N/A')
+        if isinstance(margin_buy, (int, float)):
+            lines.append(f"   融资余额: {margin_buy:.2f}")
+        else:
+            lines.append(f"   融资余额: {margin_buy}")
     
     # 估值水平
     valuation = report['valuation_indicators']
     if valuation:
-        print(f"\n💰 估值水平:")
-        print(f"   沪深300 PE: {valuation.get('hs300_pe', 'N/A'):.2f}")
-        print(f"   股息率: {valuation.get('hs300_dividend_yield', 'N/A'):.2f}%")
+        lines.append(f"\n💰 估值水平:")
+        hs300_pe = valuation.get('hs300_pe', 'N/A')
+        if isinstance(hs300_pe, (int, float)):
+            lines.append(f"   沪深300 PE: {hs300_pe:.2f}")
+        else:
+            lines.append(f"   沪深300 PE: {hs300_pe}")
+        dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
+        if isinstance(dividend_yield, (int, float)):
+            lines.append(f"   股息率: {dividend_yield:.2f}%")
+        else:
+            lines.append(f"   股息率: {dividend_yield}%")
     
     # 资金面
     money = report['money_flow_indicators']
     if money:
-        print(f"\n💸 资金流向:")
-        print(f"   M2余额: {money.get('m2_amount', 'N/A'):.2f}亿")
-        print(f"   M2增速: {money.get('m2_growth', 'N/A'):.2f}%")
-        print(f"   M1增速: {money.get('m1_growth', 'N/A'):.2f}%")
+        lines.append(f"\n💸 资金流向:")
+        m2_amount = money.get('m2_amount', 'N/A')
+        if isinstance(m2_amount, (int, float)):
+            lines.append(f"   M2余额: {m2_amount:.2f}亿")
+        else:
+            lines.append(f"   M2余额: {m2_amount}亿")
+        m2_growth = money.get('m2_growth', 'N/A')
+        if isinstance(m2_growth, (int, float)):
+            lines.append(f"   M2增速: {m2_growth:.2f}%")
+        else:
+            lines.append(f"   M2增速: {m2_growth}%")
+        m1_growth = money.get('m1_growth', 'N/A')
+        if isinstance(m1_growth, (int, float)):
+            lines.append(f"   M1增速: {m1_growth:.2f}%")
+        else:
+            lines.append(f"   M1增速: {m1_growth}%")
     
     # 市场摘要
     summary = report['market_summary']
     if summary:
-        print(f"\n🎯 市场摘要:")
+        lines.append(f"\n🎯 市场摘要:")
         for key, value in summary.items():
-            print(f"   {key}: {value}")
+            lines.append(f"   {key}: {value}")
     
-    print("=" * 80)
+    lines.append("=" * 80)
+    
+    return '\n'.join(lines)
+
+
+def display_index_info(index_name: str = '上证指数', use_cache: bool = True, force_refresh: bool = False):
+    """
+    显示指数信息（使用缓存）
+    
+    Args:
+        index_name: 指数名称
+        use_cache: 是否使用缓存
+        force_refresh: 是否强制刷新缓存
+    
+    Returns:
+        格式化的市场信息字符串
+    """
+    if use_cache:
+        # 使用缓存管理器
+        from market_data_cache import get_cache_manager
+        cache_manager = get_cache_manager()
+        
+        print("=" * 80)
+        print(f"📊 {index_name} 市场信息 (缓存模式)")
+        print("=" * 80)
+        
+        # 获取技术指标（不缓存，因为指数相关）
+        collector = MarketIndicators()
+        tech_data = collector.get_index_technical_indicators(index_name)
+        
+        # 获取缓存的基础市场数据
+        sentiment_data = cache_manager.get_market_sentiment(force_refresh)
+        valuation_data = cache_manager.get_valuation_data(force_refresh)
+        money_flow_data = cache_manager.get_money_flow_data(force_refresh)
+        margin_data = cache_manager.get_margin_data(force_refresh)
+        ai_analysis_data = cache_manager.get_ai_analysis(force_refresh)
+        
+        # 构建报告
+        report = {
+            'report_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'focus_index': index_name,
+            'technical_indicators': tech_data,
+            'sentiment_indicators': sentiment_data,
+            'valuation_indicators': valuation_data,
+            'money_flow_indicators': money_flow_data,
+            'margin_detail': margin_data,
+            'ai_analysis': ai_analysis_data,
+            'market_summary': {}
+        }
+        
+        # 生成市场摘要
+        collector = MarketIndicators()
+        report['market_summary'] = collector._generate_market_summary(report)
+        
+        return get_market_report(report)
+    else:
+        # 使用原始方法（不缓存）
+        collector = MarketIndicators()
+        report = collector.get_comprehensive_market_report(index_name)
+        return get_market_report(report)
+
+
+def show_cache_status():
+    """显示缓存状态"""
+    from providers.market_data_cache import get_cache_manager
+    cache_manager = get_cache_manager()
+    cache_manager.print_cache_status()
+
+
+def clear_market_cache(data_type: str = None):
+    """
+    清理市场数据缓存
+    
+    Args:
+        data_type: 数据类型，可选值：
+                  - market_sentiment: 市场情绪
+                  - valuation: 估值指标  
+                  - money_flow: 资金流向
+                  - margin_detail: 融资融券
+                  - ai_analysis: AI分析
+                  - None: 清理所有缓存
+    """
+    from providers.market_data_cache import get_cache_manager
+    cache_manager = get_cache_manager()
+    cache_manager.clear_cache(data_type)
+
+
+def refresh_all_cache():
+    """刷新所有缓存数据"""
+    from providers.market_data_cache import get_cache_manager
+    cache_manager = get_cache_manager()
+    
+    print("🔄 开始刷新所有缓存数据...")
+    
+    # 强制刷新所有数据
+    cache_manager.get_market_sentiment(force_refresh=True)
+    cache_manager.get_valuation_data(force_refresh=True) 
+    cache_manager.get_money_flow_data(force_refresh=True)
+    cache_manager.get_margin_data(force_refresh=True)
+    
+    print("✅ 所有缓存数据刷新完成!")
+    show_cache_status()
+
+
+def set_ai_market_analysis(analysis_data: Dict):
+    """
+    设置AI市场分析数据
+    
+    Args:
+        analysis_data: AI分析数据字典，建议包含以下字段：
+            - market_trend: 市场趋势判断
+            - confidence_level: 信心度
+            - risk_assessment: 风险评估
+            - suggestions: 投资建议
+            - analysis_time: 分析时间
+    """
+    from market_data_cache import get_cache_manager
+    cache_manager = get_cache_manager()
+    
+    # 添加时间戳
+    analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    cache_manager.set_ai_analysis(analysis_data)
+    print("✅ AI市场分析数据已更新")
+
+
+def get_ai_market_analysis() -> Dict:
+    """获取AI市场分析数据"""
+    from market_data_cache import get_cache_manager
+    cache_manager = get_cache_manager()
+    return cache_manager.get_ai_analysis()
+
+
+def update_ai_analysis_example():
+    """设置AI分析数据的示例"""
+    example_analysis = {
+        'market_trend': '震荡上涨',
+        'confidence_level': 0.75,
+        'risk_assessment': '中等风险',
+        'technical_summary': '技术指标显示多空分歧',
+        'sentiment_summary': '市场情绪偏谨慎',
+        'suggestions': [
+            '建议关注权重股表现',
+            '注意控制仓位风险',
+            '关注政策面变化'
+        ],
+        'key_factors': [
+            '宏观经济数据',
+            '资金流向变化',
+            '政策预期'
+        ]
+    }
+    
+    set_ai_market_analysis(example_analysis)
+    print("📝 AI分析示例数据已设置")
 
 
 if __name__ == "__main__":
     # 测试用例
     print("🧪 测试大盘指标收集模块...")
     
+    # 测试缓存功能
+    print("\n=== 缓存功能测试 ===")
+    
+    print("\n1. 显示缓存状态:")
+    show_cache_status()
+    
+    print("\n2. 测试缓存模式的市场信息:")
+    market_info = display_index_info('上证指数', use_cache=True)
+    print(market_info)
+    
+    print("\n3. 再次获取（应使用缓存）:")
+    market_info2 = display_index_info('上证指数', use_cache=True)
+    
+    print("\n4. 显示更新后的缓存状态:")
+    show_cache_status()
+    
+    # 测试原始功能（不使用缓存）
+    print("\n=== 原始功能测试 ===")
     collector = MarketIndicators()
     
-    # 测试单个指标
-    print("\n1. 测试技术指标:")
+    print("\n5. 测试技术指标:")
     tech_indicators = collector.get_index_technical_indicators('上证指数')
     print(f"技术指标数量: {len(tech_indicators)}")
     
-    print("\n2. 测试市场情绪:")
-    sentiment_indicators = collector.get_market_sentiment_indicators()
-    print(f"情绪指标数量: {len(sentiment_indicators)}")
-    
-    print("\n3. 测试估值指标:")
-    valuation_indicators = collector.get_valuation_indicators()
-    print(f"估值指标数量: {len(valuation_indicators)}")
-    
-    print("\n4. 测试资金流向:")
-    money_flow_indicators = collector.get_money_flow_indicators()
-    print(f"资金流向指标数量: {len(money_flow_indicators)}")
-        
-    print("\n6. 测试涨跌榜:")
-    rankings = collector.get_stock_gainers_losers(5)
-    print(f"排行榜数据可用: {'是' if rankings else '否'}")
-        
-    print("\n8. 测试综合报告:")
-    report = collector.get_comprehensive_market_report('上证指数')
-    show_market_report(report)
-    
-    print("\n9. 测试便捷函数:")
-    quick_analysis = quick_market_analysis('上证指数', show_details=False)
-    print(f"快速分析完成: {'是' if quick_analysis else '否'}")
+    print("\n6. 测试无缓存模式:")
+    market_info_no_cache = display_index_info('上证指数', use_cache=False)
     
     print("\n✅ 测试完成!")

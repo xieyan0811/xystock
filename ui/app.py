@@ -15,7 +15,6 @@ from ui.components.page_settings import main as display_settings
 from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
 from ui.components.page_index import display_index_info
-from providers.market_tools import MarketIndicators
 from providers.stock_tools import normalize_stock_input
 
 def main():
@@ -104,11 +103,13 @@ def display_analysis_page():
         use_ai_news_analysis = st.checkbox("📰 AI新闻分析", value=False, help="选中后将使用AI对股票相关新闻进行分析")
         use_ai_chip_analysis = st.checkbox("🧮 AI筹码分析", value=False, help="选中后将使用AI对股票筹码分布进行分析")
         use_ai_fundamental_analysis = st.checkbox("📊 AI基本面分析", value=False, help="选中后将使用AI对股票基本面数据进行深入分析")
+        use_ai_index_analysis = False
     else:
         use_ai_market_analysis = False
         use_ai_news_analysis = False
         use_ai_chip_analysis = False
         use_ai_fundamental_analysis = False
+        use_ai_index_analysis = st.checkbox("🤖 AI指数分析", value=False, help="选中后将使用AI对指数进行深入分析")
     
     # 查询按钮
     col1, col2, col3 = st.columns([1, 1, 4])
@@ -132,47 +133,42 @@ def display_analysis_page():
             with result_container:
                 with st.spinner("正在查询数据..."):
                     try:
-                        # 根据市场类型选择不同的查询方法
-                        if market_type == "指数":
-                            # 调用指数分析功能
-                            market_collector = MarketIndicators()
-                            stock_code,name = normalize_stock_input(stock_code.strip(), 'index')
-                            result = market_collector.get_comprehensive_market_report(name)
-                            
-                            if isinstance(result, dict):
-                                # 显示指数分析结果
-                                display_index_info(result)
-                            else:
-                                st.success("查询成功！")
-                                st.code(str(result), language="text")
+                        if market_type == "指数":                            
+                            if use_ai_index_analysis:
+                                if "ai_index_report" not in st.session_state:
+                                    st.session_state.ai_index_report = {}
+                                st.session_state['run_ai_index_for'] = stock_code.strip()
+
+                            stock_code,stock_name = normalize_stock_input(stock_code.strip(), 'index')                            
+                            display_index_info(stock_code,stock_name)
                         else:
                             stock_code,name = normalize_stock_input(stock_code.strip())
                             # 如果选择了AI分析，设置session_state参数
                             if use_ai_market_analysis:
                                 if "ai_market_report" not in st.session_state:
                                     st.session_state.ai_market_report = {}
-                                st.session_state['run_ai_market_for'] = stock_code.strip()
+                                st.session_state['run_ai_market_for'] = stock_code
                             
                             # 如果选择了AI新闻分析，设置session_state参数
                             if use_ai_news_analysis:
                                 if "ai_news_report" not in st.session_state:
                                     st.session_state.ai_news_report = {}
-                                st.session_state['run_news_ai_for'] = stock_code.strip()
+                                st.session_state['run_news_ai_for'] = stock_code
                             
                             # 如果选择了AI筹码分析，设置session_state参数
                             if use_ai_chip_analysis:
                                 if "ai_chip_report" not in st.session_state:
                                     st.session_state.ai_chip_report = {}
-                                st.session_state['run_chip_ai_for'] = stock_code.strip()
+                                st.session_state['run_chip_ai_for'] = stock_code
                             
                             # 如果选择了AI基本面分析，设置session_state参数
                             if use_ai_fundamental_analysis:
                                 if "ai_fundamental_report" not in st.session_state:
                                     st.session_state.ai_fundamental_report = {}
-                                st.session_state['run_fundamental_ai_for'] = stock_code.strip()
+                                st.session_state['run_fundamental_ai_for'] = stock_code
                                 
                             # 显示股票信息
-                            display_stock_info(stock_code.strip(), market_type)
+                            display_stock_info(stock_code, market_type)
                         
                         # 额外的展示选项
                         with st.expander("📊 详细信息", expanded=False):
