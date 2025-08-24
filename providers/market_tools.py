@@ -562,7 +562,7 @@ def quick_market_analysis(index_name: str = '上证指数', show_details: bool =
     
     # 如果需要显示详细信息
     if show_details:
-        display_market_report(report)
+        show_market_report(report)
     
     return report
 
@@ -581,7 +581,7 @@ def get_market_rankings(top_n: int = 10) -> Dict:
     return collector.get_stock_gainers_losers(top_n)
 
 
-def display_market_report(report: Dict):
+def show_market_report(report: Dict):
     """
     美化显示市场报告
     
@@ -665,7 +665,7 @@ if __name__ == "__main__":
         
     print("\n8. 测试综合报告:")
     report = collector.get_comprehensive_market_report('上证指数')
-    display_market_report(report)
+    show_market_report(report)
     
     print("\n9. 测试便捷函数:")
     quick_analysis = quick_market_analysis('上证指数', show_details=False)

@@ -4,24 +4,23 @@
 
 import sys
 import os
+import datetime
 import pandas as pd
 import streamlit as st
 import akshare as ak
 import plotly.graph_objects as go
 
-# 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-# 导入相关模块
+from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
+from ui.components.page_index import display_technical_indicators
+from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
+from providers.stock_tools import get_stock_name, get_market_info, get_indicators, normalize_stock_input
 from providers.stock_data_fetcher import data_manager
 from providers.risk_metrics import calculate_portfolio_risk
 from providers.news_tools import get_stock_news_by_akshare
-from ui.components.page_index import display_technical_indicators
-from providers.stock_tools import get_stock_name, get_market_info, get_indicators
-from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
-from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
 
 def display_stock_info(stock_code, market_type):
     """
@@ -35,8 +34,6 @@ def display_stock_info(stock_code, market_type):
         st.warning("请输入证券代码或名称")
         return
     
-    # 获取证券名称（用于显示）
-    from providers.stock_tools import normalize_stock_input
     # 根据市场类型确定证券类型
     security_type = 'index' if market_type == "指数" else 'stock'
     stock_code,stock_name = normalize_stock_input(stock_code, security_type)
@@ -84,6 +81,7 @@ def display_stock_info(stock_code, market_type):
 
 def display_basic_info(stock_code):
     """显示股票基本信息"""
+    
     st.subheader("基本信息")
     
     try:
@@ -162,11 +160,7 @@ def display_basic_info(stock_code):
         st.divider()  # 添加分隔线
         st.subheader("基本面分析")
         
-        print("AAAAAAAAAAAAAAAAAa 1")
         try:
-            # 使用简化版基本面数据获取函数
-            from providers.stock_tools import get_stock_name, get_market_info
-            print("AAAAAAAAAAAAAAAAAa 2")
             # 获取股票名称和市场信息
             market_info = get_market_info(stock_code)
             stock_name_fundamental = get_stock_name(stock_code, 'stock')
@@ -178,18 +172,14 @@ def display_basic_info(stock_code):
             if "ai_fundamental_report" not in st.session_state:
                 st.session_state.ai_fundamental_report = {}
                 
-            print("AAAAAAAAAAAAAAAAAa 3", st.session_state.get('run_fundamental_ai_for', ''), stock_code)
             # 检查是否需要执行AI基本面分析
             if st.session_state.get('run_fundamental_ai_for', '') == stock_code:
                 # 重置触发状态，避免重复分析
-                print("AAAAAAAAAAAAAAAAAa 4")
                 st.session_state['run_fundamental_ai_for'] = ''
                 
                 with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    print("AAAAAAAAAAAAAAAAAa 5")
                     try:
                         # 生成基本面分析报告
-                        print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
                         fundamental_report, timestamp = generate_fundamental_analysis_report(
                             stock_code=stock_code,
                             stock_name=str(stock_name_fundamental),
@@ -254,7 +244,6 @@ def run_ai_analysis(stock_code, df):
         )
         
         # 生成时间戳
-        import datetime
         now = datetime.datetime.now()
         timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -510,35 +499,6 @@ def display_news(stock_code):
                             st.caption(f"[阅读原文]({url})")
             else:
                 st.write("暂无相关新闻")
-                
-            """
-            # 显示研究报告
-            if 'research_reports' in stock_data and stock_data['research_reports']:
-                st.subheader("研究报告")
-                
-                reports = stock_data['research_reports']
-                st.info(f"共获取到 {len(reports)} 份研究报告")
-                
-                for idx, report in enumerate(reports[:5]):  # 只显示前5条
-                    # 研究报告字段名可能不一致，尝试多种可能的字段名
-                    title = (report.get('报告名称') or 
-                           report.get('研报标题') or 
-                           report.get('title') or 
-                           '未知报告')
-                    
-                    author = (report.get('研究员') or 
-                            report.get('分析师') or 
-                            report.get('author') or 
-                            '未知作者')
-                    
-                    org = (report.get('机构名称') or 
-                          report.get('发布机构') or 
-                          report.get('organization') or 
-                          '未知机构')
-                    
-                    st.write(f"**{title}**")
-                    st.caption(f"{org} - {author}")\
-            """
         else:
             st.info("未能获取到相关新闻")
             
@@ -723,75 +683,3 @@ def display_chips_analysis(stock_code):
     except Exception as e:
         st.error(f"加载筹码分析数据失败: {str(e)}")
 
-
-def main():
-    """股票分析页面主函数"""
-    st.title("股票分析")
-    
-    # 导入市场类型和股票工具
-    from ui.config import MARKET_TYPES, STOCK_CODE_EXAMPLES
-    from providers.stock_tools import get_stock_code, get_stock_name, normalize_stock_input
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        market_type = st.selectbox(
-            "选择市场类型:",
-            MARKET_TYPES,
-            index=0,
-            help="选择要查询的股票市场类型"
-        )
-    
-    with col2:
-        # 显示对应市场的股票代码示例
-        if market_type in STOCK_CODE_EXAMPLES:
-            examples = ", ".join(STOCK_CODE_EXAMPLES[market_type])
-            st.caption(f"示例代码或名称: {examples}")
-        
-        stock_input = st.text_input(
-            "股票代码或名称:",
-            placeholder=f"请输入{market_type}代码或股票名称",
-            help=f"输入{market_type}代码或股票名称进行查询"
-        )
-        
-    # 设置AI分析选项
-    use_ai_analysis = st.checkbox("🤖 AI分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
-    
-    # 查询按钮
-    col1, col2, col3 = st.columns([1, 1, 4])
-    with col1:
-        query_btn = st.button("🔍 查询", type="primary")
-    with col2:
-        clear_btn = st.button("🗑️ 清空")
-    
-    # 处理清空按钮
-    if clear_btn:
-        st.rerun()
-    
-    # 处理查询按钮
-    if query_btn and stock_input.strip():
-        # 根据市场类型确定证券类型
-        security_type = 'index' if market_type == "指数" else 'stock'
-        
-        stock_code = get_stock_code(stock_input.strip(), security_type)
-        stock_name = get_stock_name(stock_code, security_type)
-        
-        # 在界面上展示转换结果
-        if stock_code != stock_input.strip():
-            if market_type == "指数":
-                st.info(f"已将输入 \"{stock_input.strip()}\" 识别为指数 {stock_name} ({stock_code})")
-            else:
-                st.info(f"已将输入 \"{stock_input.strip()}\" 识别为{market_type} {stock_name} ({stock_code})")
-        
-        # 如果选择了AI分析，设置标志以便在显示行情走势时触发分析
-        if use_ai_analysis:
-            st.session_state['run_ai_for'] = stock_code
-        
-        # 调用显示函数
-        display_stock_info(stock_code, market_type)
-    elif query_btn:
-        st.warning("请输入证券代码或名称")
-
-
-if __name__ == "__main__":
-    main()

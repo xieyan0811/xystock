@@ -110,7 +110,7 @@ def main():
     
     # 根据菜单选择显示不同的页面
     if menu == "📊 股票分析":
-        display_stock_analysis_page()
+        display_analysis_page()
     elif menu == "🔢 Token统计":
         # 导入并显示Token统计页面
         display_token_stats()
@@ -119,7 +119,7 @@ def main():
         display_settings()
 
 
-def display_stock_analysis_page():
+def display_analysis_page():
     """显示股票分析页面"""
     # 主内容区域
     st.header("股票查询")
@@ -139,7 +139,7 @@ def display_stock_analysis_page():
     
     # 股票代码输入框
     stock_code = st.text_input(
-        "股票代码:",
+        "代码/名称:",
         placeholder=f"请输入{market_type}代码",
         help=f"输入{market_type}代码进行查询"
     )

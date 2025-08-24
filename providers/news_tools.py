@@ -475,7 +475,7 @@ def get_stock_news_by_akshare(stock_code, debug=False):
     return result
 
 
-def display_stock_by_ak_summary(stock_info):
+def show_stock_by_ak_summary(stock_info):
     """
     美化显示股票信息摘要
     
@@ -620,17 +620,3 @@ def analyze_news_sentiment(news_base, stock_name, start_date=None, end_date=None
 
     return ret_array
 
-if __name__ == "__main__":
-    # 简单的模块测试
-    print("=== news_tools.py 模块测试 ===\n")
-    
-    # 测试单个股票
-    test_stock = '000001'
-    print(f"测试股票: {test_stock}")
-    
-    try:
-        stock_data = get_stock_info_by_akshare(test_stock)
-        display_stock_by_ak_summary(stock_data)
-        print("\n✅ 模块测试成功")
-    except Exception as e:
-        print(f"❌ 模块测试失败: {e}")

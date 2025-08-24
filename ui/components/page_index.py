@@ -3,18 +3,19 @@
 """
 
 import streamlit as st
-from datetime import datetime
 import sys
 import os
 
-# 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
+from utils.format_utils import format_large_number, format_volume, format_price, format_percentage
+from providers.market_tools import MarketIndicators
 
 def display_technical_indicators(tech_data):
+    """显示技术指标分析卡片"""
+
     st.markdown("""
     <style>
     /* 调整 metric 组件的 value 字体大小 */
@@ -24,7 +25,6 @@ def display_technical_indicators(tech_data):
     </style>
     """, unsafe_allow_html=True)
 
-    """显示技术指标分析卡片"""
     st.subheader("技术指标分析")
     
     if not tech_data:
@@ -118,6 +118,7 @@ def display_technical_indicators(tech_data):
 
 def display_market_sentiment(sentiment_data):
     """显示市场情绪指标卡片"""
+    
     st.subheader("市场情绪指标")
     
     if not sentiment_data:
@@ -166,6 +167,7 @@ def display_market_sentiment(sentiment_data):
 
 def display_valuation_level(valuation_data):
     """显示估值水平卡片"""
+    
     st.subheader("估值水平")
     
     if not valuation_data:
@@ -222,6 +224,7 @@ def display_valuation_level(valuation_data):
 
 def display_money_flow(money_data):
     """显示资金流向卡片"""
+    
     st.subheader("资金流向")
     
     if not money_data:
@@ -267,6 +270,7 @@ def display_money_flow(money_data):
 
 def display_market_summary(result_data):
     """显示综合摘要卡片"""
+    
     st.subheader("综合摘要")
     summary_data = result_data.get('market_summary', {})
     
@@ -333,7 +337,6 @@ def display_market_summary(result_data):
 
 def display_index_analysis_result(result_data):
     """显示指数分析结果"""
-    # 应用自定义样式
     
     if not result_data:
         st.error("未获取到指数数据")
@@ -361,66 +364,3 @@ def display_index_analysis_result(result_data):
     with tab5:
         display_market_summary(result_data)
 
-
-def show_index_query_interface():
-    """显示指数查询界面"""
-    st.header("📊 指数分析")
-    
-    # 指数选择
-    index_options = {
-        "上证指数": "000001",
-        "深证成指": "399001", 
-        "创业板指": "399006",
-        "沪深300": "000300",
-        "中证500": "000905",
-        "科创50": "000688"
-    }
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        selected_index = st.selectbox(
-            "选择指数:",
-            list(index_options.keys()),
-            help="选择要分析的指数"
-        )
-    
-    with col2:
-        st.write("")
-        st.write("")
-        query_btn = st.button("🔍 开始分析", type="primary", use_container_width=True)
-    
-    # 显示指数代码
-    st.caption(f"指数代码: {index_options[selected_index]}")
-    
-    return selected_index, query_btn
-
-
-def query_index_data(index_name: str):
-    """查询指数数据"""
-    try:
-        from providers.market_tools import MarketIndicators
-        market_collector = MarketIndicators()
-        result = market_collector.get_comprehensive_market_report(index_name)
-        return result
-    except Exception as e:
-        st.error(f"查询指数数据失败: {str(e)}")
-        return None
-
-
-def main():
-    """指数分析页面主函数"""
-    
-    # 显示查询界面
-    selected_index, query_btn = show_index_query_interface()
-    
-    # 处理查询
-    if query_btn:
-        with st.spinner(f"正在分析{selected_index}数据..."):
-            result = query_index_data(selected_index)
-            if result:
-                display_index_analysis_result(result)
-
-
-if __name__ == "__main__":
-    main()
