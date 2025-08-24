@@ -21,6 +21,10 @@ from providers.stock_utils import get_stock_name, get_market_info, get_indicator
 from providers.stock_data_fetcher import data_manager
 from providers.risk_metrics import calculate_portfolio_risk
 from providers.news_tools import get_stock_news_by_akshare
+from providers.stock_tools import get_stock_tools
+
+# 获取全局股票工具实例
+stock_tools = get_stock_tools()
 
 def display_stock_info(stock_code, market_type):
     """
@@ -85,74 +89,68 @@ def display_basic_info(stock_code):
     st.subheader("基本信息")
     
     try:
-        # 获取股票实时行情
-        if not data_manager.is_available():
-            if not data_manager.initialize():
-                st.error("数据提供者初始化失败")
-                return
-                
-        realtime_data = data_manager.get_realtime_quote(stock_code)
-        stock_info = data_manager.get_stock_info(stock_code)
+        # 使用 StockTools 获取股票基本信息（带缓存）
+        basic_info_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
         
-        if realtime_data:
+        if 'error' in basic_info_data:
+            st.error(f"获取股票基本信息失败: {basic_info_data['error']}")
+            return
+        
+        if basic_info_data:
             # 基本信息
             col1, col2 = st.columns(2)
             
             with col1:
-                
-                if stock_info:
-                    if stock_info.name:
-                        st.write(f"**股票名称:** {stock_info.name}")
+                if basic_info_data.get('name'):
+                    st.write(f"**股票名称:** {basic_info_data['name']}")
 
-                    if stock_info.industry:
-                        st.info(f"所属行业: {stock_info.industry}")
+                if basic_info_data.get('industry'):
+                    st.info(f"所属行业: {basic_info_data['industry']}")
+                
+                if basic_info_data.get('total_market_value'):
+                    st.write(f"总市值: {format_market_value(basic_info_data['total_market_value'])}")
                     
-                    if stock_info.total_market_value:
-                        st.write(f"总市值: {format_market_value(stock_info.total_market_value)}")
-                        
-                    if stock_info.circulating_market_value:
-                        st.write(f"流通市值: {format_market_value(stock_info.circulating_market_value)}")
+                if basic_info_data.get('circulating_market_value'):
+                    st.write(f"流通市值: {format_market_value(basic_info_data['circulating_market_value'])}")
 
                 st.metric(
                     label="当前价格", 
-                    value=f"{format_price(realtime_data.current_price)}",
-                    delta=format_change(realtime_data.change, realtime_data.change_percent)
+                    value=f"{format_price(basic_info_data.get('current_price', 0))}",
+                    delta=format_change(basic_info_data.get('change', 0), basic_info_data.get('change_percent', 0))
                 )
                 
-                st.metric("成交量", format_volume(realtime_data.volume))
+                st.metric("成交量", format_volume(basic_info_data.get('volume', 0)))
 
             with col2:
                 # 当日价格区间
-                st.write(f"**开盘价:** {format_price(realtime_data.open)}")
-                st.write(f"**最高价:** {format_price(realtime_data.high)}")
-                st.write(f"**最低价:** {format_price(realtime_data.low)}")
-                st.write(f"**昨收价:** {format_price(realtime_data.prev_close)}")
+                st.write(f"**开盘价:** {format_price(basic_info_data.get('open', 0))}")
+                st.write(f"**最高价:** {format_price(basic_info_data.get('high', 0))}")
+                st.write(f"**最低价:** {format_price(basic_info_data.get('low', 0))}")
+                st.write(f"**昨收价:** {format_price(basic_info_data.get('prev_close', 0))}")
                 
-                if stock_info:
-                    # 估值指标
-                    if stock_info.pe_ratio:
-                        st.write(f"**市盈率(动):** {stock_info.pe_ratio}")
-                    
-                    if stock_info.pb_ratio:
-                        st.write(f"**市净率:** {stock_info.pb_ratio}")
-                    
-                    if stock_info.roe:
-                        st.write(f"**ROE:** {stock_info.roe}")
+                # 估值指标
+                if basic_info_data.get('pe_ratio'):
+                    st.write(f"**市盈率(动):** {basic_info_data['pe_ratio']}")
+                
+                if basic_info_data.get('pb_ratio'):
+                    st.write(f"**市净率:** {basic_info_data['pb_ratio']}")
+                
+                if basic_info_data.get('roe'):
+                    st.write(f"**ROE:** {basic_info_data['roe']}")
             
             # 更多指标 - 使用Expander折叠显示
-            if stock_info:
-                with st.expander("更多财务指标", expanded=False):
-                    if stock_info.gross_profit_margin:
-                        st.write(f"**毛利率:** {stock_info.gross_profit_margin}")
-                    
-                    if stock_info.net_profit_margin:
-                        st.write(f"**净利润率:** {stock_info.net_profit_margin}")
-                    
-                    if stock_info.net_profit:
-                        st.write(f"**净利润:** {stock_info.net_profit}")
+            with st.expander("更多财务指标", expanded=False):
+                if basic_info_data.get('gross_profit_margin'):
+                    st.write(f"**毛利率:** {basic_info_data['gross_profit_margin']}")
                 
-                # 查询时间
-                st.caption(f"数据更新时间: {realtime_data.timestamp}")
+                if basic_info_data.get('net_profit_margin'):
+                    st.write(f"**净利润率:** {basic_info_data['net_profit_margin']}")
+                
+                if basic_info_data.get('net_profit'):
+                    st.write(f"**净利润:** {basic_info_data['net_profit']}")
+            
+            # 查询时间
+            st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:
             st.warning(f"未能获取到股票 {stock_code} 的实时数据")
         
@@ -265,19 +263,16 @@ def display_market_trend(stock_code):
     st.subheader("行情走势")
     
     try:
-        from providers.stock_data_fetcher import KLineType
+        # 使用 StockTools 获取K线数据（带缓存）
+        kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True)
         
-        # 固定使用日K数据，160天
-        kline_data = data_manager.get_kline_data(
-            stock_code, 
-            KLineType.DAY, 
-            160
-        )
+        if 'error' in kline_info:
+            st.error(f"获取K线数据失败: {kline_info['error']}")
+            return
         
-        if kline_data and len(kline_data) > 0:
-            # 转换为DataFrame
-            df = pd.DataFrame([k.__dict__ for k in kline_data])
-            df = df.sort_values('datetime')
+        if kline_info and kline_info.get('kline_data'):
+            # 从缓存数据重建DataFrame
+            df = pd.DataFrame(kline_info['kline_data'])
             
             # 初始化session_state
             if "ai_market_report" not in st.session_state:
@@ -304,23 +299,21 @@ def display_market_trend(stock_code):
                     st.markdown(st.session_state.ai_market_report[stock_code]["report"])
                     st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
             
-            # 风险指标计算
-            if len(df) >= 5:  # 确保有足够数据计算风险指标
-                try:
-                    risk_metrics = calculate_portfolio_risk(df, price_col='close')
-                    
-                    with st.expander("风险分析", expanded=True):
-                        st.table(risk_metrics['summary_table'])
-                except Exception as e:
-                    st.error(f"计算风险指标失败: {str(e)}")
+            # 风险指标展示（使用缓存的风险指标数据）
+            risk_metrics = kline_info.get('risk_metrics', {})
+            if risk_metrics and 'error' not in risk_metrics and 'summary_table' in risk_metrics:
+                with st.expander("风险分析", expanded=True):
+                    st.table(risk_metrics['summary_table'])
+            elif 'error' in risk_metrics:
+                st.error(f"计算风险指标失败: {risk_metrics['error']}")
             
             # 图表数据预处理
             df['datetime'] = pd.to_datetime(df['datetime'])
             
-            # 计算移动平均线
-            df['MA5'] = df['close'].rolling(window=5).mean()
-            df['MA10'] = df['close'].rolling(window=10).mean()
-            df['MA20'] = df['close'].rolling(window=20).mean()
+            # 移动平均线已在StockTools中计算，直接使用
+            # df['MA5'] = df['close'].rolling(window=5).mean()
+            # df['MA10'] = df['close'].rolling(window=10).mean()
+            # df['MA20'] = df['close'].rolling(window=20).mean()
             
             # 使用plotly创建K线图和均线图表
             fig_price = go.Figure()
@@ -417,8 +410,12 @@ def display_market_trend(stock_code):
             cols[3].metric("收盘", format_price(last_row['close']))
             cols[4].metric("成交量", format_volume(last_row['volume']))
             
-            indicators = get_indicators(df)
-            display_technical_indicators(indicators)
+            # 使用缓存的技术指标数据
+            indicators = kline_info.get('indicators', {})
+            if indicators:
+                display_technical_indicators(indicators)
+            else:
+                st.warning("未获取到技术指标数据")
 
         else:
             st.warning(f"未获取到 {stock_code} 的K线数据")
@@ -432,11 +429,15 @@ def display_news(stock_code):
     st.subheader("新闻资讯")
     
     try:
-        # 使用news_tools模块获取新闻
-        stock_data = get_stock_news_by_akshare(stock_code)
+        # 使用 StockTools 获取新闻数据（带缓存）
+        news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True)
         
-        if stock_data and 'company_news' in stock_data:
-            news_data = stock_data['company_news']
+        if 'error' in news_info:
+            st.info(f"获取新闻数据失败: {news_info['error']}")
+            return
+        
+        if news_info and news_info.get('news_data'):
+            news_data = news_info['news_data']
             
             # 初始化session_state
             if "ai_news_report" not in st.session_state:
@@ -482,7 +483,7 @@ def display_news(stock_code):
                     st.caption(f"分析报告生成时间: {st.session_state.ai_news_report[stock_code]['timestamp']}")
             
             # 显示新闻数量统计
-            st.info(f"共获取到 {len(news_data)} 条相关新闻")
+            st.info(f"共获取到 {news_info.get('news_count', len(news_data))} 条相关新闻")
             
             # 显示最近的新闻
             if news_data:
@@ -511,11 +512,8 @@ def display_chips_analysis(stock_code):
     st.subheader("筹码分析")
     
     try:
-        # 使用简化版筹码数据获取函数
-        from providers.stock_utils import get_chip_analysis_data, get_stock_name
-        
-        # 获取筹码分析数据
-        chip_data = get_chip_analysis_data(stock_code)
+        # 使用 StockTools 获取筹码数据（带缓存）
+        chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True)
         stock_name = get_stock_name(stock_code, 'stock')
         
         # 初始化session_state
