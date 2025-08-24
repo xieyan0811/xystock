@@ -535,3 +535,157 @@ def generate_index_analysis_report(
     except Exception as e:
         # 如果API调用失败，返回错误信息
         return f"生成指数分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def generate_comprehensive_analysis_report(
+    stock_code: str,
+    stock_name: str,
+    user_opinion: str = "",
+    stock_tools=None
+) -> Tuple[str, List[Dict]]:
+    """
+    生成综合分析报告
+    
+    Args:
+        stock_code: 股票代码
+        stock_name: 股票名称
+        user_opinion: 用户观点
+        stock_tools: 股票工具实例，用于获取历史分析
+        
+    Returns:
+        Tuple[str, List[Dict]]: (分析报告, 数据来源列表)
+    """
+    # 初始化OpenAI客户端
+    client = OpenAIClient()
+    
+    # 收集历史分析数据
+    historical_analyses = {}
+    data_sources = []
+    
+    try:
+        if stock_tools:
+            # 尝试获取各种历史分析结果
+            analysis_types = {
+                'market': '技术分析',
+                'fundamental': '基本面分析', 
+                'news': '新闻分析',
+                'chip': '筹码分析'
+            }
+            
+            for analysis_type, description in analysis_types.items():
+                try:
+                    cached_analysis = stock_tools.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+                    if cached_analysis and 'report' in cached_analysis:
+                        historical_analyses[analysis_type] = cached_analysis['report']
+                        data_sources.append({
+                            'type': description,
+                            'description': f'缓存的{description}报告',
+                            'timestamp': cached_analysis.get('timestamp', '未知时间')
+                        })
+                except Exception as e:
+                    print(f"获取{description}失败: {e}")
+                    continue
+        
+        # 如果没有历史分析数据，添加提示
+        if not historical_analyses:
+            data_sources.append({
+                'type': '提示信息',
+                'description': '未找到历史分析数据，将基于基本信息进行分析',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+    
+    except Exception as e:
+        print(f"收集历史分析数据时出错: {e}")
+        data_sources.append({
+            'type': '错误信息',
+            'description': f'收集历史数据时出错: {str(e)}',
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+    # 构建历史分析摘要
+    historical_summary = ""
+    if historical_analyses:
+        historical_summary = "\n\n## 📊 历史分析摘要\n"
+        for analysis_type, report in historical_analyses.items():
+            # 提取报告的关键信息（前300字符作为摘要）
+            summary = report[:300] + "..." if len(report) > 300 else report
+            historical_summary += f"\n### {analysis_types.get(analysis_type, analysis_type)}:\n{summary}\n"
+    else:
+        historical_summary = "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
+    
+    # 构建用户观点部分
+    user_opinion_section = ""
+    if user_opinion.strip():
+        user_opinion_section = f"\n\n## 👤 用户观点\n{user_opinion.strip()}\n"
+        data_sources.append({
+            'type': '用户观点',
+            'description': '用户提供的投资观点和看法',
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+    # 构建分析提示
+    system_message = f"""你是一位资深的投资顾问和股票分析师。现在需要你对{stock_name}（股票代码：{stock_code}）进行综合分析。
+
+你需要：
+1. 综合考虑所有提供的历史分析信息
+2. 结合用户的观点和关注点
+3. 给出一个全面、客观的投资建议
+4. 分析应当平衡，既要指出机会也要提示风险
+
+输出格式要求：
+## 🎯 综合分析概述
+## 📈 技术面综合评价  
+## 📊 基本面综合评价
+## 📰 消息面综合评价
+## 🧮 资金面综合评价
+## 👤 观点整合分析（如有用户观点）
+## 💡 综合投资建议
+## ⚠️ 风险提示
+
+请确保分析内容：
+- 客观平衡，不过度乐观或悲观
+- 基于数据和事实进行分析
+- 考虑短期和中长期因素
+- 给出具体可操作的建议
+- 总字数控制在500字左右"""
+
+    # 构建用户消息
+    user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
+
+{historical_summary}
+{user_opinion_section}
+
+请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。"""
+
+    try:
+        # 调用OpenAI API
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ]
+        
+        response = client.chat(
+            messages=messages,
+            temperature=0.4,  # 适中的创造性，保持客观性
+            model_type="default"
+        )
+        
+        return response, data_sources
+        
+    except Exception as e:
+        # 如果API调用失败，返回错误信息
+        error_report = f"""# ❌ 综合分析生成失败
+
+**错误信息:** {str(e)}
+
+**时间:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 可能的解决方案：
+1. 检查网络连接
+2. 确认AI服务配置正确
+3. 稍后重试
+
+## 数据来源：
+{len(data_sources)}个数据源已收集，但AI分析失败。"""
+        
+        return error_report, data_sources

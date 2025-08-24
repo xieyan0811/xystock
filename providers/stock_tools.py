@@ -827,6 +827,111 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
     
+    def get_comprehensive_ai_analysis(self, stock_code: str, user_opinion: str = "", 
+                                     use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取综合AI分析数据
+        
+        Args:
+            stock_code: 股票代码
+            user_opinion: 用户观点
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Dict: 综合分析结果
+        """
+        data_type = 'ai_analysis'
+        analysis_type = 'comprehensive'
+        
+        # 标准化股票代码
+        try:
+            stock_code, stock_name = normalize_stock_input(stock_code, 'stock')
+        except Exception as e:
+            return {
+                'error': f'股票代码格式错误: {str(e)}',
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        
+        cache_key = f"{data_type}_{analysis_type}_{stock_code}"
+        
+        # 检查缓存（如果用户观点为空且不强制刷新）
+        if use_cache and not force_refresh and not user_opinion.strip():
+            try:
+                cache_data = self._load_cache()
+                if cache_key in cache_data:
+                    cache_meta = cache_data[cache_key].get('cache_meta', {})
+                    cache_time = datetime.fromisoformat(cache_meta['timestamp'])
+                    expire_time = cache_time + timedelta(minutes=self.cache_configs[data_type]['expire_minutes'])
+                    
+                    if datetime.now() < expire_time:
+                        print(f"📋 使用缓存的 {stock_code} 综合分析")
+                        return cache_data[cache_key].get('data', {})
+            except Exception:
+                pass
+        
+        # 生成新的综合分析
+        try:
+            # 检查AI分析模块是否可用
+            if not AI_ANALYSIS_AVAILABLE:
+                return {
+                    'error': 'AI分析模块不可用，请检查依赖是否正确安装',
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            
+            print(f"🤖 生成 {stock_code} 综合AI分析...")
+            
+            # 导入分析函数
+            from analysis.stock_ai_analysis import generate_comprehensive_analysis_report
+            
+            # 生成综合分析报告
+            report, data_sources = generate_comprehensive_analysis_report(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                user_opinion=user_opinion,
+                stock_tools=self
+            )
+            
+            # 构建分析数据
+            analysis_data = {
+                'report': report,
+                'data_sources': data_sources,
+                'analysis_info': {
+                    'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'data_sources_count': len(data_sources),
+                    'user_opinion_included': bool(user_opinion.strip()),
+                    'user_opinion': user_opinion.strip() if user_opinion.strip() else None
+                },
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'cache_time': datetime.now().isoformat()
+            }
+            
+            # 缓存结果
+            try:
+                cache_data = self._load_cache()
+                cache_data[cache_key] = {
+                    'cache_meta': {
+                        'timestamp': datetime.now().isoformat(),
+                        'data_type': data_type,
+                        'stock_code': stock_code,
+                        'analysis_type': analysis_type,
+                        'expire_minutes': self.cache_configs[data_type]['expire_minutes']
+                    },
+                    'data': analysis_data
+                }
+                self._save_cache(cache_data)
+                print(f"💾 {stock_code} 综合分析已缓存")
+            except Exception as e:
+                print(f"❌ 缓存综合分析失败: {e}")
+            
+            return analysis_data
+            
+        except Exception as e:
+            print(f"❌ 生成综合分析失败: {e}")
+            return {
+                'error': str(e),
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+    
     # =========================
     # 综合报告方法
     # =========================

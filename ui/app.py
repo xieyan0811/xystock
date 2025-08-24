@@ -104,6 +104,17 @@ def display_analysis_page():
     use_ai_news_analysis = st.checkbox("📰 AI新闻分析", value=False, help="选中后将使用AI对股票相关新闻进行分析")
     use_ai_chip_analysis = st.checkbox("🧮 AI筹码分析", value=False, help="选中后将使用AI对股票筹码分布进行分析")
     use_ai_fundamental_analysis = st.checkbox("📊 AI基本面分析", value=False, help="选中后将使用AI对股票基本面数据进行深入分析")
+    use_ai_comprehensive_analysis = st.checkbox("🎯 综合分析", value=False, help="选中后将使用AI综合前几个分析结果并结合用户观点进行综合分析")
+    
+    # 用户观点输入框（仅在选择综合分析时显示）
+    user_opinion = ""
+    if use_ai_comprehensive_analysis:
+        user_opinion = st.text_area(
+            "用户观点:",
+            placeholder="请输入您对该股票的观点、看法或关注的重点...",
+            help="输入您的投资观点或关注的重点，AI将结合历史分析结果给出综合建议",
+            height=100
+        )
     
     # 查询按钮
     col1, col2, col3 = st.columns([1, 1, 4])
@@ -151,6 +162,13 @@ def display_analysis_page():
                             if "ai_fundamental_report" not in st.session_state:
                                 st.session_state.ai_fundamental_report = {}
                             st.session_state['run_fundamental_ai_for'] = stock_code
+                        
+                        # 如果选择了综合分析，设置session_state参数
+                        if use_ai_comprehensive_analysis:
+                            if "ai_comprehensive_report" not in st.session_state:
+                                st.session_state.ai_comprehensive_report = {}
+                            st.session_state['run_comprehensive_ai_for'] = stock_code
+                            st.session_state['user_opinion'] = user_opinion
                             
                         # 显示股票信息
                         display_stock_info(stock_code, market_type)

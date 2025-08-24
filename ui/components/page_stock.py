@@ -47,8 +47,8 @@ def display_stock_info(stock_code, market_type):
         try:
             # 根据市场类型决定标签页配置
             if market_type == "港股" or market_type == "指数":
-                # 港股和指数显示3个标签页（基本信息包含基本面分析）
-                tab1, tab2, tab3 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯"])
+                # 港股和指数显示4个标签页（添加综合分析）
+                tab1, tab2, tab3, tab4 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🎯 综合分析"])
                 
                 with tab1:
                     display_basic_info(stock_code)
@@ -58,9 +58,12 @@ def display_stock_info(stock_code, market_type):
                                     
                 with tab3:
                     display_news(stock_code)
+                
+                with tab4:
+                    display_comprehensive_analysis(stock_code)
             else:
-                # A股、基金等显示4个标签页（基本信息包含基本面分析）
-                tab1, tab2, tab3, tab4 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析"])
+                # A股、基金等显示5个标签页（添加综合分析）
+                tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析", "🎯 综合分析"])
                 
                 with tab1:
                     display_basic_info(stock_code)
@@ -73,6 +76,9 @@ def display_stock_info(stock_code, market_type):
                     
                 with tab4:
                     display_chips_analysis(stock_code)
+                
+                with tab5:
+                    display_comprehensive_analysis(stock_code)
                 
         except Exception as e:
             st.error(f"加载数据失败: {str(e)}")
@@ -614,4 +620,96 @@ def display_chips_analysis(stock_code):
     
     except Exception as e:
         st.error(f"加载筹码分析数据失败: {str(e)}")
+
+
+def display_comprehensive_analysis(stock_code):
+    """显示综合分析"""
+    
+    st.subheader("🎯 综合分析")
+    
+    try:
+        # 检查是否需要运行综合分析
+        if 'run_comprehensive_ai_for' in st.session_state and st.session_state['run_comprehensive_ai_for'] == stock_code:
+            user_opinion = st.session_state.get('user_opinion', '')
+            
+            # 运行综合分析
+            with st.spinner("🤖 AI正在进行综合分析..."):
+                try:
+                    # 使用 StockTools 获取综合分析
+                    analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, use_cache=True)
+                    
+                    if 'error' in analysis_data:
+                        st.error(f"获取综合分析失败: {analysis_data['error']}")
+                        return
+                    
+                    # 保存分析结果到session_state
+                    if "ai_comprehensive_report" not in st.session_state:
+                        st.session_state.ai_comprehensive_report = {}
+                    st.session_state.ai_comprehensive_report[stock_code] = analysis_data
+                    
+                    # 移除运行标记
+                    if 'run_comprehensive_ai_for' in st.session_state:
+                        del st.session_state['run_comprehensive_ai_for']
+                    if 'user_opinion' in st.session_state:
+                        del st.session_state['user_opinion']
+                        
+                except Exception as e:
+                    st.error(f"AI综合分析失败: {str(e)}")
+                    return
         
+        # 显示已有的综合分析结果
+        if "ai_comprehensive_report" in st.session_state and stock_code in st.session_state.ai_comprehensive_report:
+            analysis_data = st.session_state.ai_comprehensive_report[stock_code]
+            
+            # 显示分析信息
+            if 'analysis_info' in analysis_data:
+                info = analysis_data['analysis_info']
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("分析时间", info.get('analysis_time', '未知'))
+                with col2:
+                    st.metric("数据来源", f"{info.get('data_sources_count', 0)}个数据源")
+                with col3:
+                    st.metric("用户观点", "已包含" if info.get('user_opinion_included', False) else "未包含")
+            
+            # 显示综合分析报告
+            if 'report' in analysis_data:
+                st.markdown("### 📄 综合分析报告")
+                st.markdown(analysis_data['report'])
+            
+            # 显示数据来源详情
+            if 'data_sources' in analysis_data and analysis_data['data_sources']:
+                with st.expander("📊 数据来源详情", expanded=False):
+                    for source in analysis_data['data_sources']:
+                        st.write(f"- **{source.get('type', '未知类型')}**: {source.get('description', '无描述')}")
+            
+        else:
+            # 显示提示信息
+            st.info("💡 请在查询时勾选「综合分析」选项，AI将结合历史分析结果为您提供综合投资建议")
+            
+            # 手动触发分析按钮
+            if st.button("🚀 开始综合分析", key=f"manual_comprehensive_{stock_code}"):
+                # 手动运行综合分析
+                with st.spinner("🤖 AI正在进行综合分析..."):
+                    try:
+                        analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, "", use_cache=True)
+                        
+                        if 'error' in analysis_data:
+                            st.error(f"获取综合分析失败: {analysis_data['error']}")
+                            return
+                        
+                        # 保存分析结果
+                        if "ai_comprehensive_report" not in st.session_state:
+                            st.session_state.ai_comprehensive_report = {}
+                        st.session_state.ai_comprehensive_report[stock_code] = analysis_data
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"AI综合分析失败: {str(e)}")
+                        
+    except Exception as e:
+        st.error(f"显示综合分析失败: {str(e)}")
+        # 显示错误详情（调试用）
+        with st.expander("🔍 错误详情", expanded=False):
+            st.code(str(e), language="text")
+
