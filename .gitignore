@@ -5,3 +5,4 @@ config.toml
 *.csv
 *.log
 data/
+*.pyc
