@@ -130,7 +130,7 @@ def calculate_portfolio_risk(df: pd.DataFrame,
                            confidence_level: float = 0.05,
                            risk_free_rate: float = 0.03) -> Dict:
     """
-    便捷函数：计算单个资产的风险指标
+    便捷函数：计算单个资产的风险指标（完整版本，包含时间序列）
     
     Args:
         df: 包含价格数据的DataFrame
@@ -176,3 +176,105 @@ def calculate_portfolio_risk(df: pd.DataFrame,
             'returns_max': returns.max()
         }
     }
+
+
+def calculate_portfolio_risk_summary(df: pd.DataFrame, 
+                                   price_col: str = 'close',
+                                   confidence_level: float = 0.05,
+                                   risk_free_rate: float = 0.03) -> Dict:
+    """
+    计算单个资产的风险指标摘要（精简版本，仅统计信息，用于缓存）
+    
+    Args:
+        df: 包含价格数据的DataFrame
+        price_col: 价格列名
+        confidence_level: VaR/CVaR置信水平
+        risk_free_rate: 无风险利率
+        
+    Returns:
+        包含关键统计信息的字典，适合缓存和给大模型分析
+    """
+    calculator = RiskCalculator()
+    
+    if price_col not in df.columns:
+        raise ValueError(f"DataFrame中未找到列 '{price_col}'")
+    
+    prices = df[price_col].dropna()
+    
+    if len(prices) < 2:
+        raise ValueError("价格数据不足，至少需要2个数据点")
+    
+    # 计算风险指标（只保留关键统计数据）
+    metrics = calculator.calculate_all_metrics(prices, confidence_level, risk_free_rate)
+    returns = calculator.calculate_returns(prices)
+    
+    # 计算价格趋势
+    price_change = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
+    recent_volatility = returns.tail(20).std() * np.sqrt(252) if len(returns) >= 20 else returns.std() * np.sqrt(252)
+    
+    # 构建适合大模型分析的风险摘要
+    risk_analysis = {
+        'period_analysis': {
+            'data_length': len(df),
+            'price_change_pct': float(price_change * 100),  # 期间涨跌幅
+            'trend_direction': 'up' if price_change > 0 else 'down',
+        },
+        'volatility_analysis': {
+            'annual_volatility': float(metrics['annual_volatility']),
+            'recent_volatility': float(recent_volatility),
+            'volatility_trend': 'increasing' if recent_volatility > metrics['annual_volatility'] else 'decreasing',
+        },
+        'risk_metrics': {
+            'max_drawdown': float(metrics['max_drawdown']),
+            'sharpe_ratio': float(metrics['sharpe_ratio']),
+            'var_5pct': float(metrics['var_95']),
+            'cvar_5pct': float(metrics['cvar_95']),
+        },
+        'return_statistics': {
+            'daily_return_mean': float(returns.mean()),
+            'daily_return_std': float(returns.std()),
+            'positive_days_ratio': float((returns > 0).mean()),
+            'max_single_day_gain': float(returns.max()),
+            'max_single_day_loss': float(returns.min()),
+        },
+        'risk_assessment': {
+            'risk_level': _assess_risk_level(metrics['annual_volatility'], metrics['max_drawdown']),
+            'stability': _assess_stability(returns),
+            'trend_strength': _assess_trend_strength(price_change, metrics['annual_volatility']),
+        }
+    }
+    
+    return risk_analysis
+
+
+def _assess_risk_level(volatility: float, max_drawdown: float) -> str:
+    """评估风险水平"""
+    if volatility > 0.3 or abs(max_drawdown) > 0.2:
+        return 'high'
+    elif volatility > 0.2 or abs(max_drawdown) > 0.1:
+        return 'medium'
+    else:
+        return 'low'
+
+
+def _assess_stability(returns: pd.Series) -> str:
+    """评估稳定性"""
+    volatility = returns.std()
+    skewness = returns.skew()
+    
+    if abs(skewness) > 1 or volatility > returns.mean() * 3:
+        return 'unstable'
+    elif abs(skewness) > 0.5 or volatility > returns.mean() * 2:
+        return 'moderate'
+    else:
+        return 'stable'
+
+
+def _assess_trend_strength(price_change: float, volatility: float) -> str:
+    """评估趋势强度"""
+    if abs(price_change) > volatility * 2:
+        return 'strong'
+    elif abs(price_change) > volatility:
+        return 'moderate'
+    else:
+        return 'weak'

@@ -18,7 +18,7 @@ import json
 import warnings
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Any, List
+from typing import Dict, List, Tuple
 
 # 添加路径以便导入
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,187 +30,23 @@ warnings.filterwarnings('ignore')
 # 导入必要的模块
 from providers.stock_utils import (
     get_stock_name, get_market_info, get_indicators, 
-    normalize_stock_input, get_chip_analysis_data
+    normalize_stock_input, get_chip_analysis_data,
+    fetch_stock_basic_info, fetch_stock_technical_indicators,
+    fetch_stock_news_data, fetch_stock_chip_data
 )
 from providers.stock_data_fetcher import data_manager, KLineType
-from providers.news_tools import get_stock_news_by_akshare
 from providers.risk_metrics import calculate_portfolio_risk
 
-
-# =========================
-# 独立的数据获取函数（纯外部API调用）
-# =========================
-
-def fetch_stock_basic_info(stock_code: str) -> Dict:
-    """获取股票基本信息的具体实现"""
-    basic_info = {}
-    
-    try:
-        if not data_manager.is_available():
-            if not data_manager.initialize():
-                raise Exception("数据提供者初始化失败")
-                
-        # 获取实时行情
-        realtime_data = data_manager.get_realtime_quote(stock_code)
-        stock_info = data_manager.get_stock_info(stock_code)
-        
-        if realtime_data:
-            basic_info.update({
-                'current_price': float(realtime_data.current_price),
-                'change': float(realtime_data.change),
-                'change_percent': float(realtime_data.change_percent),
-                'volume': int(realtime_data.volume),
-                'amount': float(realtime_data.amount),
-                'high': float(realtime_data.high),
-                'low': float(realtime_data.low),
-                'open': float(realtime_data.open),
-                'prev_close': float(realtime_data.prev_close),
-                'timestamp': str(realtime_data.timestamp),
-            })
-        
-        if stock_info:
-            basic_info.update({
-                'name': str(stock_info.name) if stock_info.name else '',
-                'industry': str(stock_info.industry) if stock_info.industry else '',
-                'total_market_value': float(stock_info.total_market_value) if stock_info.total_market_value else 0,
-                'circulating_market_value': float(stock_info.circulating_market_value) if stock_info.circulating_market_value else 0,
-                'pe_ratio': str(stock_info.pe_ratio) if stock_info.pe_ratio else '',
-                'pb_ratio': str(stock_info.pb_ratio) if stock_info.pb_ratio else '',
-                'roe': str(stock_info.roe) if stock_info.roe else '',
-                'gross_profit_margin': str(stock_info.gross_profit_margin) if stock_info.gross_profit_margin else '',
-                'net_profit_margin': str(stock_info.net_profit_margin) if stock_info.net_profit_margin else '',
-                'net_profit': str(stock_info.net_profit) if stock_info.net_profit else '',
-            })
-        
-    except Exception as e:
-        basic_info['error'] = str(e)
-    
-    basic_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return basic_info
-
-
-def fetch_stock_kline_data(stock_code: str, period: int = 160) -> Dict:
-    """获取股票K线数据的具体实现"""
-    kline_info = {}
-    
-    try:
-        # 固定使用日K数据
-        kline_data = data_manager.get_kline_data(
-            stock_code, 
-            KLineType.DAY, 
-            period
-        )
-        
-        if kline_data and len(kline_data) > 0:
-            # 转换为DataFrame
-            df = pd.DataFrame([k.__dict__ for k in kline_data])
-            df = df.sort_values('datetime')
-            
-            # 计算移动平均线
-            df['MA5'] = df['close'].rolling(window=5).mean()
-            df['MA10'] = df['close'].rolling(window=10).mean()
-            df['MA20'] = df['close'].rolling(window=20).mean()
-            
-            # 获取技术指标
-            indicators = get_indicators(df)
-            
-            # 风险指标计算
-            risk_metrics = {}
-            if len(df) >= 5:
-                try:
-                    risk_metrics = calculate_portfolio_risk(df, price_col='close')
-                    # 确保summary_table是可序列化的
-                    if 'summary_table' in risk_metrics and hasattr(risk_metrics['summary_table'], 'to_dict'):
-                        risk_metrics['summary_table'] = risk_metrics['summary_table'].to_dict()
-                except Exception as e:
-                    risk_metrics['error'] = str(e)
-            
-            # 转换DataFrame为字典列表（确保JSON安全）
-            kline_data_list = []
-            for _, row in df.iterrows():
-                row_dict = {}
-                for col, value in row.items():
-                    if pd.isna(value):
-                        row_dict[col] = None
-                    elif hasattr(value, 'isoformat'):  # datetime
-                        row_dict[col] = value.isoformat()
-                    else:
-                        row_dict[col] = value
-                kline_data_list.append(row_dict)
-            
-            # 获取最新数据
-            latest_data = {}
-            if len(df) > 0:
-                latest_row = df.iloc[-1]
-                for col, value in latest_row.items():
-                    if pd.isna(value):
-                        latest_data[col] = None
-                    elif hasattr(value, 'isoformat'):
-                        latest_data[col] = value.isoformat()
-                    else:
-                        latest_data[col] = value
-            
-            kline_info.update({
-                'kline_data': kline_data_list,
-                'indicators': indicators,
-                'risk_metrics': risk_metrics,
-                'data_length': len(df),
-                'latest_data': latest_data
-            })
-        else:
-            kline_info['error'] = f"未获取到股票 {stock_code} 的K线数据"
-            
-    except Exception as e:
-        kline_info['error'] = str(e)
-    
-    kline_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return kline_info
-
-
-def fetch_stock_news_data(stock_code: str) -> Dict:
-    """获取股票新闻数据的具体实现"""
-    news_info = {}
-    
-    try:
-        # 使用news_tools模块获取新闻
-        stock_data = get_stock_news_by_akshare(stock_code)
-        
-        if stock_data and 'company_news' in stock_data:
-            news_data = stock_data['company_news']
-            
-            news_info.update({
-                'news_data': news_data,
-                'news_count': len(news_data),
-                'latest_news': news_data[:5] if len(news_data) >= 5 else news_data  # 前5条最新新闻
-            })
-        else:
-            news_info['error'] = "未能获取到相关新闻"
-            
-    except Exception as e:
-        news_info['error'] = str(e)
-    
-    news_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return news_info
-
-
-def fetch_stock_chip_data(stock_code: str) -> Dict:
-    """获取股票筹码数据的具体实现"""
-    chip_info = {}
-    
-    try:
-        # 获取筹码分析数据
-        chip_data = get_chip_analysis_data(stock_code)
-        
-        if "error" not in chip_data:
-            chip_info.update(chip_data)
-        else:
-            chip_info['error'] = chip_data["error"]
-            
-    except Exception as e:
-        chip_info['error'] = str(e)
-    
-    chip_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return chip_info
+# 导入AI分析模块
+try:
+    from analysis.stock_ai_analysis import (
+        generate_fundamental_analysis_report, generate_stock_analysis_report, 
+        generate_news_analysis_report, generate_chip_analysis_report
+    )
+    AI_ANALYSIS_AVAILABLE = True
+except ImportError:
+    AI_ANALYSIS_AVAILABLE = False
+    print("⚠️ AI分析模块不可用，请检查依赖是否正确安装")
 
 
 class StockTools:
@@ -228,7 +64,7 @@ class StockTools:
         # 缓存配置
         self.cache_configs = {
             'basic_info': {'expire_minutes': 5, 'description': '股票基本信息'},
-            'kline_data': {'expire_minutes': 30, 'description': 'K线数据和技术指标'},
+            'technical_indicators': {'expire_minutes': 30, 'description': '技术指标和风险指标'},
             'news_data': {'expire_minutes': 60, 'description': '新闻资讯数据'},
             'chip_data': {'expire_minutes': 1440, 'description': '筹码分析数据'},  # 1天
             'ai_analysis': {'expire_minutes': 180, 'description': 'AI分析报告'},
@@ -339,8 +175,18 @@ class StockTools:
     # 数据获取方法（带缓存）
     # =========================
     
-    def get_stock_basic_info(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取股票基本信息"""
+    def get_stock_basic_info(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False, include_ai_analysis: bool = False) -> Dict:
+        """获取股票基本信息
+        
+        Args:
+            stock_code: 股票代码
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            include_ai_analysis: 是否包含AI基本面分析报告
+            
+        Returns:
+            Dict: 基本信息数据，如果include_ai_analysis=True，则包含ai_analysis字段
+        """
         data_type = 'basic_info'
         
         # 标准化股票代码
@@ -352,23 +198,54 @@ class StockTools:
         # 检查缓存
         if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
             print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            return self._get_cached_data(data_type, stock_code)
+            basic_data = self._get_cached_data(data_type, stock_code)
+        else:
+            # 获取新数据
+            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            try:
+                basic_data = fetch_stock_basic_info(stock_code)
+                if use_cache and 'error' not in basic_data:
+                    self._save_cached_data(data_type, stock_code, basic_data)
+            except Exception as e:
+                print(f"❌ 获取股票基本信息失败: {e}")
+                # 返回缓存数据作为备份
+                basic_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
-        # 获取新数据
-        print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
-        try:
-            data = fetch_stock_basic_info(stock_code)
-            if use_cache and 'error' not in data:
-                self._save_cached_data(data_type, stock_code, data)
-            return data
-        except Exception as e:
-            print(f"❌ 获取股票基本信息失败: {e}")
-            # 返回缓存数据作为备份
-            return self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+        # 如果需要AI分析且基本数据获取成功
+        if include_ai_analysis and 'error' not in basic_data:
+            try:
+                # 获取股票名称和市场信息
+                stock_name = get_stock_name(stock_code, 'stock')
+                market_info = get_market_info(stock_code)
+                
+                # 生成AI基本面分析报告
+                ai_report, ai_timestamp = self.generate_fundamental_analysis_with_cache(
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    market_info=market_info,
+                    fundamental_data=basic_data,
+                    use_cache=use_cache,
+                    force_refresh=force_refresh
+                )
+                
+                # 将AI分析添加到返回数据中
+                basic_data['ai_analysis'] = {
+                    'report': ai_report,
+                    'timestamp': ai_timestamp
+                }
+                
+            except Exception as e:
+                print(f"❌ 生成AI基本面分析失败: {e}")
+                basic_data['ai_analysis'] = {
+                    'error': str(e),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        return basic_data
     
-    def get_stock_kline_data(self, stock_code: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取股票K线数据和技术指标"""
-        data_type = 'kline_data'
+    def get_stock_technical_indicators(self, stock_code: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取股票技术指标和风险指标（不缓存K线数据本身）"""
+        data_type = 'technical_indicators'
         
         # 标准化股票代码
         try:
@@ -384,16 +261,128 @@ class StockTools:
         # 获取新数据
         print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
         try:
-            data = fetch_stock_kline_data(stock_code, period)
+            data = fetch_stock_technical_indicators(stock_code, period)
             if use_cache and 'error' not in data:
                 self._save_cached_data(data_type, stock_code, data)
             return data
         except Exception as e:
-            print(f"❌ 获取K线数据失败: {e}")
+            print(f"❌ 获取技术指标失败: {e}")
             return self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
     
-    def get_stock_news_data(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取股票新闻数据"""
+    def get_stock_kline_data(self, stock_code: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False, include_ai_analysis: bool = False) -> Dict:
+        """获取股票K线数据（实时获取，不缓存K线数据本身，但返回包含技术指标的完整信息）
+        
+        Args:
+            stock_code: 股票代码
+            period: 获取的K线周期数
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            include_ai_analysis: 是否包含AI技术分析报告
+            
+        Returns:
+            Dict: K线数据，如果include_ai_analysis=True，则包含ai_analysis字段
+        """
+        
+        # 标准化股票代码
+        try:
+            stock_code, _ = normalize_stock_input(stock_code, 'stock')
+        except:
+            pass
+        
+        try:
+            # 直接获取K线数据（利用现有CSV缓存）
+            kline_data = data_manager.get_kline_data(
+                stock_code, 
+                KLineType.DAY, 
+                period
+            )
+            
+            if kline_data and len(kline_data) > 0:
+                # 转换为DataFrame
+                df = pd.DataFrame([k.__dict__ for k in kline_data])
+                df = df.sort_values('datetime')
+                
+                # 计算移动平均线
+                df['MA5'] = df['close'].rolling(window=5).mean()
+                df['MA10'] = df['close'].rolling(window=10).mean()
+                df['MA20'] = df['close'].rolling(window=20).mean()
+                
+                # 获取缓存的技术指标（如果有的话）
+                indicators_data = self.get_stock_technical_indicators(stock_code, period, use_cache, force_refresh)
+                
+                # 计算完整的风险指标（用于显示，包含图表数据）
+                full_risk_metrics = {}
+                try:
+                    if len(df) >= 5:
+                        full_risk_metrics = calculate_portfolio_risk(df, price_col='close')
+                        # 确保summary_table是可序列化的
+                        if 'summary_table' in full_risk_metrics and hasattr(full_risk_metrics['summary_table'], 'to_dict'):
+                            full_risk_metrics['summary_table'] = full_risk_metrics['summary_table'].to_dict()
+                except Exception as e:
+                    full_risk_metrics['error'] = str(e)
+                
+                # 组合返回完整信息
+                result = {
+                    'kline_data': df.to_dict('records'),  # K线数据实时返回
+                    'indicators': indicators_data.get('indicators', {}),
+                    'risk_metrics': full_risk_metrics,  # 完整风险指标（用于显示）
+                    'risk_summary': indicators_data.get('risk_metrics', {}),  # 精简风险摘要（来自缓存）
+                    'data_length': len(df),
+                    'latest_data': df.iloc[-1].to_dict() if len(df) > 0 else {},
+                    'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                # 如果需要AI分析且K线数据获取成功
+                if include_ai_analysis:
+                    try:
+                        # 获取股票名称和市场信息
+                        stock_name = get_stock_name(stock_code, 'stock')
+                        market_info = get_market_info(stock_code)
+                        indicators = get_indicators(df)
+                        
+                        # 生成AI技术分析报告
+                        ai_report, ai_timestamp = self.generate_stock_analysis_with_cache(
+                            stock_code=stock_code,
+                            stock_name=stock_name,
+                            market_info=market_info,
+                            df=df,
+                            indicators=indicators,
+                            use_cache=use_cache,
+                            force_refresh=force_refresh
+                        )
+                        
+                        # 将AI分析添加到返回数据中
+                        result['ai_analysis'] = {
+                            'report': ai_report,
+                            'timestamp': ai_timestamp
+                        }
+                        
+                    except Exception as e:
+                        print(f"❌ 生成AI技术分析失败: {e}")
+                        result['ai_analysis'] = {
+                            'error': str(e),
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                
+                return result
+            else:
+                return {'error': f"未获取到股票 {stock_code} 的K线数据"}
+                
+        except Exception as e:
+            return {'error': str(e)}
+    
+    def get_stock_news_data(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False, include_ai_analysis: bool = False) -> Dict:
+        """获取股票新闻数据
+        
+        Args:
+            stock_code: 股票代码
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            include_ai_analysis: 是否包含AI新闻分析报告
+            
+        Returns:
+            Dict: 新闻数据，如果include_ai_analysis=True，则包含ai_analysis字段
+        """
         data_type = 'news_data'
         
         # 标准化股票代码
@@ -405,21 +394,62 @@ class StockTools:
         # 检查缓存
         if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
             print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            return self._get_cached_data(data_type, stock_code)
+            news_data = self._get_cached_data(data_type, stock_code)
+        else:
+            # 获取新数据
+            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            try:
+                news_data = fetch_stock_news_data(stock_code)
+                if use_cache and 'error' not in news_data:
+                    self._save_cached_data(data_type, stock_code, news_data)
+            except Exception as e:
+                print(f"❌ 获取新闻数据失败: {e}")
+                news_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
-        # 获取新数据
-        print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
-        try:
-            data = fetch_stock_news_data(stock_code)
-            if use_cache and 'error' not in data:
-                self._save_cached_data(data_type, stock_code, data)
-            return data
-        except Exception as e:
-            print(f"❌ 获取新闻数据失败: {e}")
-            return self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+        # 如果需要AI分析且新闻数据获取成功
+        if include_ai_analysis and 'error' not in news_data:
+            try:
+                # 获取股票名称和市场信息
+                stock_name = get_stock_name(stock_code, 'stock')
+                market_info = get_market_info(stock_code)
+                
+                # 生成AI新闻分析报告
+                ai_report, ai_timestamp = self.generate_news_analysis_with_cache(
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    market_info=market_info,
+                    news_data=news_data.get('data', []),
+                    use_cache=use_cache,
+                    force_refresh=force_refresh
+                )
+                
+                # 将AI分析添加到返回数据中
+                news_data['ai_analysis'] = {
+                    'report': ai_report,
+                    'timestamp': ai_timestamp
+                }
+                
+            except Exception as e:
+                print(f"❌ 生成AI新闻分析失败: {e}")
+                news_data['ai_analysis'] = {
+                    'error': str(e),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        return news_data
     
-    def get_stock_chip_data(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取股票筹码数据"""
+    def get_stock_chip_data(self, stock_code: str, use_cache: bool = True, force_refresh: bool = False, include_ai_analysis: bool = False) -> Dict:
+        """获取股票筹码数据
+        
+        Args:
+            stock_code: 股票代码
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            include_ai_analysis: 是否包含AI分析报告
+            
+        Returns:
+            Dict: 筹码数据，如果include_ai_analysis=True，则包含ai_analysis字段
+        """
         data_type = 'chip_data'
         
         # 标准化股票代码
@@ -431,18 +461,47 @@ class StockTools:
         # 检查缓存
         if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
             print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            return self._get_cached_data(data_type, stock_code)
+            chip_data = self._get_cached_data(data_type, stock_code)
+        else:
+            # 获取新数据
+            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            try:
+                chip_data = fetch_stock_chip_data(stock_code)
+                if use_cache and 'error' not in chip_data:
+                    self._save_cached_data(data_type, stock_code, chip_data)
+            except Exception as e:
+                print(f"❌ 获取筹码数据失败: {e}")
+                chip_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
-        # 获取新数据
-        print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
-        try:
-            data = fetch_stock_chip_data(stock_code)
-            if use_cache and 'error' not in data:
-                self._save_cached_data(data_type, stock_code, data)
-            return data
-        except Exception as e:
-            print(f"❌ 获取筹码数据失败: {e}")
-            return self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+        # 如果需要AI分析且筹码数据获取成功
+        if include_ai_analysis and 'error' not in chip_data:
+            try:
+                # 获取股票名称
+                stock_name = get_stock_name(stock_code, 'stock')
+                
+                # 生成AI分析报告
+                ai_report, ai_timestamp = self.generate_chip_analysis_with_cache(
+                    stock_code=stock_code,
+                    stock_name=stock_name, 
+                    chip_data=chip_data,
+                    use_cache=use_cache,
+                    force_refresh=force_refresh
+                )
+                
+                # 将AI分析添加到返回数据中
+                chip_data['ai_analysis'] = {
+                    'report': ai_report,
+                    'timestamp': ai_timestamp
+                }
+                
+            except Exception as e:
+                print(f"❌ 生成AI分析失败: {e}")
+                chip_data['ai_analysis'] = {
+                    'error': str(e),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        return chip_data
     
     def get_ai_analysis(self, stock_code: str, analysis_type: str = 'comprehensive', use_cache: bool = True) -> Dict:
         """获取AI分析数据"""
@@ -505,6 +564,268 @@ class StockTools:
             print(f"💾 {stock_code} {analysis_type} AI分析已缓存")
         except Exception as e:
             print(f"❌ 缓存AI分析失败: {e}")
+    
+    # =========================
+    # AI分析报告方法
+    # =========================
+    
+    def generate_fundamental_analysis_with_cache(self, stock_code: str, stock_name: str = None, 
+                                                market_info: Dict = None, fundamental_data: Dict = None,
+                                                use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """
+        生成基本面分析报告（带缓存）
+        
+        Args:
+            stock_code: 股票代码
+            stock_name: 股票名称
+            market_info: 市场信息
+            fundamental_data: 基本面数据
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Tuple[str, str]: (分析报告, 时间戳)
+        """
+        analysis_type = "fundamental"
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        
+        # 检查缓存
+        if use_cache and not force_refresh:
+            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        # 检查AI分析模块是否可用
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            # 获取必要数据
+            if stock_name is None:
+                stock_name = get_stock_name(stock_code, 'stock')
+            if market_info is None:
+                market_info = get_market_info(stock_code)
+            
+            # 生成基本面分析报告
+            report, timestamp = generate_fundamental_analysis_report(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                market_info=market_info,
+                fundamental_data=fundamental_data or {}
+            )
+            
+            # 缓存结果
+            self.set_ai_analysis(stock_code, analysis_type, {
+                'report': report,
+                'timestamp': timestamp,
+                'stock_name': stock_name
+            })
+            
+            return report, timestamp
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            error_msg = f"基本面分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
+    
+    def generate_stock_analysis_with_cache(self, stock_code: str, stock_name: str = None,
+                                         market_info: Dict = None, df=None, indicators: Dict = None,
+                                         use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """
+        生成股票技术分析报告（带缓存）
+        
+        Args:
+            stock_code: 股票代码
+            stock_name: 股票名称
+            market_info: 市场信息
+            df: K线数据DataFrame
+            indicators: 技术指标
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Tuple[str, str]: (分析报告, 时间戳)
+        """
+        analysis_type = "technical"
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        
+        # 检查缓存
+        if use_cache and not force_refresh:
+            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        # 检查AI分析模块是否可用
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            # 获取必要数据
+            if stock_name is None:
+                stock_name = get_stock_name(stock_code, 'stock')
+            if market_info is None:
+                market_info = get_market_info(stock_code)
+            if df is None:
+                kline_data = self.get_stock_kline_data(stock_code)
+                if 'data' in kline_data and 'df' in kline_data['data']:
+                    df = kline_data['data']['df']
+                else:
+                    raise ValueError("无法获取K线数据")
+            if indicators is None:
+                indicators = get_indicators(df)
+            
+            # 生成技术分析报告
+            report = generate_stock_analysis_report(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                market_info=market_info,
+                df=df,
+                indicators=indicators
+            )
+            
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 缓存结果
+            self.set_ai_analysis(stock_code, analysis_type, {
+                'report': report,
+                'timestamp': timestamp,
+                'stock_name': stock_name
+            })
+            
+            return report, timestamp
+            
+        except Exception as e:
+            error_msg = f"技术分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
+    
+    def generate_news_analysis_with_cache(self, stock_code: str, stock_name: str = None,
+                                        market_info: Dict = None, news_data: List = None,
+                                        use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """
+        生成新闻分析报告（带缓存）
+        
+        Args:
+            stock_code: 股票代码
+            stock_name: 股票名称
+            market_info: 市场信息
+            news_data: 新闻数据
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Tuple[str, str]: (分析报告, 时间戳)
+        """
+        analysis_type = "news"
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        
+        # 检查缓存
+        if use_cache and not force_refresh:
+            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        # 检查AI分析模块是否可用
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            # 获取必要数据
+            if stock_name is None:
+                stock_name = get_stock_name(stock_code, 'stock')
+            if market_info is None:
+                market_info = get_market_info(stock_code)
+            if news_data is None:
+                news_result = self.get_stock_news_data(stock_code)
+                if 'data' in news_result and 'news' in news_result['data']:
+                    news_data = news_result['data']['news']
+                else:
+                    news_data = []
+            
+            # 生成新闻分析报告
+            report, timestamp = generate_news_analysis_report(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                market_info=market_info,
+                news_data=news_data
+            )
+            
+            # 缓存结果
+            self.set_ai_analysis(stock_code, analysis_type, {
+                'report': report,
+                'timestamp': timestamp,
+                'stock_name': stock_name
+            })
+            
+            return report, timestamp
+            
+        except Exception as e:
+            error_msg = f"新闻分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
+    
+    def generate_chip_analysis_with_cache(self, stock_code: str, stock_name: str = None,
+                                        chip_data: Dict = None,
+                                        use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """
+        生成筹码分析报告（带缓存）
+        
+        Args:
+            stock_code: 股票代码
+            stock_name: 股票名称
+            chip_data: 筹码数据
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Tuple[str, str]: (分析报告, 时间戳)
+        """
+        analysis_type = "chip"
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        
+        # 检查缓存
+        if use_cache and not force_refresh:
+            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        # 检查AI分析模块是否可用
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            # 获取必要数据
+            if stock_name is None:
+                stock_name = get_stock_name(stock_code, 'stock')
+            if chip_data is None:
+                raise ValueError("无法获取筹码数据")
+            
+            # 生成筹码分析报告
+            report, timestamp = generate_chip_analysis_report(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                chip_data=chip_data
+            )
+            
+            # 缓存结果
+            self.set_ai_analysis(stock_code, analysis_type, {
+                'report': report,
+                'timestamp': timestamp,
+                'stock_name': stock_name
+            })
+            
+            return report, timestamp
+            
+        except Exception as e:
+            error_msg = f"筹码分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
     
     # =========================
     # 综合报告方法
@@ -760,7 +1081,6 @@ def get_stock_ai_analysis(stock_code: str, analysis_type: str = 'comprehensive')
     """获取股票AI分析数据"""
     tools = get_stock_tools()
     return tools.get_ai_analysis(stock_code, analysis_type)
-
 
 if __name__ == "__main__":
     # 测试用例

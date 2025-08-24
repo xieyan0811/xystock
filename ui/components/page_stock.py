@@ -14,7 +14,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
+from providers import stock_tools
 from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_utils import get_stock_name, get_market_info, get_indicators, normalize_stock_input
@@ -159,46 +159,31 @@ def display_basic_info(stock_code):
         st.subheader("基本面分析")
         
         try:
-            # 获取股票名称和市场信息
-            market_info = get_market_info(stock_code)
-            stock_name_fundamental = get_stock_name(stock_code, 'stock')
+            # 检查是否需要执行AI基本面分析
+            include_ai_analysis = st.session_state.get('run_fundamental_ai_for', '') == stock_code
             
-            # 获取基本面数据（这里实际上就是上面已经获取的stock_info）
-            fundamental_data = data_manager.get_stock_info(stock_code)
+            # 如果需要AI分析，重置触发状态，避免重复分析
+            if include_ai_analysis:
+                st.session_state['run_fundamental_ai_for'] = ''
+                with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
+                    fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True, include_ai_analysis=True)
+            else:
+                fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
             
             # 初始化session_state
             if "ai_fundamental_report" not in st.session_state:
                 st.session_state.ai_fundamental_report = {}
                 
-            # 检查是否需要执行AI基本面分析
-            if st.session_state.get('run_fundamental_ai_for', '') == stock_code:
-                # 重置触发状态，避免重复分析
-                st.session_state['run_fundamental_ai_for'] = ''
-                
-                with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    try:
-                        # 生成基本面分析报告
-                        fundamental_report, timestamp = generate_fundamental_analysis_report(
-                            stock_code=stock_code,
-                            stock_name=str(stock_name_fundamental),
-                            market_info=market_info,
-                            fundamental_data=fundamental_data
-                        )
-                        print(fundamental_report)  # 调试用
-                        
-                        # 保存分析报告到session_state
-                        st.session_state.ai_fundamental_report[stock_code] = {
-                            "report": fundamental_report,
-                            "timestamp": timestamp
-                        }
-                        
-                    except ImportError as e:
-                        st.error(f"加载AI基本面分析模块失败: {str(e)}")
-                        st.info("请确保已安装必要的依赖和正确配置API密钥")
-                        
-                    except Exception as e:
-                        st.error(f"AI基本面分析失败: {str(e)}")
-                        st.info("请稍后再试或联系管理员")
+            # 如果获取到了AI分析结果，保存到session_state
+            if 'ai_analysis' in fundamental_data:
+                if 'error' not in fundamental_data['ai_analysis']:
+                    st.session_state.ai_fundamental_report[stock_code] = {
+                        "report": fundamental_data['ai_analysis']['report'],
+                        "timestamp": fundamental_data['ai_analysis']['timestamp']
+                    }
+                else:
+                    st.error(f"AI基本面分析失败: {fundamental_data['ai_analysis']['error']}")
+                    st.info("请稍后再试或联系管理员")
             
             # 显示AI基本面分析报告(如果有)
             if stock_code in st.session_state.ai_fundamental_report:
@@ -213,85 +198,47 @@ def display_basic_info(stock_code):
         st.error(f"获取基本信息失败: {str(e)}")
 
 
-def run_ai_analysis(stock_code, df):
-    """
-    执行AI分析并返回分析报告
-    
-    Args:
-        stock_code: 股票代码
-        df: K线数据DataFrame
-        
-    Returns:
-        tuple: (分析报告文本, 时间戳)
-    """
-    try:
-        # 获取股票名称和市场信息
-        market_info = get_market_info(stock_code)
-        stock_name = get_stock_name(stock_code, 'stock')
-        
-        # 获取技术指标
-        indicators = get_indicators(df)
-        
-        # 生成分析报告
-        ai_market_report = generate_stock_analysis_report(
-            stock_code=stock_code,
-            stock_name=stock_name,
-            market_info=market_info,
-            df=df,
-            indicators=indicators
-        )
-        
-        # 生成时间戳
-        now = datetime.datetime.now()
-        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-        
-        return ai_market_report, timestamp
-        
-    except ImportError as e:
-        st.error(f"加载AI分析模块失败: {str(e)}")
-        st.info("请确保已安装必要的依赖和正确配置API密钥")
-        return f"分析失败: {str(e)}", None
-        
-    except Exception as e:
-        st.error(f"AI分析失败: {str(e)}")
-        st.info("请稍后再试或联系管理员")
-        return f"分析失败: {str(e)}", None
-
-
 def display_market_trend(stock_code):
     """显示股票行情走势"""
     st.subheader("行情走势")
     
     try:
-        # 使用 StockTools 获取K线数据（带缓存）
-        kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True)
+        # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
+        include_ai_analysis = st.session_state.get('run_ai_market_for', '') == stock_code
+        
+        # 如果需要AI分析，重置触发状态，避免重复分析
+        if include_ai_analysis:
+            st.session_state['run_ai_market_for'] = ''
+        
+        # 使用 StockTools 获取K线数据（K线数据实时获取，技术指标使用缓存）
+        if include_ai_analysis:
+            with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
+                kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True, include_ai_analysis=True)
+        else:
+            kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True)
         
         if 'error' in kline_info:
             st.error(f"获取K线数据失败: {kline_info['error']}")
             return
         
         if kline_info and kline_info.get('kline_data'):
-            # 从缓存数据重建DataFrame
+            # 从返回数据重建DataFrame
             df = pd.DataFrame(kline_info['kline_data'])
             
             # 初始化session_state
             if "ai_market_report" not in st.session_state:
                 st.session_state.ai_market_report = {}
                 
-            # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
-            if st.session_state.get('run_ai_market_for', '') == stock_code:
-                # 重置触发状态，避免重复分析
-                st.session_state['run_ai_market_for'] = ''
-                
-                with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
-                    # 执行AI分析
-                    report, timestamp = run_ai_analysis(stock_code, df)
-                    
-                    if timestamp:  # 如果分析成功
-                        st.session_state.ai_market_report[stock_code] = {
-                            "report": report,
-                            "timestamp": timestamp
-                        }
+            # 如果获取到了AI分析结果，保存到session_state
+            if 'ai_analysis' in kline_info:
+                if 'error' not in kline_info['ai_analysis']:
+                    st.session_state.ai_market_report[stock_code] = {
+                        "report": kline_info['ai_analysis']['report'],
+                        "timestamp": kline_info['ai_analysis']['timestamp']
+                    }
+                else:
+                    st.error(f"AI行情分析失败: {kline_info['ai_analysis']['error']}")
+                    st.info("请稍后再试或联系管理员")
             
             # 显示AI分析报告(如果有)
             if stock_code in st.session_state.ai_market_report:
@@ -299,13 +246,20 @@ def display_market_trend(stock_code):
                     st.markdown(st.session_state.ai_market_report[stock_code]["report"])
                     st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
             
-            # 风险指标展示（使用缓存的风险指标数据）
+            # 风险指标展示（使用完整版本的风险指标数据）
             risk_metrics = kline_info.get('risk_metrics', {})
             if risk_metrics and 'error' not in risk_metrics and 'summary_table' in risk_metrics:
                 with st.expander("风险分析", expanded=True):
                     st.table(risk_metrics['summary_table'])
             elif 'error' in risk_metrics:
                 st.error(f"计算风险指标失败: {risk_metrics['error']}")
+            
+            # 如果没有完整风险指标，显示风险摘要（来自缓存）
+            elif kline_info.get('risk_summary'):
+                risk_summary = kline_info['risk_summary']
+                if 'error' not in risk_summary:
+                    with st.expander("风险分析摘要", expanded=True):
+                        st.json(risk_summary)
             
             # 图表数据预处理
             df['datetime'] = pd.to_datetime(df['datetime'])
@@ -429,8 +383,19 @@ def display_news(stock_code):
     st.subheader("新闻资讯")
     
     try:
-        # 使用 StockTools 获取新闻数据（带缓存）
-        news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True)
+        # 检查是否需要执行AI新闻分析 (由app.py中的查询按钮和checkbox控制)
+        include_ai_analysis = st.session_state.get('run_news_ai_for', '') == stock_code
+        
+        # 如果需要AI分析，重置触发状态，避免重复分析
+        if include_ai_analysis:
+            st.session_state['run_news_ai_for'] = ''
+        
+        # 使用 StockTools 获取新闻数据（带缓存和可选的AI分析）
+        if include_ai_analysis:
+            with st.spinner("🤖 AI正在分析相关新闻，请稍候..."):
+                news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True, include_ai_analysis=True)
+        else:
+            news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True)
         
         if 'error' in news_info:
             st.info(f"获取新闻数据失败: {news_info['error']}")
@@ -443,38 +408,16 @@ def display_news(stock_code):
             if "ai_news_report" not in st.session_state:
                 st.session_state.ai_news_report = {}
                 
-            # 检查是否需要执行AI新闻分析 (由app.py中的查询按钮和checkbox控制)
-            if st.session_state.get('run_news_ai_for', '') == stock_code:
-                # 重置触发状态，避免重复分析
-                st.session_state['run_news_ai_for'] = ''
-                
-                with st.spinner("🤖 AI正在分析相关新闻，请稍候..."):
-                    try:                        
-                        # 获取股票名称和市场信息
-                        market_info = get_market_info(stock_code)
-                        stock_name = get_stock_name(stock_code, 'stock')
-                        
-                        # 生成新闻分析报告
-                        news_report, timestamp = generate_news_analysis_report(
-                            stock_code=stock_code,
-                            stock_name=stock_name,
-                            market_info=market_info,
-                            news_data=news_data
-                        )
-                        
-                        # 保存分析报告到session_state
-                        st.session_state.ai_news_report[stock_code] = {
-                            "report": news_report,
-                            "timestamp": timestamp
-                        }
-                        
-                    except ImportError as e:
-                        st.error(f"加载AI新闻分析模块失败: {str(e)}")
-                        st.info("请确保已安装必要的依赖和正确配置API密钥")
-                        
-                    except Exception as e:
-                        st.error(f"AI新闻分析失败: {str(e)}")
-                        st.info("请稍后再试或联系管理员")
+            # 如果获取到了AI分析结果，保存到session_state
+            if 'ai_analysis' in news_info:
+                if 'error' not in news_info['ai_analysis']:
+                    st.session_state.ai_news_report[stock_code] = {
+                        "report": news_info['ai_analysis']['report'],
+                        "timestamp": news_info['ai_analysis']['timestamp']
+                    }
+                else:
+                    st.error(f"AI新闻分析失败: {news_info['ai_analysis']['error']}")
+                    st.info("请稍后再试或联系管理员")
             
             # 显示AI新闻分析报告(如果有)
             if stock_code in st.session_state.ai_news_report:
@@ -512,41 +455,32 @@ def display_chips_analysis(stock_code):
     st.subheader("筹码分析")
     
     try:
-        # 使用 StockTools 获取筹码数据（带缓存）
-        chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True)
+        # 检查是否需要执行AI筹码分析 (由app.py中的查询按钮和checkbox控制)
+        include_ai_analysis = st.session_state.get('run_chip_ai_for', '') == stock_code
+        
+        if include_ai_analysis:
+            st.session_state['run_chip_ai_for'] = ''
+            with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
+                chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True, include_ai_analysis=True)
+        else:
+            chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True)
+        
         stock_name = get_stock_name(stock_code, 'stock')
         
         # 初始化session_state
         if "ai_chip_report" not in st.session_state:
             st.session_state.ai_chip_report = {}
             
-        # 检查是否需要执行AI筹码分析 (由app.py中的查询按钮和checkbox控制)
-        if st.session_state.get('run_chip_ai_for', '') == stock_code:
-            # 重置触发状态，避免重复分析
-            st.session_state['run_chip_ai_for'] = ''
-            
-            with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
-                try:
-                    # 生成筹码分析报告
-                    chip_report, timestamp = generate_chip_analysis_report(
-                        stock_code=stock_code,
-                        stock_name=stock_name,
-                        chip_data=chip_data
-                    )
-                    
-                    # 保存分析报告到session_state
-                    st.session_state.ai_chip_report[stock_code] = {
-                        "report": chip_report,
-                        "timestamp": timestamp
-                    }
-                    
-                except ImportError as e:
-                    st.error(f"加载AI筹码分析模块失败: {str(e)}")
-                    st.info("请确保已安装必要的依赖和正确配置API密钥")
-                    
-                except Exception as e:
-                    st.error(f"AI筹码分析失败: {str(e)}")
-                    st.info("请稍后再试或联系管理员")
+        # 如果获取到了AI分析结果，保存到session_state
+        if 'ai_analysis' in chip_data:
+            if 'error' not in chip_data['ai_analysis']:
+                st.session_state.ai_chip_report[stock_code] = {
+                    "report": chip_data['ai_analysis']['report'],
+                    "timestamp": chip_data['ai_analysis']['timestamp']
+                }
+            else:
+                st.error(f"AI筹码分析失败: {chip_data['ai_analysis']['error']}")
+                st.info("请稍后再试或联系管理员")
                 
         # 显示AI筹码分析报告(如果有)
         if stock_code in st.session_state.ai_chip_report:

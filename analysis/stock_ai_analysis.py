@@ -360,18 +360,18 @@ def generate_fundamental_analysis_report(
     profile_text = "**公司简介:**\n"
     # 将StockInfo对象转换为字典形式
     stock_info_dict = {
-        "股票代码": company_profile.symbol,
-        "股票名称": company_profile.name,
-        "净利润": format_large_number(company_profile.net_profit) if company_profile.net_profit else None,
-        "总市值": f"{format_market_value(company_profile.total_market_value)}{currency_symbol}" if company_profile.total_market_value else None,
-        "流通市值": f"{format_market_value(company_profile.circulating_market_value)}{currency_symbol}" if company_profile.circulating_market_value else None,
-        "所处行业": company_profile.industry,
-        "市盈率(动)": company_profile.pe_ratio,
-        "市净率": company_profile.pb_ratio,
-        "ROE": company_profile.roe,
-        "毛利率": company_profile.gross_profit_margin,
-        "净利率": company_profile.net_profit_margin,
-        "板块编号": company_profile.sector_code
+        "股票代码": company_profile['symbol'],
+        "股票名称": company_profile['name'],
+        "净利润": format_large_number(company_profile['net_profit']) if company_profile['net_profit'] else None,
+        "总市值": f"{format_market_value(company_profile['total_market_value'])}{currency_symbol}" if company_profile['total_market_value'] else None,
+        "流通市值": f"{format_market_value(company_profile['circulating_market_value'])}{currency_symbol}" if company_profile['circulating_market_value'] else None,
+        "所处行业": company_profile['industry'],
+        "市盈率(动)": company_profile['pe_ratio'],
+        "市净率": company_profile['pb_ratio'],
+        "ROE": company_profile['roe'],
+        "毛利率": company_profile['gross_profit_margin'],
+        "净利率": company_profile['net_profit_margin'],
+        "板块编号": company_profile['sector_code']
     }
     
     # 只显示有值的字段

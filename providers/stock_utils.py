@@ -4,6 +4,8 @@ import pandas as pd
 import json
 from pathlib import Path
 import time
+from datetime import datetime
+from typing import Dict
 
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
@@ -452,3 +454,176 @@ def get_indicators(df):
         'macd_trend': _judge_macd_trend(stock),
     }
     return indicators
+
+
+# =========================
+# 独立的数据获取函数（纯外部API调用）
+# =========================
+
+def fetch_stock_basic_info(stock_code: str) -> Dict:
+    """获取股票基本信息的具体实现"""
+    # 导入必要的模块
+    from providers.stock_data_fetcher import data_manager
+    
+    basic_info = {}
+    
+    try:
+        if not data_manager.is_available():
+            if not data_manager.initialize():
+                raise Exception("数据提供者初始化失败")
+                
+        # 获取实时行情
+        realtime_data = data_manager.get_realtime_quote(stock_code)
+        stock_info = data_manager.get_stock_info(stock_code)
+        
+        if realtime_data:
+            basic_info.update({
+                'current_price': float(realtime_data.current_price),
+                'change': float(realtime_data.change),
+                'change_percent': float(realtime_data.change_percent),
+                'volume': int(realtime_data.volume),
+                'amount': float(realtime_data.amount),
+                'high': float(realtime_data.high),
+                'low': float(realtime_data.low),
+                'open': float(realtime_data.open),
+                'prev_close': float(realtime_data.prev_close),
+                'timestamp': str(realtime_data.timestamp),
+            })
+        
+        if stock_info:
+            basic_info.update({
+                'symbol': str(stock_info.symbol) if stock_info.symbol else '',
+                'name': str(stock_info.name) if stock_info.name else '',
+                'industry': str(stock_info.industry) if stock_info.industry else '',
+                'total_market_value': float(stock_info.total_market_value) if stock_info.total_market_value else 0,
+                'circulating_market_value': float(stock_info.circulating_market_value) if stock_info.circulating_market_value else 0,
+                'pe_ratio': str(stock_info.pe_ratio) if stock_info.pe_ratio else '',
+                'pb_ratio': str(stock_info.pb_ratio) if stock_info.pb_ratio else '',
+                'roe': str(stock_info.roe) if stock_info.roe else '',
+                'gross_profit_margin': str(stock_info.gross_profit_margin) if stock_info.gross_profit_margin else '',
+                'net_profit_margin': str(stock_info.net_profit_margin) if stock_info.net_profit_margin else '',
+                'net_profit': str(stock_info.net_profit) if stock_info.net_profit else '',
+                'sector_code': str(stock_info.sector_code) if stock_info.sector_code else '',
+            })
+        
+    except Exception as e:
+        basic_info['error'] = str(e)
+    
+    basic_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return basic_info
+
+
+def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict:
+    """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）"""
+    # 导入必要的模块
+    from providers.stock_data_fetcher import data_manager, KLineType
+    from providers.risk_metrics import calculate_portfolio_risk_summary
+    
+    indicators_info = {}
+    
+    try:
+        # 固定使用日K数据（利用现有的CSV缓存机制）
+        kline_data = data_manager.get_kline_data(
+            stock_code, 
+            KLineType.DAY, 
+            period
+        )
+        
+        if kline_data and len(kline_data) > 0:
+            # 转换为DataFrame
+            df = pd.DataFrame([k.__dict__ for k in kline_data])
+            df = df.sort_values('datetime')
+            
+            # 计算移动平均线
+            df['MA5'] = df['close'].rolling(window=5).mean()
+            df['MA10'] = df['close'].rolling(window=10).mean()
+            df['MA20'] = df['close'].rolling(window=20).mean()
+            
+            # 获取技术指标
+            indicators = get_indicators(df)
+            
+            # 风险指标计算（使用精简版本，只缓存统计摘要）
+            risk_metrics = {}
+            if len(df) >= 5:
+                try:
+                    risk_metrics = calculate_portfolio_risk_summary(df, price_col='close')
+                except Exception as e:
+                    risk_metrics['error'] = str(e)
+            
+            # 获取最新数据摘要（不包含完整K线数据）
+            latest_data = {}
+            if len(df) > 0:
+                latest_row = df.iloc[-1]
+                latest_data = {
+                    'date': latest_row['datetime'].isoformat() if hasattr(latest_row['datetime'], 'isoformat') else str(latest_row['datetime']),
+                    'open': float(latest_row['open']) if pd.notna(latest_row['open']) else None,
+                    'high': float(latest_row['high']) if pd.notna(latest_row['high']) else None,
+                    'low': float(latest_row['low']) if pd.notna(latest_row['low']) else None,
+                    'close': float(latest_row['close']) if pd.notna(latest_row['close']) else None,
+                    'volume': int(latest_row['volume']) if pd.notna(latest_row['volume']) else None,
+                }
+            
+            indicators_info.update({
+                'indicators': indicators,
+                'risk_metrics': risk_metrics,
+                'data_length': len(df),
+                'latest_data': latest_data,
+                'has_ma_data': True  # 标记移动平均线已计算
+            })
+        else:
+            indicators_info['error'] = f"未获取到股票 {stock_code} 的K线数据"
+            
+    except Exception as e:
+        indicators_info['error'] = str(e)
+    
+    indicators_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return indicators_info
+
+
+def fetch_stock_news_data(stock_code: str) -> Dict:
+    """获取股票新闻数据的具体实现"""
+    # 导入必要的模块
+    from providers.news_tools import get_stock_news_by_akshare
+    
+    news_info = {}
+    
+    try:
+        # 使用news_tools模块获取新闻
+        stock_data = get_stock_news_by_akshare(stock_code)
+        
+        if stock_data and 'company_news' in stock_data:
+            news_data = stock_data['company_news']
+            
+            news_info.update({
+                'news_data': news_data,
+                'news_count': len(news_data),
+                'latest_news': news_data[:5] if len(news_data) >= 5 else news_data  # 前5条最新新闻
+            })
+        else:
+            news_info['error'] = "未能获取到相关新闻"
+            
+    except Exception as e:
+        news_info['error'] = str(e)
+    
+    news_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return news_info
+
+
+def fetch_stock_chip_data(stock_code: str) -> Dict:
+    """获取股票筹码数据的具体实现"""
+    chip_info = {}
+    
+    try:
+        # 获取筹码分析数据
+        chip_data = get_chip_analysis_data(stock_code)
+        
+        if "error" not in chip_data:
+            chip_info.update(chip_data)
+        else:
+            chip_info['error'] = chip_data["error"]
+            
+    except Exception as e:
+        chip_info['error'] = str(e)
+    
+    chip_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return chip_info
