@@ -7,62 +7,16 @@ import sys
 import os
 from datetime import datetime
 
-# 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-# 导入本地股票数据提供者
-from ui.stock_provider import stock_data_provider
 from ui.config import MARKET_TYPES, STOCK_CODE_EXAMPLES
 from ui.components.page_settings import main as display_settings
 from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
+from ui.components.page_index import display_index_info
 from providers.market_tools import MarketIndicators
 from providers.stock_tools import normalize_stock_input
-
-# 隐藏默认导航的CSS
-hide_default_nav = """
-<style>
-    /* 隐藏Streamlit默认的页面导航 */
-    section[data-testid="stSidebar"] > div.st-emotion-cache-14nqv6l.ezrtsby2 > div.st-emotion-cache-1cypcdb.ezrtsby1 {
-        display: none !important;
-    }
-    
-    /* 隐藏"App"标签 */
-    .st-emotion-cache-1inwz65 {
-        display: none;
-    }
-    
-    /* 隐藏缩小后的页面标签 */
-    .st-emotion-cache-7ym5gk {
-        display: none;
-    }
-    
-    /* 隐藏hamburger菜单中的页面链接 */
-    .st-emotion-cache-13sxguw {
-        display: none;
-    }
-    
-    /* 隐藏默认的菜单、页眉和页脚 */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    
-    /* 调整主标题样式 */
-    h1 {
-        font-size: 1.8rem !important;
-        margin-bottom: 1rem !important;
-    }
-    
-    /* 调整侧边栏宽度和样式 */
-    [data-testid="stSidebar"] {
-        min-width: 250px !important;
-        max-width: 300px !important;
-    }
-    [data-testid="collapsedControl"] {display: none}
-    section[data-testid="stSidebar"] > div.css-1d391kg {padding-top: 1rem;}
-</style>
-"""
 
 def main():
     """主应用程序"""
@@ -145,7 +99,7 @@ def display_analysis_page():
     )
     
     # 添加AI分析选项
-    use_ai_analysis = st.checkbox("🤖 AI行情分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
+    use_ai_market_analysis = st.checkbox("🤖 AI行情分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
     use_ai_news_analysis = st.checkbox("📰 AI新闻分析", value=False, help="选中后将使用AI对股票相关新闻进行分析")
     use_ai_chip_analysis = st.checkbox("🧮 AI筹码分析", value=False, help="选中后将使用AI对股票筹码分布进行分析")
     use_ai_fundamental_analysis = st.checkbox("📊 AI基本面分析", value=False, help="选中后将使用AI对股票基本面数据进行深入分析")
@@ -181,19 +135,17 @@ def display_analysis_page():
                             
                             if isinstance(result, dict):
                                 # 显示指数分析结果
-                                from ui.components.page_index import display_index_analysis_result 
-                                display_index_analysis_result(result)
+                                display_index_info(result)
                             else:
                                 st.success("查询成功！")
                                 st.code(str(result), language="text")
                         else:
-                            # 调用普通股票数据获取函数并显示结果                            
                             stock_code,name = normalize_stock_input(stock_code.strip())
                             # 如果选择了AI分析，设置session_state参数
-                            if use_ai_analysis:
-                                if "ai_report" not in st.session_state:
-                                    st.session_state.ai_report = {}
-                                st.session_state['run_ai_for'] = stock_code.strip()
+                            if use_ai_market_analysis:
+                                if "ai_market_report" not in st.session_state:
+                                    st.session_state.ai_market_report = {}
+                                st.session_state['run_ai_market_for'] = stock_code.strip()
                             
                             # 如果选择了AI新闻分析，设置session_state参数
                             if use_ai_news_analysis:

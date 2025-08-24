@@ -10,111 +10,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from utils.format_utils import format_large_number, format_volume, format_price, format_percentage
-from providers.market_tools import MarketIndicators
-
-def display_technical_indicators(tech_data):
-    """显示技术指标分析卡片"""
-
-    st.markdown("""
-    <style>
-    /* 调整 metric 组件的 value 字体大小 */
-    [data-testid="stMetricValue"] {
-        font-size: 1.4rem !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.subheader("技术指标分析")
-    
-    if not tech_data:
-        st.warning("未获取到技术指标数据")
-        return
-    
-    # 基础信息
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        latest_close = tech_data.get('latest_close', 0)
-        if latest_close:
-            st.metric("当前点位", format_price(latest_close))
-        else:
-            st.metric("当前点位", "N/A")
-    with col2:
-        latest_volume = tech_data.get('latest_volume', 0)
-        if latest_volume:
-            st.metric("成交量", format_volume(latest_volume))
-        else:
-            st.metric("成交量", "N/A")
-    with col3:
-        st.metric("MA趋势", tech_data.get('ma_trend', 'N/A'))
-    with col4:
-        st.metric("MACD趋势", tech_data.get('macd_trend', 'N/A'))
-    
-    # 移动平均线
-    with st.expander("📈 移动平均线", expanded=True):
-        ma_col1, ma_col2, ma_col3, ma_col4 = st.columns(4)
-        with ma_col1:
-            ma_5 = tech_data.get('ma_5')
-            st.metric("MA5", format_price(ma_5) if ma_5 else "N/A")
-        with ma_col2:
-            ma_10 = tech_data.get('ma_10')
-            st.metric("MA10", format_price(ma_10) if ma_10 else "N/A")
-        with ma_col3:
-            ma_20 = tech_data.get('ma_20')
-            st.metric("MA20", format_price(ma_20) if ma_20 else "N/A")
-        with ma_col4:
-            ma_60 = tech_data.get('ma_60')
-            st.metric("MA60", format_price(ma_60) if ma_60 else "N/A")
-    
-    # 技术指标
-    with st.expander("🔢 技术指标", expanded=True):
-        tech_col1, tech_col2, tech_col3 = st.columns(3)
-        with tech_col1:
-            rsi_14 = tech_data.get('rsi_14')
-            st.metric("RSI(14)", format_price(rsi_14) if rsi_14 else "N/A")
-        with tech_col2:
-            kdj_k = tech_data.get('kdj_k')
-            st.metric("KDJ-K", format_price(kdj_k) if kdj_k else "N/A")
-        with tech_col3:
-            kdj_d = tech_data.get('kdj_d')
-            st.metric("KDJ-D", format_price(kdj_d) if kdj_d else "N/A")
-        
-        # MACD指标
-        macd_col1, macd_col2, macd_col3 = st.columns(3)
-        with macd_col1:
-            macd = tech_data.get('macd')
-            st.metric("MACD", f"{macd:.4f}" if macd else "N/A")
-        with macd_col2:
-            macd_signal = tech_data.get('macd_signal')
-            st.metric("MACD信号", f"{macd_signal:.4f}" if macd_signal else "N/A")
-        with macd_col3:
-            macd_hist = tech_data.get('macd_histogram')
-            st.metric("MACD柱状", f"{macd_hist:.4f}" if macd_hist else "N/A")
-        
-        # 布林带指标
-        boll_col1, boll_col2, boll_col3 = st.columns(3)
-        with boll_col1:
-            boll_upper = tech_data.get('boll_upper')
-            st.metric("布林上轨", format_price(boll_upper) if boll_upper else "N/A")
-        with boll_col2:
-            boll_middle = tech_data.get('boll_middle')
-            st.metric("布林中轨", format_price(boll_middle) if boll_middle else "N/A")
-        with boll_col3:
-            boll_lower = tech_data.get('boll_lower')
-            st.metric("布林下轨", format_price(boll_lower) if boll_lower else "N/A")
-        
-        # 其他技术指标
-        other_col1, other_col2, other_col3 = st.columns(3)
-        with other_col1:
-            wr_14 = tech_data.get('wr_14')
-            st.metric("威廉指标", format_price(wr_14) if wr_14 else "N/A")
-        with other_col2:
-            cci_14 = tech_data.get('cci_14')
-            st.metric("CCI指标", format_price(cci_14) if cci_14 else "N/A")
-        with other_col3:
-            kdj_j = tech_data.get('kdj_j')
-            st.metric("KDJ-J", format_price(kdj_j) if kdj_j else "N/A")
-
+from utils.format_utils import format_large_number, format_percentage
+from ui.components.page_common import display_technical_indicators
 
 def display_market_sentiment(sentiment_data):
     """显示市场情绪指标卡片"""
@@ -241,31 +138,30 @@ def display_money_flow(money_data):
         st.metric("M2增速", f"{m2_growth:.2f}%" if m2_growth else "N/A")
     
     # M1数据
-    with st.expander("💰 详细货币数据", expanded=False):
-        m1_col1, m1_col2 = st.columns(2)
-        with m1_col1:
-            m1_amount = money_data.get('m1_amount')
-            st.metric("M1余额", f"{m1_amount/10000:.2f}万亿" if m1_amount else "N/A")
-        with m1_col2:
-            m1_growth = money_data.get('m1_growth')
-            st.metric("M1增速", f"{m1_growth:.2f}%" if m1_growth else "N/A")
-        
-        # 流动性分析
-        st.write("**流动性分析:**")
-        if money_data.get('m2_growth') and money_data.get('m1_growth'):
-            m2_gr = money_data['m2_growth']
-            m1_gr = money_data['m1_growth']
-            if m2_gr > 10:
-                st.write("🟢 M2增速较高，流动性充裕")
-            elif m2_gr > 8:
-                st.write("🔵 M2增速适中，流动性正常")
-            else:
-                st.write("🟡 M2增速偏低，流动性偏紧")
-                
-            if m1_gr > m2_gr:
-                st.write("📈 M1增速超过M2，资金活跃度较高")
-            else:
-                st.write("📉 M1增速低于M2，资金活跃度一般")
+    m1_col1, m1_col2 = st.columns(2)
+    with m1_col1:
+        m1_amount = money_data.get('m1_amount')
+        st.metric("M1余额", f"{m1_amount/10000:.2f}万亿" if m1_amount else "N/A")
+    with m1_col2:
+        m1_growth = money_data.get('m1_growth')
+        st.metric("M1增速", f"{m1_growth:.2f}%" if m1_growth else "N/A")
+    
+    # 流动性分析
+    st.write("**流动性分析:**")
+    if money_data.get('m2_growth') and money_data.get('m1_growth'):
+        m2_gr = money_data['m2_growth']
+        m1_gr = money_data['m1_growth']
+        if m2_gr > 10:
+            st.write("🟢 M2增速较高，流动性充裕")
+        elif m2_gr > 8:
+            st.write("🔵 M2增速适中，流动性正常")
+        else:
+            st.write("🟡 M2增速偏低，流动性偏紧")
+            
+        if m1_gr > m2_gr:
+            st.write("📈 M1增速超过M2，资金活跃度较高")
+        else:
+            st.write("📉 M1增速低于M2，资金活跃度一般")
 
 
 def display_market_summary(result_data):
@@ -335,7 +231,7 @@ def display_market_summary(result_data):
         st.write("市场综合评级: 数据不足")
 
 
-def display_index_analysis_result(result_data):
+def display_index_info(result_data):
     """显示指数分析结果"""
     
     if not result_data:

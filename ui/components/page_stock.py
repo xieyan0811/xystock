@@ -15,7 +15,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from analysis.stock_ai_analysis import generate_fundamental_analysis_report, generate_stock_analysis_report, generate_news_analysis_report, generate_chip_analysis_report
-from ui.components.page_index import display_technical_indicators
+from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_tools import get_stock_name, get_market_info, get_indicators, normalize_stock_input
 from providers.stock_data_fetcher import data_manager
@@ -235,7 +235,7 @@ def run_ai_analysis(stock_code, df):
         indicators = get_indicators(df)
         
         # 生成分析报告
-        ai_report = generate_stock_analysis_report(
+        ai_market_report = generate_stock_analysis_report(
             stock_code=stock_code,
             stock_name=stock_name,
             market_info=market_info,
@@ -247,7 +247,7 @@ def run_ai_analysis(stock_code, df):
         now = datetime.datetime.now()
         timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
         
-        return ai_report, timestamp
+        return ai_market_report, timestamp
         
     except ImportError as e:
         st.error(f"加载AI分析模块失败: {str(e)}")
@@ -280,29 +280,29 @@ def display_market_trend(stock_code):
             df = df.sort_values('datetime')
             
             # 初始化session_state
-            if "ai_report" not in st.session_state:
-                st.session_state.ai_report = {}
+            if "ai_market_report" not in st.session_state:
+                st.session_state.ai_market_report = {}
                 
             # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
-            if st.session_state.get('run_ai_for', '') == stock_code:
+            if st.session_state.get('run_ai_market_for', '') == stock_code:
                 # 重置触发状态，避免重复分析
-                st.session_state['run_ai_for'] = ''
+                st.session_state['run_ai_market_for'] = ''
                 
                 with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
                     # 执行AI分析
                     report, timestamp = run_ai_analysis(stock_code, df)
                     
                     if timestamp:  # 如果分析成功
-                        st.session_state.ai_report[stock_code] = {
+                        st.session_state.ai_market_report[stock_code] = {
                             "report": report,
                             "timestamp": timestamp
                         }
             
             # 显示AI分析报告(如果有)
-            if stock_code in st.session_state.ai_report:
+            if stock_code in st.session_state.ai_market_report:
                 with st.expander("🤖 AI 行情分析报告", expanded=True):
-                    st.markdown(st.session_state.ai_report[stock_code]["report"])
-                    st.caption(f"分析报告生成时间: {st.session_state.ai_report[stock_code]['timestamp']}")
+                    st.markdown(st.session_state.ai_market_report[stock_code]["report"])
+                    st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
             
             # 风险指标计算
             if len(df) >= 5:  # 确保有足够数据计算风险指标
@@ -682,4 +682,4 @@ def display_chips_analysis(stock_code):
     
     except Exception as e:
         st.error(f"加载筹码分析数据失败: {str(e)}")
-
+        
