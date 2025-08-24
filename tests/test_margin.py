@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append('/app')
 
-from providers.market_tools import MarketIndicators
+from providers.market_tools import get_market_tools
 
 def test_margin_data():
     """测试融资融券数据获取"""
@@ -15,7 +15,7 @@ def test_margin_data():
     print("测试融资融券数据获取（沪深两市）")
     print("=" * 60)
     
-    market = MarketIndicators()
+    market = get_market_tools()
     
     # 测试市场情绪指标中的融资融券数据
     print("\n1. 测试市场情绪指标中的融资融券数据...")

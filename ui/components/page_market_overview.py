@@ -1,5 +1,5 @@
 """
-指数分析页面 - 指数查询和分析结果显示
+大盘整体分析页面 - 市场全局分析和上证指数分析
 """
 
 import streamlit as st
@@ -13,13 +13,13 @@ if project_root not in sys.path:
 
 from utils.format_utils import format_large_number, format_percentage
 from ui.components.page_common import display_technical_indicators
-from providers.market_tools import MarketIndicators
+from providers.market_tools import get_market_tools
 
-def display_market_sentiment(sentiment_data = None):
+def display_market_sentiment():
     """显示市场情绪指标卡片"""
     
-    if sentiment_data is None:
-        sentiment_data = MarketIndicators().get_market_sentiment_indicators()
+    sentiment_data = get_market_tools().get_market_sentiment()
+    margin_data = get_market_tools().get_margin_data()
     
     st.subheader("市场情绪指标")
     
@@ -46,16 +46,16 @@ def display_market_sentiment(sentiment_data = None):
     with st.expander("💳 融资融券数据", expanded=True):
         margin_col1, margin_col2, margin_col3 = st.columns(3)
         with margin_col1:
-            margin_balance = sentiment_data.get('margin_balance')
+            margin_balance = margin_data.get('margin_balance')
             st.metric("融资融券余额", f"{format_large_number(margin_balance)}" if margin_balance else "N/A")
         with margin_col2:
-            margin_buy = sentiment_data.get('margin_buy_balance')
+            margin_buy = margin_data.get('margin_buy_balance')
             st.metric("融资余额", f"{format_large_number(margin_buy)}" if margin_buy else "N/A")
         with margin_col3:
-            margin_sell = sentiment_data.get('margin_sell_balance')
+            margin_sell = margin_data.get('margin_sell_balance')
             st.metric("融券余额", f"{format_large_number(margin_sell)}" if margin_sell else "N/A")
     
-        st.metric("统计时间", sentiment_data.get('margin_date', 'N/A'))
+        st.metric("统计时间", margin_data.get('margin_date', 'N/A'))
     # 市场统计
     with st.expander("📊 市场统计", expanded=False):
         stats_col1, stats_col2 = st.columns(2)
@@ -67,11 +67,10 @@ def display_market_sentiment(sentiment_data = None):
             st.metric("下跌占比", f"{down_ratio*100:.1f}%" if down_ratio else "N/A")
 
 
-def display_valuation_level(valuation_data=None):
+def display_valuation_level():
     """显示估值水平卡片"""
     
-    if valuation_data is None:
-        valuation_data = MarketIndicators().get_valuation_indicators()
+    valuation_data = get_market_tools().get_valuation_data()
         
     st.subheader("估值水平")
     
@@ -127,11 +126,10 @@ def display_valuation_level(valuation_data=None):
             st.write(f"**股息水平:** {div_color} {div_level}")
 
 
-def display_money_flow(money_data=None):
+def display_money_flow():
     """显示资金流向卡片"""
     
-    if money_data is None:
-        money_data = MarketIndicators().get_money_flow_indicators()
+    money_data = get_market_tools().get_money_flow_data()
 
     st.subheader("资金流向")
     
@@ -175,9 +173,12 @@ def display_money_flow(money_data=None):
             st.write("📉 M1增速低于M2，资金活跃度一般")
 
 
-def display_market_summary(result_data):
+def display_market_summary():
     """显示综合摘要卡片"""
-    
+
+    market_tools = get_market_tools()    
+    result_data = market_tools.get_comprehensive_market_report()
+
     st.subheader("综合摘要")
     summary_data = result_data.get('market_summary', {})
     
@@ -193,22 +194,17 @@ def display_market_summary(result_data):
         if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
             with st.spinner("🤖 AI正在分析指数数据..."):
                 try:
-                    from analysis.stock_ai_analysis import generate_index_analysis_report
-                    
-                    # 使用result_data作为市场报告数据
-                    ai_report, timestamp = generate_index_analysis_report(
-                        stock_code_for_ai,
-                        result_data.get('focus_index', stock_code_for_ai),
-                        result_data
+                    # 调用market_tools中的AI分析方法
+                    ai_data = market_tools.get_ai_analysis(
+                        use_cache=False, 
+                        index_name=stock_code_for_ai, 
+                        force_regenerate=True
                     )
                     
                     # 保存AI报告到session_state
                     if "ai_index_report" not in st.session_state:
                         st.session_state.ai_index_report = {}
-                    st.session_state.ai_index_report[stock_code_for_ai] = {
-                        'report': ai_report,
-                        'timestamp': timestamp
-                    }
+                    st.session_state.ai_index_report[stock_code_for_ai] = ai_data
                 except Exception as e:
                     st.error(f"AI分析失败: {str(e)}")
         
@@ -285,51 +281,95 @@ def display_market_summary(result_data):
             st.markdown(ai_data['report'])
             st.caption(f"分析时间: {ai_data['timestamp']}")
             
-            # 添加重新分析按钮
-            if st.button("🔄 重新生成AI分析", key="regenerate_ai_index"):
-                # 清除当前AI报告并重新生成
-                if current_stock_code in st.session_state['ai_index_report']:
-                    del st.session_state['ai_index_report'][current_stock_code]
-                st.session_state['run_ai_index_for'] = current_stock_code
-                st.rerun()
-
-
-def display_index_info(stock_code, stock_name):
-    """显示指数分析结果"""
-        
-    market_collector = MarketIndicators()
-    result_data = market_collector.get_comprehensive_market_report(stock_name)
-
-    if not result_data:
-        st.error("未获取到指数数据")
-        return
+            
+def display_market_overview():
+    """显示大盘整体分析"""
     
-    if not isinstance(result_data, dict):
-        st.code(str(result_data), language="text")
-        return
-        
-    # 显示报告基本信息
-    report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    st.info(f"📊 **{stock_name}** 综合分析报告")
-    st.caption(f"报告时间: {report_time}")
+    st.header("📊 大盘整体分析")
+    st.caption("基于上证指数的全市场分析")
     
-    # 创建标签页
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 技术指标", "😊 市场情绪", "💰 估值水平", "💸 资金流向", "📋 综合摘要"])
+    # AI分析选项
+    use_ai_analysis = st.checkbox("🤖 AI大盘分析", value=False, help="选中后将使用AI对大盘进行深入分析")
     
-    with tab1:
-        # tech_data = market_collector.get_index_technical_indicators(stock_name)
-        tech_data = result_data.get('technical_indicators', {})
-        display_technical_indicators(tech_data)
+    # 分析按钮
+    col1, col2, col3 = st.columns([1, 1, 4])
+    with col1:
+        analyze_btn = st.button("🔍 开始分析", type="primary")
+    with col2:
+        refresh_btn = st.button("🔄 刷新数据")
+    
+    market_tools = get_market_tools()
+    
+    # 处理刷新按钮
+    if refresh_btn:
+        market_tools.refresh_all_cache()
+        st.rerun()
+    
+    # 显示分析结果的区域
+    result_container = st.container()
+    
+    # 处理分析逻辑
+    if analyze_btn:
+        with result_container:
+            with st.spinner("正在分析大盘数据..."):
+                try:
+                    # 如果选择了AI分析，设置session_state参数
+                    if use_ai_analysis:
+                        if "ai_index_report" not in st.session_state:
+                            st.session_state.ai_index_report = {}
+                        st.session_state['run_ai_index_for'] = "上证指数"
+                                            
+                    # 显示报告基本信息
+                    report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    st.success(f"📊 **大盘整体分析报告** (基于上证指数)")
+                    st.caption(f"报告时间: {report_time}")
+                    
+                    # 创建标签页
+                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 技术指标", "😊 市场情绪", "💰 估值水平", "💸 资金流向", "📋 综合摘要"])
+                    
+                    with tab1:
+                        tech_data = market_tools.get_index_technical_indicators('上证指数')
+                        display_technical_indicators(tech_data)
 
-    with tab2:
-        display_market_sentiment(result_data.get('sentiment_indicators', {}))
-    
-    with tab3:
-        display_valuation_level(result_data.get('valuation_indicators', {}))
-    
-    with tab4:
-        display_money_flow(result_data.get('money_flow_indicators', {}))
+                    with tab2:
+                        display_market_sentiment()
+                    
+                    with tab3:
+                        display_valuation_level()
+                    
+                    with tab4:
+                        display_money_flow()
 
-    with tab5:
-        display_market_summary(result_data)
-
+                    with tab5:
+                        display_market_summary()
+                        
+                    # 额外的展示选项
+                    with st.expander("📊 详细信息", expanded=False):
+                        st.write(f"**分析时间:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                        st.write(f"**分析对象:** 上证指数 (大盘整体)")
+                        st.write(f"**数据来源:** 实时市场数据")
+                        
+                except Exception as e:
+                    st.error(f"分析失败: {str(e)}")
+                    st.write("请稍后重试或检查网络连接。")
+                    
+                    # 显示错误详情（调试用）
+                    with st.expander("🔍 错误详情", expanded=False):
+                        st.code(str(e), language="text")
+    else:
+        with result_container:
+            st.info("点击'开始分析'按钮获取大盘整体分析报告")
+            
+            # 显示功能说明
+            with st.expander("ℹ️ 功能说明", expanded=True):
+                st.markdown("""
+                **大盘整体分析功能包括：**
+                
+                - 📈 **技术指标分析**: 基于上证指数的技术指标，反映大盘走势
+                - 😊 **市场情绪分析**: 全市场涨跌家数、融资融券等情绪指标
+                - 💰 **估值水平分析**: 市场整体估值水平评估
+                - 💸 **资金流向分析**: 主力资金流向和市场资金面分析
+                - 📋 **综合摘要**: AI生成的大盘分析综合报告
+                
+                **AI分析功能：** 选中AI分析选项后，系统会对大盘数据进行深度分析，提供更详细的投资建议。
+                """)

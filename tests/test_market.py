@@ -33,11 +33,10 @@ warnings.filterwarnings('ignore')
 
 # 导入大盘分析模块
 from providers.market_tools import (
-    MarketIndicators, 
-    display_market_report,
-    quick_market_analysis,
-    get_market_rankings,
-    get_market_indicators_summary
+    get_market_tools,
+    get_market_report,
+    display_index_info,
+    show_cache_status
 )
 
 
@@ -47,7 +46,7 @@ class TestMarketIndicators(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """测试类初始化"""
-        cls.market_collector = MarketIndicators()
+        cls.market_collector = get_market_tools()
         cls.test_index = '上证指数'
         cls.supported_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']
         print(f"\n🚀 开始测试大盘分析模块...")
@@ -310,23 +309,22 @@ class TestMarketIndicators(unittest.TestCase):
         """测试便捷函数"""
         print(f"\n🔧 测试便捷函数...")
         
-        # 测试快速市场分析
-        print("   测试快速市场分析...")
-        quick_report = quick_market_analysis(self.test_index, show_details=False)
-        assert isinstance(quick_report, dict), "快速分析应返回字典类型"
-        print("   ✓ 快速市场分析功能正常")
+        # 测试综合市场报告
+        print("   测试综合市场报告...")
+        quick_report = self.market_collector.get_comprehensive_market_report(self.test_index, use_cache=False)
+        assert isinstance(quick_report, dict), "综合报告应返回字典类型"
+        print("   ✓ 综合市场报告功能正常")
         
-        # 测试市场排行榜
-        print("   测试市场排行榜...")
-        rankings = get_market_rankings(5)
-        assert isinstance(rankings, dict), "排行榜应返回字典类型"
-        print("   ✓ 市场排行榜功能正常")
+        # 测试缓存状态显示
+        print("   测试缓存状态显示...")
+        show_cache_status()
+        print("   ✓ 缓存状态显示功能正常")
         
-        # 测试市场指标摘要
-        print("   测试市场指标摘要...")
-        summary = get_market_indicators_summary(self.test_index)
-        assert isinstance(summary, dict), "指标摘要应返回字典类型"
-        print("   ✓ 市场指标摘要功能正常")
+        # 测试估值指标
+        print("   测试估值指标...")
+        valuation_data = self.market_collector.get_valuation_data(use_cache=False)
+        assert isinstance(valuation_data, dict), "估值指标应返回字典类型"
+        print("   ✓ 估值指标功能正常")
         
         print("   ✓ 所有便捷函数测试通过")
     
@@ -340,7 +338,9 @@ class TestMarketIndicators(unittest.TestCase):
         # 测试显示功能（不会抛出异常即为成功）
         try:
             print("   测试美化显示功能...")
-            display_market_report(report)
+            from providers.market_tools import get_market_report
+            report_str = get_market_report(report)
+            assert isinstance(report_str, str), "报告格式化应返回字符串"
             print("   ✓ 报告显示功能正常")
         except Exception as e:
             self.fail(f"报告显示功能出现异常: {e}")
@@ -376,15 +376,15 @@ class TestIntegrationScenarios(unittest.TestCase):
     
     def setUp(self):
         """每个测试方法的初始化"""
-        self.market_collector = MarketIndicators()
+        self.market_collector = get_market_tools()
     
     def test_daily_market_analysis_workflow(self):
         """测试日常市场分析工作流"""
         print(f"\n🚀 测试日常市场分析工作流...")
         
-        # 1. 快速获取综合分析
+        # 1. 获取综合分析报告
         print("   步骤1: 获取综合市场分析...")
-        comprehensive_report = quick_market_analysis('上证指数', show_details=False)
+        comprehensive_report = self.market_collector.get_comprehensive_market_report('上证指数', use_cache=False)
         assert isinstance(comprehensive_report, dict), "综合分析应返回字典"
         
         # 2. 获取主要技术指标
@@ -469,7 +469,7 @@ def run_market_tests():
     
     # 导入检查
     try:
-        from providers.market_tools import MarketIndicators
+        from providers.market_tools import get_market_tools
         print("   ✓ 大盘分析模块导入成功")
     except ImportError as e:
         print(f"   ❌ 模块导入失败: {e}")
