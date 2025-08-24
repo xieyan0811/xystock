@@ -121,7 +121,7 @@ def display_analysis_page():
     with col1:
         query_btn = st.button("🔍 查询", type="primary")
     with col2:
-        clear_btn = st.button("🗑️ 清空")
+        clear_btn = st.button("🗑️ 重置")
     
     # 处理清空按钮
     if clear_btn:

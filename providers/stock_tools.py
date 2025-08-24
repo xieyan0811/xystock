@@ -418,7 +418,7 @@ class StockTools:
                     stock_code=stock_code,
                     stock_name=stock_name,
                     market_info=market_info,
-                    news_data=news_data.get('data', []),
+                    news_data=news_data.get('news_data', []),
                     use_cache=use_cache,
                     force_refresh=force_refresh
                 )
@@ -880,15 +880,20 @@ class StockTools:
             
             print(f"🤖 生成 {stock_code} 综合AI分析...")
             
-            # 导入分析函数
+            # 导入分析函数和市场工具
             from analysis.stock_ai_analysis import generate_comprehensive_analysis_report
+            from providers.market_tools import get_market_tools
+            
+            # 获取市场工具实例
+            market_tools = get_market_tools()
             
             # 生成综合分析报告
             report, data_sources = generate_comprehensive_analysis_report(
                 stock_code=stock_code,
                 stock_name=stock_name,
                 user_opinion=user_opinion,
-                stock_tools=self
+                stock_tools=self,
+                market_tools=market_tools
             )
             
             # 构建分析数据

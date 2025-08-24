@@ -580,7 +580,7 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
     return indicators_info
 
 
-def fetch_stock_news_data(stock_code: str) -> Dict:
+def fetch_stock_news_data(stock_code: str, day=7) -> Dict:
     """获取股票新闻数据的具体实现"""
     # 导入必要的模块
     from providers.news_tools import get_stock_news_by_akshare
@@ -589,7 +589,7 @@ def fetch_stock_news_data(stock_code: str) -> Dict:
     
     try:
         # 使用news_tools模块获取新闻
-        stock_data = get_stock_news_by_akshare(stock_code)
+        stock_data = get_stock_news_by_akshare(stock_code, day=day)
         
         if stock_data and 'company_news' in stock_data:
             news_data = stock_data['company_news']

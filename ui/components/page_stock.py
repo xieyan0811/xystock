@@ -436,7 +436,7 @@ def display_news(stock_code):
             
             # 显示最近的新闻
             if news_data:
-                for idx, news in enumerate(news_data[:10]):  # 只显示前10条
+                for idx, news in enumerate(news_data):
                     title = news.get('新闻标题', '')
                     time = news.get('发布时间', '')
                     url = news.get('新闻链接', '')

@@ -541,7 +541,8 @@ def generate_comprehensive_analysis_report(
     stock_code: str,
     stock_name: str,
     user_opinion: str = "",
-    stock_tools=None
+    stock_tools=None,
+    market_tools=None
 ) -> Tuple[str, List[Dict]]:
     """
     生成综合分析报告
@@ -551,6 +552,7 @@ def generate_comprehensive_analysis_report(
         stock_name: 股票名称
         user_opinion: 用户观点
         stock_tools: 股票工具实例，用于获取历史分析
+        market_tools: 市场工具实例，用于获取市场数据
         
     Returns:
         Tuple[str, List[Dict]]: (分析报告, 数据来源列表)
@@ -561,6 +563,52 @@ def generate_comprehensive_analysis_report(
     # 收集历史分析数据
     historical_analyses = {}
     data_sources = []
+    
+    # 收集市场数据
+    market_data = {}
+    market_report_text = ""
+    market_ai_analysis = ""
+    
+    # 如果没有传入market_tools，尝试导入并获取
+    if market_tools is None:
+        try:
+            from providers.market_tools import get_market_tools
+            market_tools = get_market_tools()
+        except Exception as e:
+            print(f"导入market_tools失败: {e}")
+    
+    # 获取市场数据
+    if market_tools:
+        try:
+            # 获取综合市场报告
+            market_report = market_tools.get_comprehensive_market_report(use_cache=True)
+            if market_report:
+                market_data['comprehensive_report'] = market_report
+                data_sources.append({
+                    'type': '市场综合报告',
+                    'description': '包含技术指标、情绪、估值、资金流向等市场数据',
+                    'timestamp': market_report.get('report_time', '未知时间')
+                })
+                
+                # 生成市场报告文本
+                from providers.market_tools import get_market_report
+                market_report_text = get_market_report(market_report)
+                
+        except Exception as e:
+            print(f"获取市场综合报告失败: {e}")
+        
+        try:
+            # 获取AI市场分析
+            market_ai_data = market_tools.get_ai_analysis(use_cache=True)
+            if market_ai_data:
+                market_ai_analysis = market_ai_data
+                data_sources.append({
+                    'type': 'AI市场分析',
+                    'description': '基于AI模型的市场分析报告',
+                    'timestamp': market_ai_data.get('analysis_time', '未知时间')
+                })
+        except Exception as e:
+            print(f"获取AI市场分析失败: {e}")
     
     try:
         if stock_tools:
@@ -613,6 +661,28 @@ def generate_comprehensive_analysis_report(
     else:
         historical_summary = "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
     
+    # 构建市场数据摘要
+    market_summary = ""
+    if market_report_text or market_ai_analysis:
+        market_summary = "\n\n## 🌐 市场环境分析\n"
+        
+        if market_report_text:
+            # 截取市场报告的关键部分（前500字符）
+            market_text_summary = market_report_text[:500] + "..." if len(market_report_text) > 500 else market_report_text
+            market_summary += f"\n### 市场综合报告:\n{market_text_summary}\n"
+        
+        if market_ai_analysis:
+            # 如果有AI市场分析，添加其内容
+            if isinstance(market_ai_analysis, dict) and 'analysis' in market_ai_analysis:
+                ai_text = market_ai_analysis['analysis']
+                ai_summary = ai_text[:300] + "..." if len(ai_text) > 300 else ai_text
+                market_summary += f"\n### AI市场分析:\n{ai_summary}\n"
+            elif isinstance(market_ai_analysis, str):
+                ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
+                market_summary += f"\n### AI市场分析:\n{ai_summary}\n"
+    else:
+        market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n"
+    
     # 构建用户观点部分
     user_opinion_section = ""
     if user_opinion.strip():
@@ -628,9 +698,11 @@ def generate_comprehensive_analysis_report(
 
 你需要：
 1. 综合考虑所有提供的历史分析信息
-2. 结合用户的观点和关注点
-3. 给出一个全面、客观的投资建议
-4. 分析应当平衡，既要指出机会也要提示风险
+2. 重点关注当前市场环境和整体趋势
+3. 结合用户的观点和关注点
+4. 给出一个全面、客观的投资建议
+5. 分析应当平衡，既要指出机会也要提示风险
+6. 将个股分析与大盘走势相结合
 
 输出格式要求：
 ## 🎯 综合分析概述
@@ -638,6 +710,7 @@ def generate_comprehensive_analysis_report(
 ## 📊 基本面综合评价
 ## 📰 消息面综合评价
 ## 🧮 资金面综合评价
+## 🌐 市场环境影响分析
 ## 👤 观点整合分析（如有用户观点）
 ## 💡 综合投资建议
 ## ⚠️ 风险提示
@@ -645,17 +718,19 @@ def generate_comprehensive_analysis_report(
 请确保分析内容：
 - 客观平衡，不过度乐观或悲观
 - 基于数据和事实进行分析
+- 重点关注市场环境对个股的影响
 - 考虑短期和中长期因素
 - 给出具体可操作的建议
-- 总字数控制在500字左右"""
+- 总字数控制在600字左右"""
 
     # 构建用户消息
     user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
 
 {historical_summary}
+{market_summary}
 {user_opinion_section}
 
-请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。"""
+请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。"""
 
     try:
         # 调用OpenAI API

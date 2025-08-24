@@ -393,7 +393,7 @@ def search_stock_news_by_fg_smart(stock_name, stock_code=None, num_results=5, se
             }
 
 
-def get_stock_news_by_akshare(stock_code, debug=False):
+def get_stock_news_by_akshare(stock_code, day = 7, debug=False):
     """
     使用akshare获取股票新闻、公告、研究报告（东财数据源）
     
@@ -422,6 +422,12 @@ def get_stock_news_by_akshare(stock_code, debug=False):
             company_news = sorted(company_news, 
                            key=lambda x: datetime.strptime(x.get('发布时间', '1900-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S'), 
                            reverse=True)
+            # 对新闻做时间过滤，过滤掉当前日期之前day天的数据，且最多保留20条
+            if day > 0:
+                from datetime import timedelta
+                cutoff_date = datetime.now() - timedelta(days=day)
+                company_news = [news for news in company_news if datetime.strptime(news.get('发布时间', '1900-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S') >= cutoff_date]
+            company_news = company_news[:20]
             result['company_news'] = company_news
         print(f"   ✓ 成功获取 {len(result['company_news'])} 条公司新闻")
 
