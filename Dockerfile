@@ -19,7 +19,7 @@ RUN echo 'deb http://mirrors.aliyun.com/debian/ bookworm main' > /etc/apt/source
     echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main' >> /etc/apt/sources.list && \
     echo 'deb-src http://mirrors.aliyun.com/debian-security bookworm-security main' >> /etc/apt/sources.list
 
-# 安装基础系统依赖（先不安装wkhtmltopdf）
+# 安装基础系统依赖 (暂不安装 weasyprint)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     xvfb \

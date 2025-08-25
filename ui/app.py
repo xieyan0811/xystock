@@ -123,8 +123,51 @@ def display_analysis_page():
     with col2:
         clear_btn = st.button("🗑️ 重置")
     
+    # 处理按钮逻辑 - 使用session_state保持状态
+    if query_btn and stock_code.strip():
+        # 设置显示状态和股票信息
+        st.session_state['show_stock_info'] = True
+        st.session_state['current_stock_code'] = stock_code.strip()
+        st.session_state['current_market_type'] = market_type
+        st.session_state['query_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 设置AI分析选项
+        if use_ai_market_analysis:
+            if "ai_market_report" not in st.session_state:
+                st.session_state.ai_market_report = {}
+            st.session_state['run_ai_market_for'] = stock_code.strip()
+        
+        if use_ai_news_analysis:
+            if "ai_news_report" not in st.session_state:
+                st.session_state.ai_news_report = {}
+            st.session_state['run_news_ai_for'] = stock_code.strip()
+        
+        if use_ai_chip_analysis:
+            if "ai_chip_report" not in st.session_state:
+                st.session_state.ai_chip_report = {}
+            st.session_state['run_chip_ai_for'] = stock_code.strip()
+        
+        if use_ai_fundamental_analysis:
+            if "ai_fundamental_report" not in st.session_state:
+                st.session_state.ai_fundamental_report = {}
+            st.session_state['run_fundamental_ai_for'] = stock_code.strip()
+        
+        if use_ai_comprehensive_analysis:
+            if "ai_comprehensive_report" not in st.session_state:
+                st.session_state.ai_comprehensive_report = {}
+            st.session_state['run_comprehensive_ai_for'] = stock_code.strip()
+            st.session_state['user_opinion'] = user_opinion
+    
     # 处理清空按钮
     if clear_btn:
+        # 清除显示状态和相关数据
+        st.session_state['show_stock_info'] = False
+        if 'current_stock_code' in st.session_state:
+            del st.session_state['current_stock_code']
+        if 'current_market_type' in st.session_state:
+            del st.session_state['current_market_type']
+        if 'query_time' in st.session_state:
+            del st.session_state['query_time']
         st.rerun()
     
     # 显示返回内容的区域
@@ -132,73 +175,53 @@ def display_analysis_page():
     
     result_container = st.container()
     
-    # 处理查询逻辑
-    if query_btn:
-        if stock_code.strip():
-            with result_container:
-                with st.spinner("正在查询数据..."):
-                    try:
-                        stock_code,name = normalize_stock_input(stock_code.strip())
-                        # 如果选择了AI分析，设置session_state参数
-                        if use_ai_market_analysis:
-                            if "ai_market_report" not in st.session_state:
-                                st.session_state.ai_market_report = {}
-                            st.session_state['run_ai_market_for'] = stock_code
+    # 根据session_state状态显示内容
+    if st.session_state.get('show_stock_info', False):
+        # 从session_state获取股票信息
+        current_stock_code = st.session_state.get('current_stock_code', '')
+        current_market_type = st.session_state.get('current_market_type', '')
+        query_time = st.session_state.get('query_time', '')
+        
+        with result_container:
+            with st.spinner("正在查询数据..."):
+                try:
+                    # 标准化股票代码
+                    normalized_stock_code, name = normalize_stock_input(current_stock_code)
+                    
+                    # 显示股票信息
+                    display_stock_info(normalized_stock_code, current_market_type)
+                    
+                    # 额外的展示选项
+                    with st.expander("📊 详细信息", expanded=False):
+                        st.write(f"**查询时间:** {query_time}")
+                        st.write(f"**市场类型:** {current_market_type}")
+                        st.write(f"**股票代码:** {normalized_stock_code}")
+                        st.write(f"**股票名称:** {name}")
                         
-                        # 如果选择了AI新闻分析，设置session_state参数
-                        if use_ai_news_analysis:
-                            if "ai_news_report" not in st.session_state:
-                                st.session_state.ai_news_report = {}
-                            st.session_state['run_news_ai_for'] = stock_code
-                        
-                        # 如果选择了AI筹码分析，设置session_state参数
-                        if use_ai_chip_analysis:
-                            if "ai_chip_report" not in st.session_state:
-                                st.session_state.ai_chip_report = {}
-                            st.session_state['run_chip_ai_for'] = stock_code
-                        
-                        # 如果选择了AI基本面分析，设置session_state参数
-                        if use_ai_fundamental_analysis:
-                            if "ai_fundamental_report" not in st.session_state:
-                                st.session_state.ai_fundamental_report = {}
-                            st.session_state['run_fundamental_ai_for'] = stock_code
-                        
-                        # 如果选择了综合分析，设置session_state参数
-                        if use_ai_comprehensive_analysis:
-                            if "ai_comprehensive_report" not in st.session_state:
-                                st.session_state.ai_comprehensive_report = {}
-                            st.session_state['run_comprehensive_ai_for'] = stock_code
-                            st.session_state['user_opinion'] = user_opinion
-                            
-                        # 显示股票信息
-                        display_stock_info(stock_code, market_type)
-                        
-                        # 额外的展示选项
-                        with st.expander("📊 详细信息", expanded=False):
-                            st.write(f"**查询时间:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                            st.write(f"**市场类型:** {market_type}")
-                            st.write(f"**股票代码:** {stock_code}")
-                            
-                    except Exception as e:
-                        st.error(f"查询失败: {str(e)}")
-                        st.write("请检查股票代码是否正确，或稍后重试。")
-                        
-                        # 显示错误详情（调试用）
-                        with st.expander("🔍 错误详情", expanded=False):
-                            st.code(str(e), language="text")
+                except Exception as e:
+                    st.error(f"查询失败: {str(e)}")
+                    st.write("请检查股票代码是否正确，或稍后重试。")
+                    
+                    # 显示错误详情（调试用）
+                    with st.expander("🔍 错误详情", expanded=False):
+                        st.code(str(e), language="text")
+    else:
+        # 处理查询逻辑 - 仅处理按钮点击，但不显示结果
+        if query_btn:
+            if not stock_code.strip():
+                with result_container:
+                    st.warning("请输入股票代码")
+            # 如果有股票代码，状态已在上面的按钮处理中设置，页面会重新运行并显示结果
         else:
             with result_container:
-                st.warning("请输入股票代码")
-    else:
-        with result_container:
-            st.info("请输入股票代码并点击查询按钮")
+                st.info("请输入股票代码并点击查询按钮")
     
     # 页面底部信息
     st.markdown("---")
     st.markdown(
         """
         <div style='text-align: center; color: #666;'>
-            <small>XY Stock 股票分析系统 | 数据仅供参考，投资有风险</small>
+            <small>XY Stock 股票分析系统 | 数据仅供参考，不构成任何投资建议</small>
         </div>
         """,
         unsafe_allow_html=True

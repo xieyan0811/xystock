@@ -2,17 +2,32 @@
 
 一个极简的股票/基金分析工具，支持实时行情获取和大模型分析。
 
-## 目录结构
-- provider/ 数据获取脚本
-- llm/  大模型相关及prompt
-- ui/   预留界面
-- notebooks/ 实验用notebook
-- data/ 过程数据
+## 安装和使用
 
-## 快速开始
-1. 安装依赖：`pip install -r requirements.txt`
-2. 设置OpenAI API Key（环境变量OPENAI_API_KEY）
-3. 运行：`python main.py`
+克隆仓库并构建Docker镜像
+
+   ```bash
+   git clone git@github.com:xieyan0811/xystock.git
+   cd xystock
+   docker build . -t xystock:latest
+   ```
+
+启动Docker Compose容器
+
+生产模式：
+   
+```bash
+ docker compose up -d
+ ```
+   
+ 开发模式：
+ ```bash
+ docker compose -f docker-compose.dev.yml up -d
+ docker exec -it xystock-web bash
+ python -m streamlit run ui/app.py --server.address=0.0.0.0 --server.port=8811
+ ```
+
+进入容器后，请先配置大模型相关参数。随后可以依次尝试以下功能：token统计、大盘分析、股票分析。
 
 ## 支持的模型
 
@@ -53,3 +68,12 @@
 
 - **普通模型**：对于快速查询和简单任务，建议使用较轻量的模型，如 GPT-4.1-mini、o4-mini 或通义千问 Turbo。
 - **推理模型**：建议使用功能更强大的模型，如 GPT-4o、o3 或通义千问 Max，以获取更深入的股票分析。
+
+## 目录结构
+- provider/ 数据获取脚本
+- llm/  大模型相关及prompt
+- ui/   预留界面
+- notebooks/ 实验用notebook
+- data/ 过程数据
+
+*如果你觉得项目对你有帮助或能解决你的实际问题，请帮我点亮小星星～*
