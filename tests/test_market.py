@@ -79,7 +79,6 @@ class TestMarketIndicators(unittest.TestCase):
                 assert 0 <= rsi <= 100, f"RSI值应在0-100之间，当前值: {rsi}"
             
             print(f"   ✓ 技术指标获取成功，包含 {len(tech_indicators)} 个指标")
-            print(f"   ✓ 当前点位: {tech_indicators['latest_close']:.2f}")
             print(f"   ✓ MA趋势: {tech_indicators['ma_trend']}")
             print(f"   ✓ MACD趋势: {tech_indicators['macd_trend']}")
         else:

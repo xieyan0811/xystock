@@ -10,6 +10,8 @@ from typing import Dict
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
 _STOCK_NAME_CODE_MAP = {}
+_HK_STOCK_CODE_NAME_MAP = {}
+_HK_STOCK_NAME_CODE_MAP = {}
 _INDEX_CODE_NAME_MAP = {
     '000001': '上证指数',
     '399001': '深证成指', 
@@ -27,7 +29,9 @@ _INDEX_NAME_CODE_MAP = {
     '科创50': '000688'
 }
 _LAST_UPDATE_TIME = 0
+_HK_LAST_UPDATE_TIME = 0
 _MAP_FILE_PATH = os.path.join(Path(__file__).parent.parent, 'data', 'cache', 'stock_code_name_map.json')
+_HK_MAP_FILE_PATH = os.path.join(Path(__file__).parent.parent, 'data', 'cache', 'hk_stock_code_name_map.json')
 
 def _ensure_dir_exists(file_path):
     """确保文件目录存在"""
@@ -94,13 +98,81 @@ def _load_stock_map(force_download = False):
     except Exception as e:
         print(f"获取股票映射关系失败: {e}")
 
+def _load_hk_stock_map(force_download=False):
+    """加载港股通股票代码和名称的映射关系"""
+    global _HK_STOCK_CODE_NAME_MAP, _HK_STOCK_NAME_CODE_MAP, _HK_LAST_UPDATE_TIME
+    
+    # 如果已加载且距离上次更新不超过24小时，则直接返回
+    current_time = time.time()
+    if _HK_STOCK_CODE_NAME_MAP and (current_time - _HK_LAST_UPDATE_TIME < 86400):  # 86400秒 = 24小时
+        return
+    
+    # 尝试从本地文件加载
+    try:
+        if os.path.exists(_HK_MAP_FILE_PATH) and not force_download:
+            with open(_HK_MAP_FILE_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                _HK_STOCK_CODE_NAME_MAP = data.get('code_to_name', {})
+                _HK_STOCK_NAME_CODE_MAP = data.get('name_to_code', {})
+                _HK_LAST_UPDATE_TIME = data.get('update_time', 0)
+                
+                # 如果距离上次更新不超过7天，则直接返回
+                if current_time - _HK_LAST_UPDATE_TIME < 604800:  # 604800秒 = 7天
+                    return
+    except Exception as e:
+        print(f"加载港股通映射文件失败: {e}")
+    
+    # 如果本地文件不存在或已过期，则重新获取
+    try:
+        # 获取港股通成分股信息
+        print("正在更新港股通股票代码与名称映射表...")
+        
+        # 获取港股通成分股信息
+        hk_stock_info = ak.stock_hk_ggt_components_em()
+        
+        # 处理港股通数据
+        for _, row in hk_stock_info.iterrows():
+            code = row['代码']
+            name = row['名称']
+            _HK_STOCK_CODE_NAME_MAP[code] = name
+            _HK_STOCK_NAME_CODE_MAP[name] = code
+        
+        # 保存到本地文件
+        _ensure_dir_exists(_HK_MAP_FILE_PATH)
+        with open(_HK_MAP_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump({
+                'code_to_name': _HK_STOCK_CODE_NAME_MAP,
+                'name_to_code': _HK_STOCK_NAME_CODE_MAP,
+                'update_time': current_time
+            }, f, ensure_ascii=False, indent=2)
+            
+        _HK_LAST_UPDATE_TIME = current_time
+        print(f"港股通映射表更新完成，共有 {len(_HK_STOCK_CODE_NAME_MAP)} 个港股通股票信息")
+    except Exception as e:
+        print(f"获取港股通映射关系失败: {e}")
+
+def update_hk_stock_map():
+    """手动更新港股通股票映射表"""
+    print("开始更新港股通股票映射表...")
+    _load_hk_stock_map(force_download=True)
+    print("港股通股票映射表更新完成")
+
+def get_hk_stock_info():
+    """获取当前港股通映射信息"""
+    _load_hk_stock_map()
+    return {
+        'total_count': len(_HK_STOCK_CODE_NAME_MAP),
+        'update_time': _HK_LAST_UPDATE_TIME,
+        'sample_stocks': dict(list(_HK_STOCK_CODE_NAME_MAP.items())[:10])  # 前10个样本
+    }
+
 def get_stock_code(stock_name_or_code, security_type='stock'):
     """
     获取证券代码
     
     Args:
         stock_name_or_code: 证券名称或代码
-        security_type: 证券类型，可选值为'stock'(股票)或'index'(指数)，默认为'stock'
+        security_type: 证券类型，可选值为'stock'(股票)、'index'(指数)或'hk'(港股通)，默认为'stock'
         
     Returns:
         证券代码，如果输入已经是代码则直接返回，如果是名称则转换为代码
@@ -129,22 +201,58 @@ def get_stock_code(stock_name_or_code, security_type='stock'):
             # 返回第一个匹配项
             return _INDEX_NAME_CODE_MAP[matched_names[0]]
     
-    # 默认查找所有(股票+指数)
+    # 如果明确指定查找港股通
+    elif security_type == 'hk':
+        # 确保港股通映射表已加载
+        _load_hk_stock_map()
+        
+        # 检查输入是否已经是港股通代码
+        if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
+            return stock_name_or_code
+        
+        # 检查输入是否是港股通名称
+        if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
+            return _HK_STOCK_NAME_CODE_MAP[stock_name_or_code]
+        
+        # 尝试模糊匹配港股通名称
+        matched_names = [name for name in _HK_STOCK_NAME_CODE_MAP.keys() 
+                        if stock_name_or_code in name]
+        
+        if matched_names:
+            # 返回第一个匹配项
+            return _HK_STOCK_NAME_CODE_MAP[matched_names[0]]
+    
+    # 默认查找所有(A股+港股通+指数)
+    # 先尝试加载港股通映射表
+    _load_hk_stock_map()
+    
     # 检查输入是否已经是代码
     if stock_name_or_code in _STOCK_CODE_NAME_MAP:
+        return stock_name_or_code
+    if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
         return stock_name_or_code
     
     # 检查输入是否是名称
     if stock_name_or_code in _STOCK_NAME_CODE_MAP:
         return _STOCK_NAME_CODE_MAP[stock_name_or_code]
+    if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
+        return _HK_STOCK_NAME_CODE_MAP[stock_name_or_code]
     
-    # 尝试模糊匹配
+    # 尝试模糊匹配A股
     matched_names = [name for name in _STOCK_NAME_CODE_MAP.keys() 
                     if stock_name_or_code in name]
     
     if matched_names:
         # 返回第一个匹配项
         return _STOCK_NAME_CODE_MAP[matched_names[0]]
+    
+    # 尝试模糊匹配港股通
+    matched_hk_names = [name for name in _HK_STOCK_NAME_CODE_MAP.keys() 
+                       if stock_name_or_code in name]
+    
+    if matched_hk_names:
+        # 返回第一个匹配项
+        return _HK_STOCK_NAME_CODE_MAP[matched_hk_names[0]]
     
     # 如果都没匹配到，返回原始输入
     return stock_name_or_code
@@ -155,7 +263,7 @@ def get_stock_name(stock_name_or_code, security_type='stock'):
     
     Args:
         stock_name_or_code: 证券名称或代码
-        security_type: 证券类型，可选值为'stock'(股票)或'index'(指数)，默认为'stock'
+        security_type: 证券类型，可选值为'stock'(股票)、'index'(指数)或'hk'(港股通)，默认为'stock'
         
     Returns:
         证券名称，如果输入已经是名称则直接返回，如果是代码则转换为名称
@@ -184,14 +292,42 @@ def get_stock_name(stock_name_or_code, security_type='stock'):
             # 返回第一个匹配项
             return _INDEX_CODE_NAME_MAP[matched_codes[0]]
     
-    # 默认查找所有(股票+指数)
+    # 如果明确指定查找港股通
+    elif security_type == 'hk':
+        # 确保港股通映射表已加载
+        _load_hk_stock_map()
+        
+        # 检查输入是否已经是港股通名称
+        if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
+            return stock_name_or_code
+        
+        # 检查输入是否是港股通代码
+        if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
+            return _HK_STOCK_CODE_NAME_MAP[stock_name_or_code]
+        
+        # 尝试模糊匹配港股通代码
+        matched_codes = [code for code in _HK_STOCK_CODE_NAME_MAP.keys() 
+                        if stock_name_or_code in code]
+        
+        if matched_codes:
+            # 返回第一个匹配项
+            return _HK_STOCK_CODE_NAME_MAP[matched_codes[0]]
+    
+    # 默认查找所有(A股+港股通+指数)
+    # 先尝试加载港股通映射表
+    _load_hk_stock_map()
+    
     # 检查输入是否已经是名称
     if stock_name_or_code in _STOCK_NAME_CODE_MAP:
+        return stock_name_or_code
+    if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
         return stock_name_or_code
     
     # 检查输入是否是代码
     if stock_name_or_code in _STOCK_CODE_NAME_MAP:
         return _STOCK_CODE_NAME_MAP[stock_name_or_code]
+    if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
+        return _HK_STOCK_CODE_NAME_MAP[stock_name_or_code]
     
     # 如果都没匹配到，返回原始输入
     return stock_name_or_code
@@ -202,7 +338,7 @@ def normalize_stock_input(stock_input, security_type='stock'):
     
     Args:
         stock_input: 用户输入的证券代码或名称
-        security_type: 证券类型，可选值为'stock'(股票)或'index'(指数)，默认为'stock'
+        security_type: 证券类型，可选值为'stock'(股票)、'index'(指数)或'hk'(港股通)，默认为'stock'
         
     Returns:
         元组 (stock_code, stock_name)

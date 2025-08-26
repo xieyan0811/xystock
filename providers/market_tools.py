@@ -452,7 +452,7 @@ class MarketTools:
             
             if df_raw.empty:
                 raise ValueError(f"无法获取{index_name}数据")
-            
+                        
             # 获取最近的数据
             df = df_raw.tail(period).copy()
             
@@ -773,11 +773,6 @@ def get_market_report(report: Dict) -> str:
     tech = report['technical_indicators']
     if tech:
         lines.append(f"\n📈 技术指标分析:")
-        latest_close = tech.get('latest_close', 'N/A')
-        if isinstance(latest_close, (int, float)):
-            lines.append(f"   当前点位: {latest_close:.2f}")
-        else:
-            lines.append(f"   当前点位: {latest_close}")
         lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
         lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
         rsi_14 = tech.get('rsi_14', 'N/A')

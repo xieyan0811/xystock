@@ -520,15 +520,6 @@ def display_market_trend(stock_code):
             
             # 显示成交量图表
             st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
-
-            # 显示最近交易日信息
-            last_row = df.iloc[-1]
-            cols = st.columns(5)
-            cols[0].metric("开盘", format_price(last_row['open']))
-            cols[1].metric("最高", format_price(last_row['high']))
-            cols[2].metric("最低", format_price(last_row['low']))
-            cols[3].metric("收盘", format_price(last_row['close']))
-            cols[4].metric("成交量", format_volume(last_row['volume']))
             
             # 使用缓存的技术指标数据
             indicators = kline_info.get('indicators', {})

@@ -27,22 +27,10 @@ def display_technical_indicators(tech_data):
         return
     
     # 基础信息
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     with col1:
-        latest_close = tech_data.get('latest_close', 0)
-        if latest_close:
-            st.metric("当前点位", format_price(latest_close))
-        else:
-            st.metric("当前点位", "N/A")
-    with col2:
-        latest_volume = tech_data.get('latest_volume', 0)
-        if latest_volume:
-            st.metric("成交量", format_volume(latest_volume))
-        else:
-            st.metric("成交量", "N/A")
-    with col3:
         st.metric("MA趋势", tech_data.get('ma_trend', 'N/A'))
-    with col4:
+    with col2:
         st.metric("MACD趋势", tech_data.get('macd_trend', 'N/A'))
     
     # 移动平均线

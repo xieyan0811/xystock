@@ -294,8 +294,7 @@ class StockTools:
             kline_data = data_manager.get_kline_data(
                 stock_code, 
                 KLineType.DAY, 
-                period,
-                force = force_refresh
+                period
             )
             
             if kline_data and len(kline_data) > 0:
@@ -303,9 +302,6 @@ class StockTools:
                 df = pd.DataFrame([k.__dict__ for k in kline_data])
                 df = df.sort_values('datetime')
                 
-                print("###############################################")
-                print(df)
-
                 # 计算移动平均线
                 df['MA5'] = df['close'].rolling(window=5).mean()
                 df['MA10'] = df['close'].rolling(window=10).mean()

@@ -160,7 +160,6 @@ class TestDataManager(unittest.TestCase):
             assert latest_data.close < 6000, "上证指数应小于6000点"  # 合理范围检查
             
             print(f"      ✓ 获取到 {len(kline_data)} 条指数数据")
-            print(f"      ✓ 当前点位: {latest_data.close:.2f}")
             print(f"      ✓ 日期: {latest_data.datetime}")
             
             # 转换为DataFrame进行分析

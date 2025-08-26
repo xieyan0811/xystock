@@ -721,6 +721,10 @@ def generate_comprehensive_analysis_report(
 
 请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。"""
 
+    # 把 user_message 写入 data/cache/req.txt
+    with open("data/cache/req.txt", "w", encoding="utf-8") as f:
+        f.write(user_message)
+
     try:
         # 调用OpenAI API
         messages = [

@@ -3,6 +3,7 @@
 """
 
 import time
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from providers.cache_manager import cache_manager, KLineData, KLineType
@@ -76,6 +77,32 @@ class StockDataFetcher:
             KLineType.MONTH: 103,
         }
     
+    def _get_previous_trading_day(self) -> str:
+        """
+        计算前一个交易日
+        
+        规则：
+        - 如果当前日期是周二至周六（1-5），则为前一天
+        - 如果是周一（0）或周日（6），则为上个周五
+        
+        Returns:
+            str: 前一个交易日，格式为 YYYY-MM-DD
+        """
+        today = datetime.now()
+        weekday = today.weekday()  # 0=Monday, 1=Tuesday, ..., 6=Sunday
+        
+        if weekday == 0:  # 周一
+            # 前一个交易日是上周五
+            prev_trading_day = today - timedelta(days=3)
+        elif weekday == 6:  # 周日
+            # 前一个交易日是上周五
+            prev_trading_day = today - timedelta(days=2)
+        else:  # 周二到周六
+            # 前一个交易日是前一天
+            prev_trading_day = today - timedelta(days=1)
+        
+        return prev_trading_day.strftime("%Y-%m-%d")
+    
     def initialize(self) -> bool:
         """初始化 efinance 模块"""
         try:
@@ -146,8 +173,7 @@ class StockDataFetcher:
     def get_kline_data(self, 
                       symbol: str, 
                       kline_type: KLineType = KLineType.DAY, 
-                      count: int = 30,
-                      force: bool = False) -> List[KLineData]:
+                      count: int = 30) -> List[KLineData]:
         """
         获取K线数据（支持缓存）
         
@@ -155,7 +181,6 @@ class StockDataFetcher:
             symbol: 股票代码（如:600519, AAPL, 微软，ETF Code）
             kline_type: K线类型
             count: 获取条数
-            force: 是否强制从数据源获取新数据，忽略缓存
             
         Returns:
             List[KLineData]: K线数据列表
@@ -168,13 +193,22 @@ class StockDataFetcher:
         
         symbol = symbol.upper().strip()
         
-        # 如果不强制刷新，先尝试从缓存获取
-        if not force:
-            cached_data = cache_manager.get_cached_kline(symbol, kline_type, count)
-            if cached_data:
+        # 检查缓存数据
+        cached_data = cache_manager.get_cached_kline(symbol, kline_type, count)
+        if cached_data:
+            # 检查是否包含前一个交易日的数据
+            previous_trading_day = self._get_previous_trading_day()
+            has_previous_trading_day_data = any(
+                kline.datetime.startswith(previous_trading_day) for kline in cached_data
+            )
+            
+            if not has_previous_trading_day_data:
+                print(f"⚠️  缓存不包含前一个交易日数据，需要重新拉取: {symbol} {kline_type.value}")
+            else:
                 print(f"📦 从缓存获取K线数据: {symbol} {kline_type.value} {len(cached_data)}条")
                 return cached_data
 
+        # 从数据源获取数据
         try:
             formatted_symbol = self.format_symbol(symbol)
             klt = self._kline_type_mapping[kline_type]
@@ -183,10 +217,6 @@ class StockDataFetcher:
             kline_df = self._ef.stock.get_quote_history(formatted_symbol, klt=klt)
             
             if kline_df is not None and not kline_df.empty:
-                # 保留最近count条记录
-                if len(kline_df) > count:
-                    kline_df = kline_df.tail(count)
-                
                 # 转换为标准格式
                 kline_list = []
                 if hasattr(kline_df, "to_dict"):
@@ -196,17 +226,52 @@ class StockDataFetcher:
                         if kline_data:
                             kline_list.append(kline_data)
                 
-                # 如果成功获取到数据，则缓存
                 if kline_list:
-                    cache_manager.cache_kline(symbol, kline_type, count, kline_list)
-                    print(f"🔄 从数据源获取K线数据: {symbol} {kline_type.value} {len(kline_list)}条")
-                
-                return kline_list
+                    # 判断是否保存当日K线数据：仅对日K线应用16:30收盘判断
+                    now = datetime.now()
+                    today = now.strftime("%Y-%m-%d")
+                    
+                    if kline_type == KLineType.DAY:
+                        # 日K线：判断是否过了16:30收盘时间
+                        market_close_time = now.replace(hour=16, minute=30, second=0, microsecond=0)
+                        
+                        if now >= market_close_time:
+                            # 已收盘，保存包含当日在内的所有数据
+                            filtered_kline_list = kline_list
+                            log_message = f"🔄 从数据源获取K线数据: {symbol} {kline_type.value} {len(filtered_kline_list)}条 (已收盘，包含当日数据)"
+                        else:
+                            # 未收盘，去掉当日数据，避免保存盘中价格
+                            filtered_kline_list = [
+                                kline for kline in kline_list 
+                                if not kline.datetime.startswith(today)
+                            ]
+                            log_message = f"🔄 从数据源获取K线数据: {symbol} {kline_type.value} {len(filtered_kline_list)}条 (未收盘，已去除当日数据)"
+                    else:
+                        # 分钟级K线：直接去掉当日数据（实时数据变化频繁）
+                        filtered_kline_list = [
+                            kline for kline in kline_list 
+                            if not kline.datetime.startswith(today)
+                        ]
+                        log_message = f"🔄 从数据源获取K线数据: {symbol} {kline_type.value} {len(filtered_kline_list)}条 (分钟线，已去除当日数据)"
+                    
+                    # 保留最近count条记录
+                    if len(filtered_kline_list) > count:
+                        filtered_kline_list = filtered_kline_list[-count:]
+                    
+                    # 缓存数据
+                    cache_manager.cache_kline(symbol, kline_type, count, filtered_kline_list)
+                    print(log_message)
+                    
+                    return filtered_kline_list
             
             return []
             
         except Exception as e:
             print(f"获取K线数据失败: {e}")
+            # 如果拉取失败且有缓存数据，返回缓存数据
+            if cached_data:
+                print(f"⚠️  拉取失败，返回缓存数据: {symbol} {kline_type.value} {len(cached_data)}条")
+                return cached_data
             return []
     
     def get_stock_info(self, symbol: str) -> Optional[StockInfo]:
@@ -339,6 +404,7 @@ class StockDataFetcher:
     
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(name='{self.name}', available={self.is_available()})>"
+    
     def _convert_to_stock_info(self, data: Dict[str, Any], original_symbol: str) -> StockInfo:
         """将efinance返回的股票基本信息转换为标准格式"""
         try:
@@ -352,8 +418,8 @@ class StockDataFetcher:
                     return None
             
             def safe_convert_str(value):
-                """安全转换为字符串，处理'-'值"""
-                if value == '-' or value is None:
+                """安全转换为字符串，处理'-'和'0.0'值"""
+                if value == '-' or value is None or str(value).strip() == '0.0':
                     return None
                 return str(value).strip() if str(value).strip() else None
             
