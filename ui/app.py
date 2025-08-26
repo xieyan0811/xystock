@@ -134,27 +134,17 @@ def display_analysis_page():
         
         # 设置AI分析选项
         if use_ai_analysis:
-            # 设置所有AI分析标志
-            if "ai_market_report" not in st.session_state:
-                st.session_state.ai_market_report = {}
-            st.session_state['run_ai_market_for'] = stock_code.strip()
-            
-            if "ai_news_report" not in st.session_state:
-                st.session_state.ai_news_report = {}
-            st.session_state['run_news_ai_for'] = stock_code.strip()
-            
-            if "ai_chip_report" not in st.session_state:
-                st.session_state.ai_chip_report = {}
-            st.session_state['run_chip_ai_for'] = stock_code.strip()
-            
-            if "ai_fundamental_report" not in st.session_state:
-                st.session_state.ai_fundamental_report = {}
-            st.session_state['run_fundamental_ai_for'] = stock_code.strip()
-            
-            if "ai_comprehensive_report" not in st.session_state:
-                st.session_state.ai_comprehensive_report = {}
-            st.session_state['run_comprehensive_ai_for'] = stock_code.strip()
+            # 设置AI分析标志 - 使用统一的状态管理
+            st.session_state['include_ai_analysis'] = True
             st.session_state['user_opinion'] = user_opinion
+            
+            # 初始化AI报告存储（如果不存在）
+            for report_type in ['ai_market_report', 'ai_news_report', 'ai_chip_report', 
+                               'ai_fundamental_report', 'ai_comprehensive_report']:
+                if report_type not in st.session_state:
+                    st.session_state[report_type] = {}
+        else:
+            st.session_state['include_ai_analysis'] = False
     
     # 处理清空按钮
     if clear_btn:
@@ -166,6 +156,11 @@ def display_analysis_page():
             del st.session_state['current_market_type']
         if 'query_time' in st.session_state:
             del st.session_state['query_time']
+        # 清除AI分析相关状态
+        if 'include_ai_analysis' in st.session_state:
+            del st.session_state['include_ai_analysis']
+        if 'user_opinion' in st.session_state:
+            del st.session_state['user_opinion']
         st.rerun()
     
     # 显示返回内容的区域

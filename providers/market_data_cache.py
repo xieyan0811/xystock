@@ -30,7 +30,7 @@ class MarketDataCache:
         # 定义数据类型和过期时间
         self.data_configs = {
             'market_sentiment': {
-                'expire_minutes': 15,  # 15分钟过期
+                'expire_minutes': 60,  # 60分钟过期
                 'fetch_method': 'get_market_sentiment_indicators',
                 'description': '市场情绪指标'
             },

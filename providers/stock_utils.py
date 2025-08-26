@@ -582,8 +582,16 @@ def get_indicators(df):
         
         # 基础数据
         'latest_close': stock['close'].iloc[-1],
+        'latest_high': stock['high'].iloc[-1],
+        'latest_low': stock['low'].iloc[-1],
+        'latest_open': stock['open'].iloc[-1],
         'latest_volume': stock['volume'].iloc[-1],
         'latest_date': df.iloc[-1].get('datetime', datetime.now().strftime('%Y-%m-%d')),
+        
+        # 价格变化（如果有前一日数据）
+        'prev_close': stock['close'].iloc[-2] if len(stock) > 1 else None,
+        'change_amount': stock['close'].iloc[-1] - stock['close'].iloc[-2] if len(stock) > 1 else 0,
+        'change_percent': ((stock['close'].iloc[-1] - stock['close'].iloc[-2]) / stock['close'].iloc[-2] * 100) if len(stock) > 1 and stock['close'].iloc[-2] != 0 else 0,
         
         # 趋势判断
         'ma_trend': _judge_ma_trend(stock),

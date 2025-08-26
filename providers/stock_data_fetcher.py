@@ -215,7 +215,7 @@ class StockDataFetcher:
             
             # 获取K线数据
             kline_df = self._ef.stock.get_quote_history(formatted_symbol, klt=klt)
-            
+
             if kline_df is not None and not kline_df.empty:
                 # 转换为标准格式
                 kline_list = []

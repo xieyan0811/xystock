@@ -400,8 +400,8 @@ class MarketTools:
         except Exception as e:
             print(f"❌ 获取融资融券失败: {e}")
             return self._get_cached_data(data_type) if use_cache else {}
-    
-    def get_ai_analysis(self, use_cache: bool = True, index_name: str = None, force_regenerate: bool = False) -> Dict:
+        
+    def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False) -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
         

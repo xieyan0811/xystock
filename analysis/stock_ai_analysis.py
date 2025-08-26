@@ -76,7 +76,6 @@ def generate_stock_analysis_report(
 5. 给出明确的投资建议
 
 **输出格式：**
-## 📊 股票基本信息
 ## 📈 技术指标分析
 ## 📉 价格趋势分析
 ## 💭 投资建议
@@ -88,7 +87,7 @@ def generate_stock_analysis_report(
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请基于以下数据对{stock_name}({stock_code})进行技术分析：
 
-1. 最新交易日数据：
+1. 前一个交易日数据：
 - 日期：{latest_data['datetime']}
 - 开盘价：{format_price(latest_data['open'])}
 - 最高价：{format_price(latest_data['high'])}
@@ -109,7 +108,7 @@ def generate_stock_analysis_report(
         response = client.chat(
             messages=messages,
             temperature=0.5,  # 使用较低的温度以保持输出一致性
-            model_type="default"  # 使用默认分析模型
+            model_type="inference"  # 使用推理模型
         )
         
         return response
@@ -542,15 +541,42 @@ def generate_comprehensive_analysis_report(
     stock_name: str,
     user_opinion: str = "",
     stock_tools=None,
-    market_tools=None
+    market_tools=None,
+    truncate_data: bool = False
 ) -> Tuple[str, List[Dict]]:
-    """生成综合分析报告"""
+    """生成综合分析报告
+    
+    Args:
+        stock_code: 股票代码
+        stock_name: 股票名称  
+        user_opinion: 用户观点
+        stock_tools: 股票工具实例
+        market_tools: 市场工具实例
+        truncate_data: 是否截断数据，默认True。如果为False则使用全文数据
+        
+    Returns:
+        Tuple[str, List[Dict]]: (分析报告, 数据来源列表)
+    """
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
     # 收集历史分析数据
     historical_analyses = {}
     data_sources = []
+    
+    # 获取股票基本信息（包含当前价格、涨跌额、涨跌幅）
+    basic_info = {}
+    if stock_tools:
+        try:
+            basic_info = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
+            if basic_info and 'error' not in basic_info:
+                data_sources.append({
+                    'type': '股票基本信息',
+                    'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
+                    'timestamp': basic_info.get('update_time', '未知时间')
+                })
+        except Exception as e:
+            print(f"获取股票基本信息失败: {e}")
     
     # 收集市场数据
     market_data = {}
@@ -580,7 +606,7 @@ def generate_comprehensive_analysis_report(
                 
                 # 生成市场报告文本
                 from providers.market_tools import get_market_report
-                market_report_text = get_market_report(market_report)
+                market_report_text = get_market_report(market_report) # 单纯数据
                 
         except Exception as e:
             print(f"获取市场综合报告失败: {e}")
@@ -589,7 +615,7 @@ def generate_comprehensive_analysis_report(
             # 获取AI市场分析
             market_ai_data = market_tools.get_ai_analysis(use_cache=True)
             if market_ai_data:
-                market_ai_analysis = market_ai_data
+                market_ai_analysis = market_ai_data # ai分析市场
                 data_sources.append({
                     'type': 'AI市场分析',
                     'description': '基于AI模型的市场分析报告',
@@ -602,7 +628,7 @@ def generate_comprehensive_analysis_report(
         if stock_tools:
             # 尝试获取各种历史分析结果
             analysis_types = {
-                'market': '技术分析',
+                'technical': '技术分析',
                 'fundamental': '基本面分析', 
                 'news': '新闻分析',
                 'chip': '筹码分析'
@@ -641,40 +667,75 @@ def generate_comprehensive_analysis_report(
     # 构建历史分析摘要
     historical_summary = ""
     if historical_analyses:
-        historical_summary = "\n\n## 📊 历史分析摘要\n"
+        historical_summary = "\n\n# 📊 历史分析摘要\n"
         for analysis_type, report in historical_analyses.items():
-            # 提取报告的关键信息（前300字符作为摘要）
-            summary = report[:300] + "..." if len(report) > 300 else report
-            historical_summary += f"\n### {analysis_types.get(analysis_type, analysis_type)}:\n{summary}\n"
+            # 根据truncate_data参数决定是否截断数据
+            if truncate_data:
+                # 提取报告的关键信息（前300字符作为摘要）
+                summary = report[:300] + "..." if len(report) > 300 else report
+            else:
+                # 使用全文
+                summary = report
+            historical_summary += f"\n## {analysis_types.get(analysis_type, analysis_type)}:\n{summary}\n"
     else:
         historical_summary = "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
     
     # 构建市场数据摘要
     market_summary = ""
     if market_report_text or market_ai_analysis:
-        market_summary = "\n\n## 🌐 市场环境分析\n"
+        market_summary = "\n\n# 🌐 市场环境分析\n"
         
         if market_report_text:
-            # 截取市场报告的关键部分（前500字符）
-            market_text_summary = market_report_text[:500] + "..." if len(market_report_text) > 500 else market_report_text
-            market_summary += f"\n### 市场综合报告:\n{market_text_summary}\n"
+            # 根据truncate_data参数决定是否截断市场报告
+            if truncate_data:
+                # 截取市场报告的关键部分（前500字符）
+                market_text_summary = market_report_text[:500] + "..." if len(market_report_text) > 500 else market_report_text
+            else:
+                # 使用全文
+                market_text_summary = market_report_text
+            market_summary += f"\n## 市场综合报告:\n{market_text_summary}\n"
         
         if market_ai_analysis:
             # 如果有AI市场分析，添加其内容
             if isinstance(market_ai_analysis, dict) and 'analysis' in market_ai_analysis:
                 ai_text = market_ai_analysis['analysis']
-                ai_summary = ai_text[:300] + "..." if len(ai_text) > 300 else ai_text
-                market_summary += f"\n### AI市场分析:\n{ai_summary}\n"
+                if truncate_data:
+                    ai_summary = ai_text[:300] + "..." if len(ai_text) > 300 else ai_text
+                else:
+                    ai_summary = ai_text
+                market_summary += f"\n## AI市场分析:\n{ai_summary}\n"
             elif isinstance(market_ai_analysis, str):
-                ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
+                if truncate_data:
+                    ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
+                else:
+                    ai_summary = market_ai_analysis
                 market_summary += f"\n### AI市场分析:\n{ai_summary}\n"
     else:
         market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n"
     
+    # 构建股票基本信息部分
+    basic_info_section = ""
+    if basic_info and 'error' not in basic_info:
+        current_price = basic_info.get('current_price', 0)
+        change = basic_info.get('change', 0)
+        change_percent = basic_info.get('change_percent', 0)
+        stock_name_info = basic_info.get('name', stock_name)
+        
+        # 判断涨跌情况
+        
+        basic_info_section = f"""\n\n# 💹 股票实时信息
+- 股票名称：{stock_name_info}（{stock_code}）
+- 当前价格：{current_price:.2f}元
+- 涨跌金额：{change:+.2f}元
+- 涨跌幅度：{change_percent:+.2f}%
+- 更新时间：{basic_info.get('timestamp', '未知')}\n"""
+    else:
+        basic_info_section = f"\n\n# 💹 股票实时信息\n暂无{stock_name}（{stock_code}）的实时价格信息。\n"
+    
     # 构建用户观点部分
     user_opinion_section = ""
     if user_opinion.strip():
-        user_opinion_section = f"\n\n## 👤 用户观点\n{user_opinion.strip()}\n"
+        user_opinion_section = f"\n\n# 👤 用户观点\n{user_opinion.strip()}\n"
         data_sources.append({
             'type': '用户观点',
             'description': '用户提供的投资观点和看法',
@@ -682,7 +743,12 @@ def generate_comprehensive_analysis_report(
         })
     
     # 构建分析提示
-    system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）和用户观点，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
+    system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户观点，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
+
+特别关注：
+- 当前股价的涨跌情况及其反映的市场情绪
+- 价格变动与技术面、基本面分析的一致性
+- 实时表现与历史分析预期的偏差
 
 请严格按照以下结构输出，内容务必精炼、聚焦决策：
 
@@ -690,6 +756,7 @@ def generate_comprehensive_analysis_report(
 
 1. **个股当前状况**：
 - 用简明语言总结该股当前的核心优劣势、主要矛盾或机会（如趋势、估值、资金、消息等，择要突出）。
+- 结合当前价格表现分析市场对该股的即时反应。
 
 2. **大盘与行业环境**：
 - 简要说明当前大盘和行业对该股的影响（如大盘趋势、流动性、板块轮动等）。
@@ -707,23 +774,27 @@ def generate_comprehensive_analysis_report(
 - 明确列出1-3个当前最需警惕的风险。
 
 【要求】
-- 全文不超过500字，避免冗余和重复。
+- 全文不超过600字，避免冗余和重复。
 - 只输出最有决策价值的内容，避免面面俱到。
 - 结论要有明确的操作性。
+- 必须考虑当前价格变动情况对投资决策的影响。
 """
 
     # 构建用户消息
     user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
 
+{basic_info_section}
 {historical_summary}
 {market_summary}
 {user_opinion_section}
 
-请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。"""
+请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。当前股价的涨跌情况也是重要的分析因素。"""
 
     # 把 user_message 写入 data/cache/req.txt
     with open("data/cache/req.txt", "w", encoding="utf-8") as f:
         f.write(user_message)
+    print(f'req length {len(user_message)}')
+    return user_message, data_sources # for test
 
     try:
         # 调用OpenAI API

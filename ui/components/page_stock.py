@@ -322,11 +322,11 @@ def display_basic_info(stock_code):
             force_refresh = not use_cache
             
             # 检查是否需要执行AI基本面分析
-            include_ai_analysis = st.session_state.get('run_fundamental_ai_for', '') == stock_code
+            include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                                 stock_code not in st.session_state.get('ai_fundamental_report', {}))
             
-            # 如果需要AI分析，重置触发状态，避免重复分析
+            # 使用 StockTools 获取基本面数据（带缓存和可选的AI分析）
             if include_ai_analysis:
-                st.session_state['run_fundamental_ai_for'] = ''
                 with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
                     fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
             else:
@@ -369,12 +369,9 @@ def display_market_trend(stock_code):
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
         
-        # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
-        include_ai_analysis = st.session_state.get('run_ai_market_for', '') == stock_code
-        
-        # 如果需要AI分析，重置触发状态，避免重复分析
-        if include_ai_analysis:
-            st.session_state['run_ai_market_for'] = ''
+        # 检查是否需要执行AI分析
+        include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                             stock_code not in st.session_state.get('ai_market_report', {}))
         
         # 使用 StockTools 获取K线数据（K线数据实时获取，技术指标使用缓存）
         if include_ai_analysis:
@@ -544,12 +541,9 @@ def display_news(stock_code):
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
         
-        # 检查是否需要执行AI新闻分析 (由app.py中的查询按钮和checkbox控制)
-        include_ai_analysis = st.session_state.get('run_news_ai_for', '') == stock_code
-        
-        # 如果需要AI分析，重置触发状态，避免重复分析
-        if include_ai_analysis:
-            st.session_state['run_news_ai_for'] = ''
+        # 检查是否需要执行AI新闻分析
+        include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                             stock_code not in st.session_state.get('ai_news_report', {}))
         
         # 使用 StockTools 获取新闻数据（带缓存和可选的AI分析）
         if include_ai_analysis:
@@ -620,11 +614,11 @@ def display_chips_analysis(stock_code):
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
         
-        # 检查是否需要执行AI筹码分析 (由app.py中的查询按钮和checkbox控制)
-        include_ai_analysis = st.session_state.get('run_chip_ai_for', '') == stock_code
+        # 检查是否需要执行AI筹码分析
+        include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                             stock_code not in st.session_state.get('ai_chip_report', {}))
         
         if include_ai_analysis:
-            st.session_state['run_chip_ai_for'] = ''
             with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
                 chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
@@ -788,7 +782,8 @@ def display_comprehensive_analysis(stock_code):
     
     try:
         # 检查是否需要运行综合分析
-        if 'run_comprehensive_ai_for' in st.session_state and st.session_state['run_comprehensive_ai_for'] == stock_code:
+        if (st.session_state.get('include_ai_analysis', False) and 
+            stock_code not in st.session_state.get('ai_comprehensive_report', {})):
             user_opinion = st.session_state.get('user_opinion', '')
             
             # 获取缓存设置
@@ -809,12 +804,6 @@ def display_comprehensive_analysis(stock_code):
                     if "ai_comprehensive_report" not in st.session_state:
                         st.session_state.ai_comprehensive_report = {}
                     st.session_state.ai_comprehensive_report[stock_code] = analysis_data
-                    
-                    # 移除运行标记
-                    if 'run_comprehensive_ai_for' in st.session_state:
-                        del st.session_state['run_comprehensive_ai_for']
-                    if 'user_opinion' in st.session_state:
-                        del st.session_state['user_opinion']
                         
                 except Exception as e:
                     st.error(f"AI综合分析失败: {str(e)}")
