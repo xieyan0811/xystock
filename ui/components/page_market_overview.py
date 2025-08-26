@@ -173,6 +173,108 @@ def display_money_flow():
             st.write("📉 M1增速低于M2，资金活跃度一般")
 
 
+def display_market_indices():
+    """显示大盘指数信息"""
+    
+    market_tools = get_market_tools()
+    
+    st.subheader("大盘指数")
+    
+    # 定义主要指数
+    indices = {
+        '上证指数': '000001',
+        '深证成指': '399001',
+        '创业板指': '399006',
+        '沪深300': '000300',
+        '中证500': '000905',
+        '科创50': '000688'
+    }
+    
+    # 获取指数数据
+    col1, col2, col3 = st.columns(3)
+    
+    index_names = list(indices.keys())
+    
+    for i, (index_name, index_code) in enumerate(indices.items()):
+        col = [col1, col2, col3][i % 3]
+        
+        with col:
+            try:
+                # 获取技术指标数据
+                tech_data = market_tools.get_index_technical_indicators(index_name, period=30)
+                
+                if tech_data and 'latest_close' in tech_data:
+                    current_price = tech_data['latest_close']
+                    change_percent = tech_data.get('change_percent', 0)
+                    change_amount = tech_data.get('change_amount', 0)
+                    
+                    # 显示指数信息
+                    if change_percent > 0:
+                        delta_color = "normal"
+                        delta_text = f"+{change_amount:.2f} (+{change_percent:.2f}%)"
+                    elif change_percent < 0:
+                        delta_color = "inverse"
+                        delta_text = f"{change_amount:.2f} ({change_percent:.2f}%)"
+                    else:
+                        delta_color = "off"
+                        delta_text = "0.00 (0.00%)"
+                    
+                    st.metric(
+                        label=index_name,
+                        value=f"{current_price:.2f}",
+                        delta=delta_text,
+                        delta_color=delta_color
+                    )
+                else:
+                    st.metric(
+                        label=index_name,
+                        value="N/A",
+                        delta="数据获取中..."
+                    )
+                    
+            except Exception as e:
+                st.metric(
+                    label=index_name,
+                    value="N/A",
+                    delta="获取失败"
+                )
+    
+    # 显示指数分析摘要
+    with st.expander("📊 指数分析", expanded=False):
+        selected_index = st.selectbox("选择指数进行详细分析", list(indices.keys()), index=0)
+        
+        if selected_index:
+            try:
+                tech_data = market_tools.get_index_technical_indicators(selected_index, period=100)
+                
+                if tech_data:
+                    col_a, col_b = st.columns(2)
+                    
+                    with col_a:
+                        st.write("**技术指标:**")
+                        ma_trend = tech_data.get('ma_trend', '未知')
+                        macd_trend = tech_data.get('macd_trend', '未知')
+                        rsi_14 = tech_data.get('rsi_14', 0)
+                        
+                        st.write(f"MA趋势: {ma_trend}")
+                        st.write(f"MACD趋势: {macd_trend}")
+                        st.write(f"RSI(14): {rsi_14:.2f}" if isinstance(rsi_14, (int, float)) else f"RSI(14): {rsi_14}")
+                    
+                    with col_b:
+                        st.write("**价格信息:**")
+                        latest_high = tech_data.get('latest_high', 0)
+                        latest_low = tech_data.get('latest_low', 0)
+                        latest_volume = tech_data.get('latest_volume', 0)
+                        
+                        st.write(f"最高价: {latest_high:.2f}" if latest_high else "最高价: N/A")
+                        st.write(f"最低价: {latest_low:.2f}" if latest_low else "最低价: N/A")
+                        st.write(f"成交量: {format_large_number(latest_volume)}" if latest_volume else "成交量: N/A")
+                else:
+                    st.warning(f"无法获取{selected_index}的技术数据")
+            except Exception as e:
+                st.error(f"分析{selected_index}时出错: {str(e)}")
+
+
 def display_market_summary():
     """显示综合摘要卡片"""
 
@@ -186,11 +288,9 @@ def display_market_summary():
         st.info("综合摘要数据准备中...")
         return
     
-    # 检查是否需要生成AI分析报告
-    if st.session_state.get('run_ai_index_for'):
-        stock_code_for_ai = st.session_state.get('run_ai_index_for')
-        
+    if st.session_state.get('run_ai_index_for') == '上证指数':        
         # 检查是否已经生成过这个股票的AI报告
+        stock_code_for_ai = '上证指数'
         if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
             with st.spinner("🤖 AI正在分析指数数据..."):
                 try:
@@ -205,12 +305,16 @@ def display_market_summary():
                     if "ai_index_report" not in st.session_state:
                         st.session_state.ai_index_report = {}
                     st.session_state.ai_index_report[stock_code_for_ai] = ai_data
+                    
+                    # 清除标记，避免重复执行
+                    if 'run_ai_index_for' in st.session_state:
+                        del st.session_state['run_ai_index_for']
                 except Exception as e:
                     st.error(f"AI分析失败: {str(e)}")
+                    # 清除标记，即使失败也要清除
+                    if 'run_ai_index_for' in st.session_state:
+                        del st.session_state['run_ai_index_for']
         
-        # 清除标志
-        if 'run_ai_index_for' in st.session_state:
-            del st.session_state['run_ai_index_for']
     
     # 显示各个维度的摘要
     if 'technical_trend' in summary_data:
@@ -325,22 +429,25 @@ def display_market_overview():
                     st.caption(f"报告时间: {report_time}")
                     
                     # 创建标签页
-                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 技术指标", "😊 市场情绪", "💰 估值水平", "💸 资金流向", "📋 综合摘要"])
+                    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 大盘指数", "📊 技术指标", "😊 市场情绪", "💰 估值水平", "💸 资金流向", "📋 综合摘要"])
                     
                     with tab1:
+                        display_market_indices()
+                    
+                    with tab2:
                         tech_data = market_tools.get_index_technical_indicators('上证指数')
                         display_technical_indicators(tech_data)
 
-                    with tab2:
+                    with tab3:
                         display_market_sentiment()
                     
-                    with tab3:
+                    with tab4:
                         display_valuation_level()
                     
-                    with tab4:
+                    with tab5:
                         display_money_flow()
 
-                    with tab5:
+                    with tab6:
                         display_market_summary()
                         
                     # 额外的展示选项
@@ -365,7 +472,8 @@ def display_market_overview():
                 st.markdown("""
                 **大盘整体分析功能包括：**
                 
-                - 📈 **技术指标分析**: 基于上证指数的技术指标，反映大盘走势
+                - 📈 **大盘指数**: 显示主要指数的实时价格和涨跌幅，包括上证指数、深证成指、创业板指等
+                - 📊 **技术指标分析**: 基于上证指数的技术指标，反映大盘走势
                 - 😊 **市场情绪分析**: 全市场涨跌家数、融资融券等情绪指标
                 - 💰 **估值水平分析**: 市场整体估值水平评估
                 - 💸 **资金流向分析**: 主力资金流向和市场资金面分析

@@ -794,7 +794,7 @@ def generate_comprehensive_analysis_report(
     with open("data/cache/req.txt", "w", encoding="utf-8") as f:
         f.write(user_message)
     print(f'req length {len(user_message)}')
-    return user_message, data_sources # for test
+    #return user_message, data_sources # for test
 
     try:
         # 调用OpenAI API
