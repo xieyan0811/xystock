@@ -199,6 +199,8 @@ class MarketDataCache:
     
     def clear_cache(self, data_type: Optional[str] = None):
         """清理缓存"""
+        cache_cleared = False
+        
         if data_type:
             if data_type not in self.data_configs:
                 print(f"❌ 未知的数据类型: {data_type}")
@@ -209,6 +211,7 @@ class MarketDataCache:
                 if cache_data and data_type in cache_data:
                     del cache_data[data_type]
                     self._save_cache_file(cache_data)
+                    cache_cleared = True
                     print(f"✅ 已清理{self.data_configs[data_type]['description']}缓存")
                 else:
                     print(f"ℹ️ {self.data_configs[data_type]['description']}缓存不存在")
@@ -219,11 +222,17 @@ class MarketDataCache:
             try:
                 if os.path.exists(self.cache_file):
                     os.remove(self.cache_file)
+                    cache_cleared = True
                     print("✅ 已清理所有缓存数据")
                 else:
                     print("ℹ️ 缓存文件不存在")
             except Exception as e:
                 print(f"❌ 清理缓存失败: {e}")
+        
+        # 如果清理了缓存，强制重新加载以确保内存中的缓存也被清空
+        if cache_cleared:
+            # 通过重新读取文件来刷新内存缓存
+            self._load_cache_file()
     
     def get_cache_status(self) -> Dict:
         """获取缓存状态"""

@@ -142,7 +142,7 @@ def generate_news_analysis_report(
     # 准备新闻数据
     news_text = ""
     if news_data and len(news_data) > 0:
-        for idx, news in enumerate(news_data[:10]):  # 只处理前10条
+        for idx, news in enumerate(news_data):
             title = news.get('新闻标题', '')
             time = news.get('发布时间', '')
             content = news.get('新闻内容', '')

@@ -294,7 +294,8 @@ class StockTools:
             kline_data = data_manager.get_kline_data(
                 stock_code, 
                 KLineType.DAY, 
-                period
+                period,
+                force = force_refresh
             )
             
             if kline_data and len(kline_data) > 0:
@@ -302,6 +303,9 @@ class StockTools:
                 df = pd.DataFrame([k.__dict__ for k in kline_data])
                 df = df.sort_values('datetime')
                 
+                print("###############################################")
+                print(df)
+
                 # 计算移动平均线
                 df['MA5'] = df['close'].rolling(window=5).mean()
                 df['MA10'] = df['close'].rolling(window=10).mean()
@@ -1032,6 +1036,7 @@ class StockTools:
         """清理缓存"""
         try:
             cache_data = self._load_cache()
+            cache_cleared = False
             
             if stock_code and data_type:
                 # 清理特定股票的特定数据类型
@@ -1039,6 +1044,7 @@ class StockTools:
                 if cache_key in cache_data:
                     del cache_data[cache_key]
                     self._save_cache(cache_data)
+                    cache_cleared = True
                     print(f"✅ 已清理 {stock_code} {self.cache_configs.get(data_type, {}).get('description', data_type)} 缓存")
                 else:
                     print(f"ℹ️  {stock_code} {data_type} 缓存不存在")
@@ -1050,6 +1056,7 @@ class StockTools:
                     del cache_data[key]
                 if keys_to_remove:
                     self._save_cache(cache_data)
+                    cache_cleared = True
                     print(f"✅ 已清理 {stock_code} 所有缓存 ({len(keys_to_remove)}项)")
                 else:
                     print(f"ℹ️  {stock_code} 无缓存数据")
@@ -1061,6 +1068,7 @@ class StockTools:
                     del cache_data[key]
                 if keys_to_remove:
                     self._save_cache(cache_data)
+                    cache_cleared = True
                     print(f"✅ 已清理所有 {self.cache_configs.get(data_type, {}).get('description', data_type)} 缓存 ({len(keys_to_remove)}项)")
                 else:
                     print(f"ℹ️  无 {data_type} 缓存数据")
@@ -1069,9 +1077,15 @@ class StockTools:
                 # 清理所有缓存
                 if os.path.exists(self.cache_file):
                     os.remove(self.cache_file)
+                    cache_cleared = True
                     print("✅ 已清理所有股票数据缓存")
                 else:
                     print("ℹ️  缓存文件不存在")
+            
+            # 如果清理了缓存，强制重新加载以确保内存中的缓存也被清空
+            if cache_cleared:
+                # 通过重新读取文件来刷新内存缓存
+                self._load_cache()
                     
         except Exception as e:
             print(f"❌ 清理缓存失败: {e}")

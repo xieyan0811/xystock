@@ -59,6 +59,9 @@
 | 模型名称 | 模型ID | 推荐用途 |
 |---------|--------|---------|
 | DeepSeek Chat | deepseek-chat | 通用对话模型，适合股票投资分析 |
+| DeepSeek Reasoner | deepseek-reasoner | 推理模型 |
+
+目前我使用的是 deepseek 系列模型，价格便宜且更了解中国情况。目前 deepseek-reasoner 比 deepseek-chat 贵一倍，2025 年 09 月 06后有调整，具体价格与是否缓存有关，不太好统计。计费方法具体见：https://api-docs.deepseek.com/zh-cn/quick_start/pricing/
 
 ### 其他兼容服务
 

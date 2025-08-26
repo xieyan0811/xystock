@@ -243,8 +243,12 @@ def display_basic_info(stock_code):
     st.subheader("基本信息")
     
     try:
+        # 获取缓存设置
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
         # 使用 StockTools 获取股票基本信息（带缓存）
-        basic_info_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
+        basic_info_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh)
         
         if 'error' in basic_info_data:
             st.error(f"获取股票基本信息失败: {basic_info_data['error']}")
@@ -313,6 +317,10 @@ def display_basic_info(stock_code):
         st.subheader("基本面分析")
         
         try:
+            # 获取缓存设置
+            use_cache = st.session_state.get('use_cache', True)
+            force_refresh = not use_cache
+            
             # 检查是否需要执行AI基本面分析
             include_ai_analysis = st.session_state.get('run_fundamental_ai_for', '') == stock_code
             
@@ -320,9 +328,9 @@ def display_basic_info(stock_code):
             if include_ai_analysis:
                 st.session_state['run_fundamental_ai_for'] = ''
                 with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True, include_ai_analysis=True)
+                    fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
             else:
-                fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
+                fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh)
             
             # 初始化session_state
             if "ai_fundamental_report" not in st.session_state:
@@ -357,6 +365,10 @@ def display_market_trend(stock_code):
     st.subheader("行情走势")
     
     try:
+        # 获取缓存设置
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
         # 检查是否需要执行AI分析 (由main函数中的查询按钮和checkbox控制)
         include_ai_analysis = st.session_state.get('run_ai_market_for', '') == stock_code
         
@@ -367,9 +379,9 @@ def display_market_trend(stock_code):
         # 使用 StockTools 获取K线数据（K线数据实时获取，技术指标使用缓存）
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
-                kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True, include_ai_analysis=True)
+                kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True)
+            kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=use_cache, force_refresh=force_refresh)
         
         if 'error' in kline_info:
             st.error(f"获取K线数据失败: {kline_info['error']}")
@@ -537,6 +549,10 @@ def display_news(stock_code):
     st.subheader("新闻资讯")
     
     try:
+        # 获取缓存设置
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
         # 检查是否需要执行AI新闻分析 (由app.py中的查询按钮和checkbox控制)
         include_ai_analysis = st.session_state.get('run_news_ai_for', '') == stock_code
         
@@ -547,9 +563,9 @@ def display_news(stock_code):
         # 使用 StockTools 获取新闻数据（带缓存和可选的AI分析）
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析相关新闻，请稍候..."):
-                news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True, include_ai_analysis=True)
+                news_info = stock_tools.get_stock_news_data(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True)
+            news_info = stock_tools.get_stock_news_data(stock_code, use_cache=use_cache, force_refresh=force_refresh)
         
         if 'error' in news_info:
             st.info(f"获取新闻数据失败: {news_info['error']}")
@@ -609,15 +625,19 @@ def display_chips_analysis(stock_code):
     st.subheader("筹码分析")
     
     try:
+        # 获取缓存设置
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
         # 检查是否需要执行AI筹码分析 (由app.py中的查询按钮和checkbox控制)
         include_ai_analysis = st.session_state.get('run_chip_ai_for', '') == stock_code
         
         if include_ai_analysis:
             st.session_state['run_chip_ai_for'] = ''
             with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
-                chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True, include_ai_analysis=True)
+                chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True)
+            chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh)
         
         stock_name = get_stock_name(stock_code, 'stock')
         
@@ -780,11 +800,15 @@ def display_comprehensive_analysis(stock_code):
         if 'run_comprehensive_ai_for' in st.session_state and st.session_state['run_comprehensive_ai_for'] == stock_code:
             user_opinion = st.session_state.get('user_opinion', '')
             
+            # 获取缓存设置
+            use_cache = st.session_state.get('use_cache', True)
+            force_refresh = not use_cache
+            
             # 运行综合分析
             with st.spinner("🤖 AI正在进行综合分析..."):
                 try:
                     # 使用 StockTools 获取综合分析
-                    analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, use_cache=True)
+                    analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, use_cache=use_cache, force_refresh=force_refresh)
                     
                     if 'error' in analysis_data:
                         st.error(f"获取综合分析失败: {analysis_data['error']}")
@@ -822,9 +846,9 @@ def display_comprehensive_analysis(stock_code):
             
             # 显示综合分析报告
             if 'report' in analysis_data:
-                st.markdown("### 📄 综合分析报告")
                 st.markdown(analysis_data['report'])
-            
+                st.caption(f"分析报告生成时间: {analysis_data['timestamp']}")                
+
             # 显示数据来源详情
             if 'data_sources' in analysis_data and analysis_data['data_sources']:
                 with st.expander("📊 数据来源详情", expanded=False):
@@ -840,7 +864,11 @@ def display_comprehensive_analysis(stock_code):
                 # 手动运行综合分析
                 with st.spinner("🤖 AI正在进行综合分析..."):
                     try:
-                        analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, "", use_cache=True)
+                        # 获取缓存设置
+                        use_cache = st.session_state.get('use_cache', True)
+                        force_refresh = not use_cache
+                        
+                        analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, "", use_cache=use_cache, force_refresh=force_refresh)
                         
                         if 'error' in analysis_data:
                             st.error(f"获取综合分析失败: {analysis_data['error']}")

@@ -15,6 +15,7 @@ from ui.components.page_settings import main as display_settings
 from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
 from ui.components.page_market_overview import display_market_overview
+from ui.components.page_cache_management import main as display_cache_management
 from providers.stock_utils import normalize_stock_input
 
 def main():
@@ -51,7 +52,7 @@ def main():
         # 添加侧边栏导航菜单
         menu = st.radio(
             "选择功能:",
-            ["📊 大盘分析", "🏢 股票分析", "🔢 Token统计", "⚙️ 设置"],
+            ["大盘分析", "股票分析", "缓存管理", "Token统计", "设置"],
             index=0,
             help="选择要使用的功能模块"
         )
@@ -62,14 +63,16 @@ def main():
         st.write("- 端口: 8811")
     
     # 根据菜单选择显示不同的页面
-    if menu == "📊 大盘分析":
+    if menu == "大盘分析":
         display_market_overview()
-    elif menu == "🏢 股票分析":
+    elif menu == "股票分析":
         display_analysis_page()
-    elif menu == "🔢 Token统计":
+    elif menu == "缓存管理":
+        display_cache_management()
+    elif menu == "Token统计":
         # 导入并显示Token统计页面
         display_token_stats()
-    elif menu == "⚙️ 设置":
+    elif menu == "设置":
         # 导入并显示设置页面
         display_settings()
 
@@ -99,20 +102,17 @@ def display_analysis_page():
         help=f"输入{market_type}代码进行查询"
     )
     
-    # 添加AI分析选项
-    use_ai_market_analysis = st.checkbox("🤖 AI行情分析", value=False, help="选中后将使用AI对股票行情进行技术分析")
-    use_ai_news_analysis = st.checkbox("📰 AI新闻分析", value=False, help="选中后将使用AI对股票相关新闻进行分析")
-    use_ai_chip_analysis = st.checkbox("🧮 AI筹码分析", value=False, help="选中后将使用AI对股票筹码分布进行分析")
-    use_ai_fundamental_analysis = st.checkbox("📊 AI基本面分析", value=False, help="选中后将使用AI对股票基本面数据进行深入分析")
-    use_ai_comprehensive_analysis = st.checkbox("🎯 综合分析", value=False, help="选中后将使用AI综合前几个分析结果并结合用户观点进行综合分析")
+    # 添加选项
+    use_ai_analysis = st.checkbox("🤖 AI智能分析", value=False, help="选中后将使用AI对股票进行全面分析，包括行情、新闻、筹码、基本面等")
+    use_cache = st.checkbox("💾 使用缓存数据", value=True, help="使用缓存数据可以加快查询速度，取消勾选将强制获取最新数据")
     
-    # 用户观点输入框（仅在选择综合分析时显示）
+    # 用户观点输入框（仅在选择AI分析时显示）
     user_opinion = ""
-    if use_ai_comprehensive_analysis:
+    if use_ai_analysis:
         user_opinion = st.text_area(
-            "用户观点:",
+            "补充观点（可选）:",
             placeholder="请输入您对该股票的观点、看法或关注的重点...",
-            help="输入您的投资观点或关注的重点，AI将结合历史分析结果给出综合建议",
+            help="输入您的投资观点或关注的重点，AI将结合多维度分析给出综合建议",
             height=100
         )
     
@@ -130,29 +130,27 @@ def display_analysis_page():
         st.session_state['current_stock_code'] = stock_code.strip()
         st.session_state['current_market_type'] = market_type
         st.session_state['query_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        st.session_state['use_cache'] = use_cache
         
         # 设置AI分析选项
-        if use_ai_market_analysis:
+        if use_ai_analysis:
+            # 设置所有AI分析标志
             if "ai_market_report" not in st.session_state:
                 st.session_state.ai_market_report = {}
             st.session_state['run_ai_market_for'] = stock_code.strip()
-        
-        if use_ai_news_analysis:
+            
             if "ai_news_report" not in st.session_state:
                 st.session_state.ai_news_report = {}
             st.session_state['run_news_ai_for'] = stock_code.strip()
-        
-        if use_ai_chip_analysis:
+            
             if "ai_chip_report" not in st.session_state:
                 st.session_state.ai_chip_report = {}
             st.session_state['run_chip_ai_for'] = stock_code.strip()
-        
-        if use_ai_fundamental_analysis:
+            
             if "ai_fundamental_report" not in st.session_state:
                 st.session_state.ai_fundamental_report = {}
             st.session_state['run_fundamental_ai_for'] = stock_code.strip()
-        
-        if use_ai_comprehensive_analysis:
+            
             if "ai_comprehensive_report" not in st.session_state:
                 st.session_state.ai_comprehensive_report = {}
             st.session_state['run_comprehensive_ai_for'] = stock_code.strip()

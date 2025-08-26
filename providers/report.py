@@ -173,7 +173,6 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
                 # 综合分析失败不影响整体报告生成
                 pass
                 
-        # 从外部传入的ai_reports或API返回值中提取AI分析
         final_ai_reports = {}
         
         # 基本面分析
@@ -466,9 +465,15 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         # AI基本面分析
         if 'fundamental' in report_data['ai_reports']:
+            fundamental_report = report_data['ai_reports']['fundamental']
+            report_text = fundamental_report['report']
+            report_time = fundamental_report.get('timestamp', '')
+            
             md_content += f"""## 🤖 AI基本面分析
 
-{report_data['ai_reports']['fundamental']['report']}
+{report_text}
+
+*分析生成时间: {report_time}*
 
 """
     
@@ -513,9 +518,15 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         # AI行情分析
         if 'market' in report_data['ai_reports']:
+            market_report = report_data['ai_reports']['market']
+            report_text = market_report['report']
+            report_time = market_report.get('timestamp', '')
+            
             md_content += f"""## 🤖 AI行情分析
 
-{report_data['ai_reports']['market']['report']}
+{report_text}
+
+*分析生成时间: {report_time}*
 
 """
     
@@ -535,15 +546,15 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         for i, news in enumerate(news_list[:10], 1):  # 只显示前10条
             title = news.get('新闻标题', '')
             time = news.get('发布时间', '')
-            content = news.get('新闻内容', '')
+            #content = news.get('新闻内容', '')
             url = news.get('新闻链接', '')
             
             md_content += f"#### {i}. {title}\n\n"
             md_content += f"**发布时间**: {time}\n\n"
             
-            if content:
-                truncated_content = content[:300] + '...' if len(content) > 300 else content
-                md_content += f"{truncated_content}\n\n"
+            #if content:
+            #    truncated_content = content[:300] + '...' if len(content) > 300 else content
+            #    md_content += f"{truncated_content}\n\n"
             
             if url:
                 md_content += f"[阅读原文]({url})\n\n"
@@ -552,9 +563,15 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         # AI新闻分析
         if 'news' in report_data['ai_reports']:
+            news_report = report_data['ai_reports']['news']
+            report_text = news_report['report']
+            report_time = news_report.get('timestamp', '')
+            
             md_content += f"""## 🤖 AI新闻分析
 
-{report_data['ai_reports']['news']['report']}
+{report_text}
+
+*分析生成时间: {report_time}*
 
 """
     
@@ -585,9 +602,15 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         # AI筹码分析
         if 'chip' in report_data['ai_reports']:
+            chip_report = report_data['ai_reports']['chip']
+            report_text = chip_report['report']
+            report_time = chip_report.get('timestamp', '')
+            
             md_content += f"""## 🤖 AI筹码分析
 
-{report_data['ai_reports']['chip']['report']}
+{report_text}
+
+*分析生成时间: {report_time}*
 
 """
     
@@ -611,9 +634,14 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 """
         
         if 'report' in analysis_data:
+            report_text = analysis_data['report']
+            report_time = analysis_data.get('timestamp', '')
+            
             md_content += f"""## 🤖 AI综合分析报告
 
-{analysis_data['report']}
+{report_text}
+
+*分析生成时间: {report_time}*
 
 """
     
