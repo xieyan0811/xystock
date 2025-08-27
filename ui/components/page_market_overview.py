@@ -235,13 +235,14 @@ def display_market_summary():
     result_data = market_tools.get_comprehensive_market_report()
 
     st.subheader("综合摘要")
-    summary_data = result_data.get('market_summary', {})
+    # 使用新的格式化摘要方法
+    summary_markdown = market_tools.generate_market_report(result_data, format_type='summary_formatted')
     
-    if not summary_data:
+    if not summary_markdown:
         st.info("综合摘要数据准备中...")
         return
     
-    if st.session_state.get('run_ai_index_for') == '上证指数':        
+    if st.session_state.get('run_ai_index', False):        
         # 检查是否已经生成过这个股票的AI报告
         stock_code_for_ai = '上证指数'
         if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
@@ -260,27 +261,17 @@ def display_market_summary():
                     st.session_state.ai_index_report[stock_code_for_ai] = ai_data
                     
                     # 清除标记，避免重复执行
-                    if 'run_ai_index_for' in st.session_state:
-                        del st.session_state['run_ai_index_for']
+                    if 'run_ai_index' in st.session_state:
+                        del st.session_state['run_ai_index']
                 except Exception as e:
                     st.error(f"AI分析失败: {str(e)}")
                     # 清除标记，即使失败也要清除
-                    if 'run_ai_index_for' in st.session_state:
-                        del st.session_state['run_ai_index_for']
+                    if 'run_ai_index' in st.session_state:
+                        del st.session_state['run_ai_index']
         
     
-    # 显示各个维度的摘要
-    if 'technical_trend' in summary_data:
-        st.write("**📈 技术面:**", summary_data['technical_trend'])
-    if 'margin_balance' in summary_data:
-        st.write("**💳 融资面:**", summary_data['margin_balance'])
-    if 'valuation_level' in summary_data:
-        st.write("**💰 估值面:**", summary_data['valuation_level'])
-    if 'liquidity_condition' in summary_data:
-        st.write("**💸 资金面:**", summary_data['liquidity_condition'])
-    if 'money_flow_indicators' in summary_data:
-        st.write("**💵 资金流向:**", summary_data['money_flow_indicators'])
-
+    # 显示各个维度的摘要 - 简化后的逻辑
+    st.markdown(summary_markdown)
 
         
     # 综合评级
@@ -378,7 +369,7 @@ def display_market_overview():
                     if use_ai_analysis:
                         if "ai_index_report" not in st.session_state:
                             st.session_state.ai_index_report = {}
-                        st.session_state['run_ai_index_for'] = "上证指数"
+                        st.session_state['run_ai_index'] = True
                                             
                     # 显示报告基本信息
                     report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
