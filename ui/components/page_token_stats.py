@@ -6,10 +6,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
 import altair as alt
-import numpy as np
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,19 +38,15 @@ def show_usage_overview(days=30):
         return
     
     # 显示关键指标
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.metric("总请求数", f"{stats.get('total_requests', 0)}")
     
     with col2:
         st.metric("总Token数", f"{stats.get('total_tokens', 0):,}")
-    
+        
     with col3:
-        total_cost = stats.get('total_cost', 0)
-        st.metric("总成本", format_cost(total_cost))
-    
-    with col4:
         avg_response_time = stats.get('avg_response_time', 0)
         st.metric("平均响应时间", f"{avg_response_time:.2f}秒")
     
@@ -95,38 +88,6 @@ def show_model_distribution(days=30):
     with st.expander("模型使用详细数据", expanded=False):
         st.dataframe(model_df, use_container_width=True)
 
-def show_daily_usage(days=30):
-    """显示每日使用情况"""
-    # 获取使用统计
-    stats = usage_logger.get_usage_stats(days=days)
-    
-    if not stats or 'daily_usage' not in stats or not stats['daily_usage']:
-        st.warning("暂无每日使用数据")
-        return
-    
-    st.subheader("每日Token使用量")
-    
-    daily_usage = stats['daily_usage']
-    dates = [str(date) for date in daily_usage.keys()]
-    tokens = list(daily_usage.values())
-    
-    # 创建每日使用量图表
-    daily_df = pd.DataFrame({
-        'date': dates,
-        'tokens': tokens
-    })
-    daily_df['date'] = pd.to_datetime(daily_df['date'])
-    daily_df = daily_df.sort_values('date')
-    
-    # 使用折线图显示使用趋势
-    chart = alt.Chart(daily_df).mark_line(point=True).encode(
-        x=alt.X('date:T', title='日期'),
-        y=alt.Y('tokens:Q', title='Token数量'),
-        tooltip=['date:T', 'tokens:Q']
-    ).properties(height=300)
-    
-    st.altair_chart(chart, use_container_width=True)
-
 def show_detailed_logs():
     """显示详细日志"""
     st.subheader("详细使用记录")
@@ -151,7 +112,8 @@ def show_detailed_logs():
         display_cols = [
             'timestamp', 'model', 'prompt_tokens', 
             'completion_tokens', 'total_tokens', 
-            'cost_estimate', 'response_time', 'success'
+            #'cost_estimate', 
+            'response_time', 'success'
         ]
         
         st.dataframe(
@@ -206,31 +168,6 @@ def show_detailed_logs():
     except Exception as e:
         st.error(f"加载详细日志失败: {str(e)}")
 
-def export_usage_report():
-    """导出使用报告"""
-    st.subheader("导出报告")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        export_path = st.text_input(
-            "导出路径:", 
-            value="reports/usage_report.html",
-            help="指定导出文件的路径"
-        )
-    
-    with col2:
-        st.write("")
-        st.write("")
-        export_btn = st.button("📊 导出报告", use_container_width=True)
-    
-    if export_btn:
-        try:
-            usage_logger.export_usage_report(export_path)
-            st.success(f"报告已导出至: {export_path}")
-        except Exception as e:
-            st.error(f"导出报告失败: {str(e)}")
-
 def main():
     """API使用统计页面主函数"""
     st.title("🔍 API使用统计")
@@ -253,21 +190,15 @@ def main():
     days = period_options[selected_period]
     
     # 创建标签页
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 使用概览", "📈 使用趋势", "📝 详细记录", "💾 导出报告"])
+    tab1, tab2 = st.tabs(["📊 使用概览", "📝 详细记录"])
     
     with tab1:
         show_usage_overview(days)
         show_model_distribution(days)
-    
+        
     with tab2:
-        show_daily_usage(days)
-    
-    with tab3:
         show_detailed_logs()
     
-    with tab4:
-        export_usage_report()
-
 
 if __name__ == "__main__":
     main()

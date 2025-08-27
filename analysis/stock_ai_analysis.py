@@ -50,10 +50,7 @@ def generate_stock_analysis_report(
     else:
         price_change = 0
         price_change_pct = 0
-    
-    # 获取近期价格数据
-    recent_prices = df.tail(10)[['datetime', 'open', 'high', 'low', 'close', 'volume']].to_dict('records')
-    
+        
     # 提取技术指标数据
     indicators_data = {}
     if indicators:
@@ -774,7 +771,7 @@ def generate_comprehensive_analysis_report(
 - 明确列出1-3个当前最需警惕的风险。
 
 【要求】
-- 全文不超过600字，避免冗余和重复。
+- 全文不超过800字，避免冗余和重复。
 - 只输出最有决策价值的内容，避免面面俱到。
 - 结论要有明确的操作性。
 - 必须考虑当前价格变动情况对投资决策的影响。

@@ -140,6 +140,72 @@ def fetch_money_flow_data(debug=False) -> Dict:
     return money_flow_data
 
 
+def fetch_current_indices() -> Dict:
+    """获取当前指数实时数据的具体实现"""
+    print("📊 获取当前指数实时数据...")
+    
+    indices_data = {}
+    
+    try:
+        # 使用东方财富获取沪深重要指数
+        print("   获取沪深重要指数...")
+        df_indices = ak.stock_zh_index_spot_em('沪深重要指数')
+        
+        if not df_indices.empty:
+            # 将DataFrame转换为字典格式，便于后续使用
+            indices_list = []
+            for _, row in df_indices.iterrows():
+                index_info = {
+                    'code': str(row.get('代码', '')),
+                    'name': str(row.get('名称', '')),
+                    'current_price': float(row.get('最新价', 0)),
+                    'change_percent': float(row.get('涨跌幅', 0)),
+                    'change_amount': float(row.get('涨跌额', 0)),
+                    'volume': float(row.get('成交量', 0)),
+                    'turnover': float(row.get('成交额', 0)),
+                    'amplitude': float(row.get('振幅', 0)),
+                    'high': float(row.get('最高', 0)),
+                    'low': float(row.get('最低', 0)),
+                    'open': float(row.get('今开', 0)),
+                    'prev_close': float(row.get('昨收', 0)),
+                    'volume_ratio': float(row.get('量比', 0))
+                }
+                indices_list.append(index_info)
+            
+            # 按指数名称创建索引字典
+            indices_dict = {}
+            for index in indices_list:
+                indices_dict[index['name']] = index
+            
+            indices_data = {
+                'indices_list': indices_list,
+                'indices_dict': indices_dict,
+                'total_count': len(indices_list),
+                'data_source': '东方财富-沪深重要指数',
+                'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            print(f"      成功获取 {len(indices_list)} 个指数数据")
+            
+            # 显示主要指数信息
+            main_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']
+            for name in main_indices:
+                if name in indices_dict:
+                    idx = indices_dict[name]
+                    change_sign = '+' if idx['change_percent'] >= 0 else ''
+                    print(f"      - {name}: {idx['current_price']:.2f} ({change_sign}{idx['change_percent']:.2f}%)")
+        
+    except Exception as e:
+        print(f"   ❌ 获取指数数据失败: {e}")
+        indices_data = {
+            'error': str(e),
+            'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    print("   ✓ 指数数据获取完成")
+    return indices_data
+
+
 def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
     """统一的融资融券数据获取方法"""
     result = {
@@ -256,6 +322,7 @@ class MarketTools:
             'valuation_data': {'expire_minutes': 1440, 'description': '估值指标'},
             'money_flow_data': {'expire_minutes': 43200, 'description': '资金流向指标'},
             'margin_data': {'expire_minutes': 60, 'description': '融资融券数据'},
+            'current_indices': {'expire_minutes': 5, 'description': '当前指数实时数据'},
             'ai_analysis': {'expire_minutes': 180, 'description': 'AI市场分析'},
         }
     
@@ -400,6 +467,34 @@ class MarketTools:
         except Exception as e:
             print(f"❌ 获取融资融券失败: {e}")
             return self._get_cached_data(data_type) if use_cache else {}
+
+    def get_current_indices(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取当前指数实时数据"""
+        data_type = 'current_indices'
+        
+        if use_cache and not force_refresh and self._is_cache_valid(data_type):
+            print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
+            return self._get_cached_data(data_type)
+        
+        print(f"📡 获取{self.cache_configs[data_type]['description']}...")
+        try:
+            data = fetch_current_indices()
+            if use_cache:
+                self._save_cached_data(data_type, data)
+            return data
+        except Exception as e:
+            print(f"❌ 获取当前指数数据失败: {e}")
+            return self._get_cached_data(data_type) if use_cache else {}
+
+    def get_index_current_price(self, index_name: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取单个指数的当前价格信息"""
+        indices_data = self.get_current_indices(use_cache, force_refresh)
+        
+        if 'indices_dict' in indices_data and index_name in indices_data['indices_dict']:
+            return indices_data['indices_dict'][index_name]
+        else:
+            print(f"❌ 未找到指数: {index_name}")
+            return {}
         
     def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False) -> Dict:
         """获取AI分析数据"""
@@ -590,10 +685,11 @@ class MarketTools:
         """刷新所有缓存数据"""
         print("🔄 开始刷新所有缓存数据...")
         
-        self.get_market_sentiment(use_cache=True, force_refresh=True)
+        #self.get_market_sentiment(use_cache=True, force_refresh=True)
         self.get_valuation_data(use_cache=True, force_refresh=True)
         self.get_money_flow_data(use_cache=True, force_refresh=True)
         self.get_margin_data(use_cache=True, force_refresh=True)
+        self.get_current_indices(use_cache=True, force_refresh=True)
         
         print("✅ 所有缓存数据刷新完成!")
         self.print_cache_status()
@@ -621,7 +717,7 @@ class MarketTools:
         
         # 获取各类指标
         report['technical_indicators'] = self.get_index_technical_indicators(index_name)
-        report['sentiment_indicators'] = self.get_market_sentiment(use_cache)
+        #report['sentiment_indicators'] = self.get_market_sentiment(use_cache)
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
@@ -647,10 +743,9 @@ class MarketTools:
             summary['rsi_level'] = self._judge_rsi_level(tech.get('rsi_14', 50))
         
         # 情绪面摘要
-        sentiment = report['sentiment_indicators']
-        if sentiment:
-            up_ratio = sentiment.get('up_ratio', 0) * 100
-            summary['market_sentiment'] = f"上涨家数占比 {up_ratio:.1f}%"
+        margin = report['margin_detail']
+        if margin:
+            summary['margin_balance'] = f"融资余额 {margin.get('margin_buy_balance', 0)/100000000:.2f}亿"
         
         # 估值面摘要
         valuation = report['valuation_indicators']
@@ -663,6 +758,7 @@ class MarketTools:
         if money:
             m2_growth = money.get('m2_growth', 0)
             summary['liquidity_condition'] = f"M2同比增长 {m2_growth:.1f}%"
+        
         
         return summary
     
