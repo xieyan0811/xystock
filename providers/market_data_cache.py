@@ -199,8 +199,6 @@ class MarketDataCache:
         print("=" * 70)
 
 
-
-
 # 全局缓存管理器实例
 _cache_manager = None
 

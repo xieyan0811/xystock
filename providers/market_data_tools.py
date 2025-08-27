@@ -327,16 +327,6 @@ def get_market_tools() -> MarketTools:
         _market_tools = MarketTools()
     return _market_tools
 
-def set_ai_market_analysis(analysis_data: Dict):
-    """设置AI市场分析数据"""
-    cache_manager = get_cache_manager()
-    analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cache_manager.save_cached_data('ai_analysis', analysis_data)
-
-def get_ai_market_analysis() -> Dict:
-    """获取AI市场分析数据"""
-    cache_manager = get_cache_manager()
-    return cache_manager.get_cached_data('ai_analysis')
 
 # =========================
 # 报告格式化函数
