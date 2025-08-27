@@ -36,6 +36,7 @@ from providers.stock_utils import (
 )
 from providers.stock_data_fetcher import data_manager, KLineType
 from providers.risk_metrics import calculate_portfolio_risk
+from providers.stock_data_cache import get_cache_manager
 
 # 导入AI分析模块
 try:
@@ -54,122 +55,7 @@ class StockTools:
     
     def __init__(self, cache_dir: str = "data/cache"):
         """初始化股票工具"""
-        self.cache_dir = cache_dir
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.cache_file = os.path.join(project_dir, cache_dir, "stock_data.json")
-        
-        # 确保缓存目录存在
-        os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
-        
-        # 缓存配置
-        self.cache_configs = {
-            'basic_info': {'expire_minutes': 5, 'description': '股票基本信息'},
-            'technical_indicators': {'expire_minutes': 30, 'description': '技术指标和风险指标'},
-            'news_data': {'expire_minutes': 60, 'description': '新闻资讯数据'},
-            'chip_data': {'expire_minutes': 1440, 'description': '筹码分析数据'},  # 1天
-            'ai_analysis': {'expire_minutes': 180, 'description': 'AI分析报告'},
-        }
-    
-    # =========================
-    # 缓存管理相关方法
-    # =========================
-    
-    def _load_cache(self) -> Dict:
-        """加载缓存文件"""
-        try:
-            if os.path.exists(self.cache_file):
-                with open(self.cache_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            return {}
-        except Exception:
-            return {}
-    
-    def _make_json_safe(self, obj):
-        """将对象转换为JSON安全的格式"""
-        import numpy as np
-        import pandas as pd
-        
-        if isinstance(obj, dict):
-            return {key: self._make_json_safe(value) for key, value in obj.items()}
-        elif isinstance(obj, list):
-            return [self._make_json_safe(item) for item in obj]
-        elif isinstance(obj, pd.Series):
-            return obj.tolist()
-        elif isinstance(obj, pd.DataFrame):
-            return obj.to_dict('records')
-        elif isinstance(obj, (np.integer, np.int64, np.int32)):
-            return int(obj)
-        elif isinstance(obj, (np.floating, np.float64, np.float32)):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif pd.isna(obj):
-            return None
-        elif hasattr(obj, 'isoformat'):  # datetime, date objects
-            return obj.isoformat()
-        else:
-            return obj
-    
-    def _save_cache(self, cache_data: Dict):
-        """保存缓存文件"""
-        try:
-            # 确保数据是JSON安全的
-            safe_cache_data = self._make_json_safe(cache_data)
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(safe_cache_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"❌ 保存股票数据缓存失败: {e}")
-    
-    def _get_cache_key(self, data_type: str, stock_code: str) -> str:
-        """生成缓存键"""
-        return f"{data_type}_{stock_code}"
-    
-    def _is_cache_valid(self, data_type: str, stock_code: str) -> bool:
-        """检查缓存是否有效"""
-        try:
-            cache_data = self._load_cache()
-            cache_key = self._get_cache_key(data_type, stock_code)
-            
-            if cache_key not in cache_data:
-                return False
-            
-            cache_meta = cache_data[cache_key].get('cache_meta', {})
-            cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-            expire_minutes = self.cache_configs[data_type]['expire_minutes']
-            expire_time = cache_time + timedelta(minutes=expire_minutes)
-            
-            return datetime.now() < expire_time
-        except Exception:
-            return False
-    
-    def _get_cached_data(self, data_type: str, stock_code: str) -> Dict:
-        """获取缓存数据"""
-        try:
-            cache_data = self._load_cache()
-            cache_key = self._get_cache_key(data_type, stock_code)
-            return cache_data.get(cache_key, {}).get('data', {})
-        except Exception:
-            return {}
-    
-    def _save_cached_data(self, data_type: str, stock_code: str, data: Dict):
-        """保存数据到缓存"""
-        try:
-            cache_data = self._load_cache()
-            cache_key = self._get_cache_key(data_type, stock_code)
-            
-            cache_data[cache_key] = {
-                'cache_meta': {
-                    'timestamp': datetime.now().isoformat(),
-                    'data_type': data_type,
-                    'stock_code': stock_code,
-                    'expire_minutes': self.cache_configs[data_type]['expire_minutes']
-                },
-                'data': data
-            }
-            self._save_cache(cache_data)
-            print(f"💾 {stock_code} {self.cache_configs[data_type]['description']}已缓存")
-        except Exception as e:
-            print(f"❌ 缓存股票数据失败: {e}")
+        self.cache_manager = get_cache_manager()
     
     # =========================
     # 数据获取方法（带缓存）
@@ -196,20 +82,20 @@ class StockTools:
             pass
         
         # 检查缓存
-        if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
-            print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            basic_data = self._get_cached_data(data_type, stock_code)
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type, stock_code):
+            print(f"📋 使用缓存的 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}")
+            basic_data = self.cache_manager.get_cached_data(data_type, stock_code)
         else:
             # 获取新数据
-            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            print(f"📡 获取 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}...")
             try:
                 basic_data = fetch_stock_basic_info(stock_code)
                 if use_cache and 'error' not in basic_data:
-                    self._save_cached_data(data_type, stock_code, basic_data)
+                    self.cache_manager.save_cached_data(data_type, stock_code, basic_data)
             except Exception as e:
                 print(f"❌ 获取股票基本信息失败: {e}")
                 # 返回缓存数据作为备份
-                basic_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+                basic_data = self.cache_manager.get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
         # 如果需要AI分析且基本数据获取成功
         if include_ai_analysis and 'error' not in basic_data:
@@ -254,20 +140,20 @@ class StockTools:
             pass
         
         # 检查缓存
-        if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
-            print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            return self._get_cached_data(data_type, stock_code)
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type, stock_code):
+            print(f"📋 使用缓存的 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}")
+            return self.cache_manager.get_cached_data(data_type, stock_code)
         
         # 获取新数据
-        print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+        print(f"📡 获取 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}...")
         try:
             data = fetch_stock_technical_indicators(stock_code, period)
             if use_cache and 'error' not in data:
-                self._save_cached_data(data_type, stock_code, data)
+                self.cache_manager.save_cached_data(data_type, stock_code, data)
             return data
         except Exception as e:
             print(f"❌ 获取技术指标失败: {e}")
-            return self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+            return self.cache_manager.get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
     
     def get_stock_kline_data(self, stock_code: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False, include_ai_analysis: bool = False) -> Dict:
         """获取股票K线数据（实时获取，不缓存K线数据本身，但返回包含技术指标的完整信息）
@@ -392,19 +278,19 @@ class StockTools:
             pass
         
         # 检查缓存
-        if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
-            print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            news_data = self._get_cached_data(data_type, stock_code)
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type, stock_code):
+            print(f"📋 使用缓存的 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}")
+            news_data = self.cache_manager.get_cached_data(data_type, stock_code)
         else:
             # 获取新数据
-            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            print(f"📡 获取 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}...")
             try:
                 news_data = fetch_stock_news_data(stock_code)
                 if use_cache and 'error' not in news_data:
-                    self._save_cached_data(data_type, stock_code, news_data)
+                    self.cache_manager.save_cached_data(data_type, stock_code, news_data)
             except Exception as e:
                 print(f"❌ 获取新闻数据失败: {e}")
-                news_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+                news_data = self.cache_manager.get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
         # 如果需要AI分析且新闻数据获取成功
         if include_ai_analysis and 'error' not in news_data:
@@ -459,19 +345,19 @@ class StockTools:
             pass
         
         # 检查缓存
-        if use_cache and not force_refresh and self._is_cache_valid(data_type, stock_code):
-            print(f"📋 使用缓存的 {stock_code} {self.cache_configs[data_type]['description']}")
-            chip_data = self._get_cached_data(data_type, stock_code)
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type, stock_code):
+            print(f"📋 使用缓存的 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}")
+            chip_data = self.cache_manager.get_cached_data(data_type, stock_code)
         else:
             # 获取新数据
-            print(f"📡 获取 {stock_code} {self.cache_configs[data_type]['description']}...")
+            print(f"📡 获取 {stock_code} {self.cache_manager.cache_configs[data_type]['description']}...")
             try:
                 chip_data = fetch_stock_chip_data(stock_code)
                 if use_cache and 'error' not in chip_data:
-                    self._save_cached_data(data_type, stock_code, chip_data)
+                    self.cache_manager.save_cached_data(data_type, stock_code, chip_data)
             except Exception as e:
                 print(f"❌ 获取筹码数据失败: {e}")
-                chip_data = self._get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
+                chip_data = self.cache_manager.get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
         # 如果需要AI分析且筹码数据获取成功
         if include_ai_analysis and 'error' not in chip_data:
@@ -518,11 +404,11 @@ class StockTools:
         
         if use_cache:
             try:
-                cache_data = self._load_cache()
+                cache_data = self.cache_manager.load_cache()
                 if cache_key in cache_data:
                     cache_meta = cache_data[cache_key].get('cache_meta', {})
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                    expire_time = cache_time + timedelta(minutes=self.cache_configs[data_type]['expire_minutes'])
+                    expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
                     
                     if datetime.now() < expire_time:
                         print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析")
@@ -533,7 +419,7 @@ class StockTools:
         # AI分析数据需要手动设置，这里返回现有缓存
         print(f"📋 使用现有的 {stock_code} {analysis_type} AI分析")
         try:
-            cache_data = self._load_cache()
+            cache_data = self.cache_manager.load_cache()
             return cache_data.get(cache_key, {}).get('data', {})
         except Exception:
             return {}
@@ -549,18 +435,18 @@ class StockTools:
         analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         try:
-            cache_data = self._load_cache()
+            cache_data = self.cache_manager.load_cache()
             cache_data[cache_key] = {
                 'cache_meta': {
                     'timestamp': datetime.now().isoformat(),
                     'data_type': 'ai_analysis',
                     'stock_code': stock_code,
                     'analysis_type': analysis_type,
-                    'expire_minutes': self.cache_configs['ai_analysis']['expire_minutes']
+                    'expire_minutes': self.cache_manager.cache_configs['ai_analysis']['expire_minutes']
                 },
                 'data': analysis_data
             }
-            self._save_cache(cache_data)
+            self.cache_manager.save_cache(cache_data)
             print(f"💾 {stock_code} {analysis_type} AI分析已缓存")
         except Exception as e:
             print(f"❌ 缓存AI分析失败: {e}")
@@ -857,11 +743,11 @@ class StockTools:
         # 检查缓存（如果用户观点为空且不强制刷新）
         if use_cache and not force_refresh and not user_opinion.strip():
             try:
-                cache_data = self._load_cache()
+                cache_data = self.cache_manager.load_cache()
                 if cache_key in cache_data:
                     cache_meta = cache_data[cache_key].get('cache_meta', {})
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                    expire_time = cache_time + timedelta(minutes=self.cache_configs[data_type]['expire_minutes'])
+                    expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
                     
                     if datetime.now() < expire_time:
                         print(f"📋 使用缓存的 {stock_code} 综合分析")
@@ -912,18 +798,18 @@ class StockTools:
             
             # 缓存结果
             try:
-                cache_data = self._load_cache()
+                cache_data = self.cache_manager.load_cache()
                 cache_data[cache_key] = {
                     'cache_meta': {
                         'timestamp': datetime.now().isoformat(),
                         'data_type': data_type,
                         'stock_code': stock_code,
                         'analysis_type': analysis_type,
-                        'expire_minutes': self.cache_configs[data_type]['expire_minutes']
+                        'expire_minutes': self.cache_manager.cache_configs[data_type]['expire_minutes']
                     },
                     'data': analysis_data
                 }
-                self._save_cache(cache_data)
+                self.cache_manager.save_cache(cache_data)
                 print(f"💾 {stock_code} 综合分析已缓存")
             except Exception as e:
                 print(f"❌ 缓存综合分析失败: {e}")
@@ -1030,142 +916,15 @@ class StockTools:
     
     def clear_cache(self, stock_code: str = None, data_type: str = None):
         """清理缓存"""
-        try:
-            cache_data = self._load_cache()
-            cache_cleared = False
-            
-            if stock_code and data_type:
-                # 清理特定股票的特定数据类型
-                cache_key = self._get_cache_key(data_type, stock_code)
-                if cache_key in cache_data:
-                    del cache_data[cache_key]
-                    self._save_cache(cache_data)
-                    cache_cleared = True
-                    print(f"✅ 已清理 {stock_code} {self.cache_configs.get(data_type, {}).get('description', data_type)} 缓存")
-                else:
-                    print(f"ℹ️  {stock_code} {data_type} 缓存不存在")
-                    
-            elif stock_code:
-                # 清理特定股票的所有缓存
-                keys_to_remove = [key for key in cache_data.keys() if key.endswith(f"_{stock_code}")]
-                for key in keys_to_remove:
-                    del cache_data[key]
-                if keys_to_remove:
-                    self._save_cache(cache_data)
-                    cache_cleared = True
-                    print(f"✅ 已清理 {stock_code} 所有缓存 ({len(keys_to_remove)}项)")
-                else:
-                    print(f"ℹ️  {stock_code} 无缓存数据")
-                    
-            elif data_type:
-                # 清理特定数据类型的所有缓存
-                keys_to_remove = [key for key in cache_data.keys() if key.startswith(f"{data_type}_")]
-                for key in keys_to_remove:
-                    del cache_data[key]
-                if keys_to_remove:
-                    self._save_cache(cache_data)
-                    cache_cleared = True
-                    print(f"✅ 已清理所有 {self.cache_configs.get(data_type, {}).get('description', data_type)} 缓存 ({len(keys_to_remove)}项)")
-                else:
-                    print(f"ℹ️  无 {data_type} 缓存数据")
-                    
-            else:
-                # 清理所有缓存
-                if os.path.exists(self.cache_file):
-                    os.remove(self.cache_file)
-                    cache_cleared = True
-                    print("✅ 已清理所有股票数据缓存")
-                else:
-                    print("ℹ️  缓存文件不存在")
-            
-            # 如果清理了缓存，强制重新加载以确保内存中的缓存也被清空
-            if cache_cleared:
-                # 通过重新读取文件来刷新内存缓存
-                self._load_cache()
-                    
-        except Exception as e:
-            print(f"❌ 清理缓存失败: {e}")
+        self.cache_manager.clear_cache(stock_code, data_type)
     
     def get_cache_status(self, stock_code: str = None) -> Dict:
         """获取缓存状态"""
-        status = {}
-        current_time = datetime.now()
-        cache_data = self._load_cache()
-        
-        for cache_key, cache_info in cache_data.items():
-            try:
-                cache_meta = cache_info.get('cache_meta', {})
-                cached_stock_code = cache_meta.get('stock_code', '')
-                data_type = cache_meta.get('data_type', '')
-                analysis_type = cache_meta.get('analysis_type', '')
-                
-                # 如果指定了股票代码，只显示该股票的缓存
-                if stock_code and cached_stock_code != stock_code:
-                    continue
-                
-                cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                expire_minutes = cache_meta.get('expire_minutes', 60)
-                expire_time = cache_time + timedelta(minutes=expire_minutes)
-                is_valid = current_time < expire_time
-                
-                remaining_minutes = (expire_time - current_time).total_seconds() / 60
-                if remaining_minutes > 0:
-                    remaining_text = f"剩余 {int(remaining_minutes)} 分钟"
-                else:
-                    remaining_text = "已过期"
-                
-                display_key = cache_key
-                if analysis_type:
-                    display_key = f"{cached_stock_code}_{analysis_type}_AI分析"
-                
-                status[display_key] = {
-                    'stock_code': cached_stock_code,
-                    'data_type': data_type,
-                    'analysis_type': analysis_type,
-                    'description': self.cache_configs.get(data_type, {}).get('description', data_type),
-                    'valid': is_valid,
-                    'cache_time': cache_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'expire_minutes': expire_minutes,
-                    'remaining': remaining_text
-                }
-            except Exception:
-                continue
-        
-        return status
+        return self.cache_manager.get_cache_status(stock_code)
     
     def print_cache_status(self, stock_code: str = None):
         """打印缓存状态"""
-        status = self.get_cache_status(stock_code)
-        
-        print("=" * 70)
-        if stock_code:
-            print(f"📊 股票 {stock_code} 数据缓存状态")
-        else:
-            print("📊 股票数据缓存状态")
-        print(f"📁 缓存文件: {self.cache_file}")
-        print("=" * 70)
-        
-        if not status:
-            if stock_code:
-                print(f"ℹ️  股票 {stock_code} 无缓存数据")
-            else:
-                print("ℹ️  无缓存数据")
-        else:
-            for key, info in status.items():
-                status_icon = "✅" if info['valid'] else "❌"
-                print(f"{status_icon} {info['stock_code']:<8} | {info['description']:<12} | {info['remaining']:<15} | 过期: {info['expire_minutes']}分钟")
-        
-        # 显示缓存文件大小
-        try:
-            if os.path.exists(self.cache_file):
-                file_size = os.path.getsize(self.cache_file) / 1024  # KB
-                print(f"💾 缓存文件大小: {file_size:.1f} KB")
-            else:
-                print("💾 缓存文件: 不存在")
-        except Exception:
-            pass
-        
-        print("=" * 70)
+        self.cache_manager.print_cache_status(stock_code)
 
 
 # =========================
