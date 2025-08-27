@@ -26,7 +26,7 @@ from providers.market_data_fetcher import (
     fetch_valuation_data,
     fetch_index_technical_indicators
 )
-from providers.market_data_cache import get_cache_manager
+from providers.market_data_cache import get_cache_manager            
 
 class MarketTools:
     """统一的市场数据工具类"""
@@ -145,13 +145,13 @@ class MarketTools:
             print(f"❌ 未找到指数: {index_name}")
             return {}
         
-    def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False) -> Dict:
+    def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False, user_opinion: str = '') -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
         
         # 如果指定了index_name并且需要重新生成AI分析
         if index_name and force_regenerate:
-            return self._generate_ai_analysis(index_name)
+            return self._generate_ai_analysis(index_name, user_opinion)
         
         if use_cache and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
@@ -476,9 +476,10 @@ class MarketTools:
         else:
             return "超卖"
     
-    def _generate_ai_analysis(self, index_name: str) -> Dict:
+    def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:
         """生成AI分析数据(返回结构)"""
         try:
+            # 延迟导入，避免循环导入
             from analysis.stock_ai_analysis import generate_index_analysis_report
             
             # 获取综合市场报告数据
@@ -486,11 +487,12 @@ class MarketTools:
             
             print(f"🤖 正在生成{index_name}的AI分析报告...")
             
-            # 调用AI分析函数
+            # 调用AI分析函数，传递用户观点
             ai_report, timestamp = generate_index_analysis_report(
                 index_name,
                 index_name, 
-                market_report_data
+                market_report_data,
+                user_opinion
             )
             
             # 构建AI分析数据
@@ -498,6 +500,7 @@ class MarketTools:
                 'report': ai_report,
                 'timestamp': timestamp,
                 'index_name': index_name,
+                'user_opinion': user_opinion,
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
@@ -512,7 +515,8 @@ class MarketTools:
             return {
                 'error': str(e),
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'index_name': index_name
+                'index_name': index_name,
+                'user_opinion': user_opinion
             }
 
 # =========================

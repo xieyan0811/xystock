@@ -246,11 +246,15 @@ def display_market_summary():
         if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
             with st.spinner("🤖 AI正在分析指数数据..."):
                 try:
-                    # 调用market_tools中的AI分析方法
+                    # 获取用户观点
+                    user_opinion = st.session_state.get('market_user_opinion', '')
+                    
+                    # 调用market_tools中的AI分析方法，传递用户观点
                     ai_data = market_tools.get_ai_analysis(
                         use_cache=False, 
                         index_name=stock_code_for_ai, 
-                        force_regenerate=True
+                        force_regenerate=True,
+                        user_opinion=user_opinion
                     )
                     
                     # 保存AI报告到session_state
@@ -278,7 +282,16 @@ def display_market_summary():
         # 显示AI分析报告
         with st.expander("📊 AI指数分析报告", expanded=True):
             st.markdown(ai_data['report'])
-            st.caption(f"分析时间: {ai_data['timestamp']}")
+            
+            # 显示分析信息
+            col1, col2 = st.columns(2)
+            with col1:
+                st.caption(f"分析时间: {ai_data['timestamp']}")
+            with col2:
+                if ai_data.get('user_opinion'):
+                    st.caption(f"包含用户观点: ✅")
+                else:
+                    st.caption(f"包含用户观点: ❌")
 
         st.markdown("---")
         st.subheader("综合摘要")
@@ -346,6 +359,16 @@ def display_market_overview():
     # AI分析选项
     use_ai_analysis = st.checkbox("🤖 AI大盘分析", value=False, help="选中后将使用AI对大盘进行深入分析")
     
+    # 用户观点输入框（仅在选择AI分析时显示）
+    user_opinion = ""
+    if use_ai_analysis:
+        user_opinion = st.text_area(
+            "补充观点（可选）:",
+            placeholder="请输入您对大盘的观点、看法或关注的重点...",
+            help="输入您的投资观点或对大盘的看法，AI将结合市场数据给出综合分析",
+            height=100
+        )
+    
     # 分析按钮
     col1, col2, col3 = st.columns([1, 1, 4])
     with col1:
@@ -373,6 +396,8 @@ def display_market_overview():
                         if "ai_index_report" not in st.session_state:
                             st.session_state.ai_index_report = {}
                         st.session_state['run_ai_index'] = True
+                        # 保存用户观点到session_state
+                        st.session_state['market_user_opinion'] = user_opinion
                                             
                     # 显示报告基本信息
                     report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
