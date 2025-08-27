@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from providers.cache_manager import cache_manager, KLineData, KLineType
+from providers.kline_cache import cache_manager, KLineData, KLineType
 
 
 @dataclass
