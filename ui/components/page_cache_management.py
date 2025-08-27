@@ -29,7 +29,7 @@ def main():
                     use_container_width=True,
                     help="清理所有股票相关的数据缓存"):
             try:
-                from providers.stock_tools import clear_stock_cache
+                from providers.stock_data_tools import clear_stock_cache
                 clear_stock_cache()
                 st.success("✅ 股票数据缓存已清理完成！")
             except Exception as e:
@@ -66,7 +66,7 @@ def main():
                     help="一键清理所有股票和大盘数据缓存"):
             try:
                 # 清理股票缓存
-                from providers.stock_tools import clear_stock_cache
+                from providers.stock_data_tools import clear_stock_cache
                 clear_stock_cache()
                 
                 # 清理大盘缓存

@@ -8,7 +8,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.stock_tools import get_stock_tools
+from providers.stock_data_tools import get_stock_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_utils import get_stock_name
 

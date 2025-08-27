@@ -18,7 +18,7 @@ from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_utils import get_stock_name, normalize_stock_input
 from providers.risk_metrics import calculate_portfolio_risk
-from providers.stock_tools import get_stock_tools
+from providers.stock_data_tools import get_stock_tools
 from providers.report import generate_complete_report_safe, PDF_SUPPORT_AVAILABLE
 
 # 获取全局股票工具实例
