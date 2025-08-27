@@ -223,39 +223,38 @@ class MarketTools:
         report['ai_analysis'] = self.get_ai_analysis(use_cache)
         
         # 生成市场摘要
-        report['market_summary'] = self.generate_market_report(report, format_type='summary')
+        #report['market_summary'] = self.generate_market_report(report, format_type='summary')
         
         print("=" * 60)
         print("✅ 综合市场报告生成完成!")
         
         return report
     
-    def generate_market_report(self, report: Dict, format_type: str = 'summary'):
+    def generate_market_report(self, report: Dict, format_type: str = 'summary', markdown: bool = True):
         """
         生成市场报告
         
         Args:
             report: 原始报告数据
             format_type: 报告格式类型
-                - 'summary': 简要结构化摘要 (Dict格式)
                 - 'summary_formatted': 格式化的摘要markdown字符串 (str格式)
                 - 'detailed': 详细字符串报告 (str格式)
                 - 'text': 纯文本格式报告 (str格式)
+            markdown: 对于detail格式，是否输出为Markdown格式，默认为False（纯文本格式）
         
         Returns:
             Dict或str: 根据format_type返回不同格式的报告
         """
         if format_type == 'summary':
-            return self._generate_summary_dict(report)
-        elif format_type == 'summary_formatted':
-            return self._generate_formatted_summary(report)
-        elif format_type in ['detailed', 'text']:
-            return self._generate_detailed_text(report, format_type == 'detailed')
+            return self._generate_summary_text(report)
+        elif format_type == 'detail':
+            return self._generate_detailed_text(report, markdown=markdown)
         else:
             raise ValueError(f"不支持的报告格式类型: {format_type}")
     
-    def _generate_summary_dict(self, report: Dict) -> Dict:
-        """生成简要结构化摘要"""
+    def _generate_summary_text(self, report: Dict) -> str:
+        """生成格式化的摘要markdown字符串，直接用于UI显示"""
+        # 生成简要结构化摘要数据
         summary = {}
         
         # 技术面摘要
@@ -282,11 +281,7 @@ class MarketTools:
             m2_growth = money.get('m2_growth', 0)
             summary['liquidity_condition'] = f"M2同比增长 {m2_growth:.1f}%"
         
-        return summary
-    
-    def _generate_formatted_summary(self, report: Dict) -> str:
-        """生成格式化的摘要markdown字符串，直接用于UI显示"""
-        summary_data = self._generate_summary_dict(report)
+        # 生成格式化的markdown字符串
         markdown_lines = []
         
         # 定义维度映射和图标
@@ -302,120 +297,171 @@ class MarketTools:
         
         # 按顺序生成格式化行
         for key, (icon, label) in dimension_map.items():
-            if key in summary_data and summary_data[key]:
-                markdown_lines.append(f"**{icon} {label}:** {summary_data[key]}")
+            if key in summary and summary[key]:
+                markdown_lines.append(f"**{icon} {label}:** {summary[key]}")
         
         return '\n\n'.join(markdown_lines)
     
-    def _generate_detailed_text(self, report: Dict, has_detail: bool = False) -> str:
-        """生成详细文本报告"""
+    def _generate_detailed_text(self, report: Dict, markdown: bool = False) -> str:
+        """生成详细文本报告
+        
+        Args:
+            report: 报告数据
+            markdown: 是否输出为Markdown格式，默认为False（纯文本格式）
+        """
         lines = []
-        lines.append(f"\n📊 A股市场综合报告")
-        lines.append(f"🕐 报告时间: {report['report_time']}")
-        lines.append(f"🎯 关注指数: {report['focus_index']}")
-        lines.append("=" * 80)
+        
+        if markdown:
+            lines.append(f"\n# 📊 A股市场综合报告")
+            lines.append(f"**🕐 报告时间:** {report['report_time']}")
+            lines.append(f"**🎯 关注指数:** {report['focus_index']}")
+            lines.append("\n---\n")
+        else:
+            lines.append(f"\n📊 A股市场综合报告")
+            lines.append(f"🕐 报告时间: {report['report_time']}")
+            lines.append(f"🎯 关注指数: {report['focus_index']}")
+            lines.append("=" * 80)
         
         # 技术指标
         tech = report['technical_indicators']
         if tech:
-            lines.append(f"\n📈 技术指标分析:")
-            lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
-            lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
-            rsi_14 = tech.get('rsi_14', 'N/A')
-            if isinstance(rsi_14, (int, float)):
-                lines.append(f"   RSI(14): {rsi_14:.2f}")
+            if markdown:
+                lines.append(f"\n## 📈 技术指标分析")
+                lines.append(f"- **MA趋势:** {tech.get('ma_trend', 'N/A')}")
+                lines.append(f"- **MACD趋势:** {tech.get('macd_trend', 'N/A')}")
+                rsi_14 = tech.get('rsi_14', 'N/A')
+                if isinstance(rsi_14, (int, float)):
+                    lines.append(f"- **RSI(14):** {rsi_14:.2f}")
+                else:
+                    lines.append(f"- **RSI(14):** {rsi_14}")
             else:
-                lines.append(f"   RSI(14): {rsi_14}")
+                lines.append(f"\n📈 技术指标分析:")
+                lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
+                lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
+                rsi_14 = tech.get('rsi_14', 'N/A')
+                if isinstance(rsi_14, (int, float)):
+                    lines.append(f"   RSI(14): {rsi_14:.2f}")
+                else:
+                    lines.append(f"   RSI(14): {rsi_14}")
         
         # 市场情绪
         sentiment = report['sentiment_indicators']
         if sentiment:
-            lines.append(f"\n😊 市场情绪指标:")
-            lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-            up_ratio = sentiment.get('up_ratio', 0)
-            lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
+            if markdown:
+                lines.append(f"\n## 😊 市场情绪指标")
+                lines.append(f"- **涨跌家数:** ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
+                up_ratio = sentiment.get('up_ratio', 0)
+                lines.append(f"- **上涨占比:** {up_ratio*100:.1f}%")
+            else:
+                lines.append(f"\n😊 市场情绪指标:")
+                lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
+                up_ratio = sentiment.get('up_ratio', 0)
+                lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
         
         # 估值水平
         valuation = report['valuation_indicators']
         if valuation:
-            lines.append(f"\n💰 估值水平:")
-            hs300_pe = valuation.get('hs300_pe', 'N/A')
-            if isinstance(hs300_pe, (int, float)):
-                lines.append(f"   沪深300 PE: {hs300_pe:.2f}")
+            if markdown:
+                lines.append(f"\n## 💰 估值水平")
+                hs300_pe = valuation.get('hs300_pe', 'N/A')
+                if isinstance(hs300_pe, (int, float)):
+                    lines.append(f"- **沪深300 PE:** {hs300_pe:.2f}")
+                else:
+                    lines.append(f"- **沪深300 PE:** {hs300_pe}")
+                dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
+                if isinstance(dividend_yield, (int, float)):
+                    lines.append(f"- **股息率:** {dividend_yield:.2f}%")
+                else:
+                    lines.append(f"- **股息率:** {dividend_yield}%")
             else:
-                lines.append(f"   沪深300 PE: {hs300_pe}")
-            dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
-            if isinstance(dividend_yield, (int, float)):
-                lines.append(f"   股息率: {dividend_yield:.2f}%")
-            else:
-                lines.append(f"   股息率: {dividend_yield}%")
+                lines.append(f"\n💰 估值水平:")
+                hs300_pe = valuation.get('hs300_pe', 'N/A')
+                if isinstance(hs300_pe, (int, float)):
+                    lines.append(f"   沪深300 PE: {hs300_pe:.2f}")
+                else:
+                    lines.append(f"   沪深300 PE: {hs300_pe}")
+                dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
+                if isinstance(dividend_yield, (int, float)):
+                    lines.append(f"   股息率: {dividend_yield:.2f}%")
+                else:
+                    lines.append(f"   股息率: {dividend_yield}%")
         
         # 资金面
         money = report['money_flow_indicators']
         if money:
-            lines.append(f"\n💸 资金流向:")
-            m2_amount = money.get('m2_amount', 'N/A')
-            if isinstance(m2_amount, (int, float)):
-                lines.append(f"   M2余额: {m2_amount/10000:.2f}万亿")
+            if markdown:
+                lines.append(f"\n## 💸 资金流向")
+                m2_amount = money.get('m2_amount', 'N/A')
+                if isinstance(m2_amount, (int, float)):
+                    lines.append(f"- **M2余额:** {m2_amount/10000:.2f}万亿")
+                else:
+                    lines.append(f"- **M2余额:** {m2_amount}")
+                m2_growth = money.get('m2_growth', 'N/A')
+                if isinstance(m2_growth, (int, float)):
+                    lines.append(f"- **M2增速:** {m2_growth:.2f}%")
+                else:
+                    lines.append(f"- **M2增速:** {m2_growth}%")
             else:
-                lines.append(f"   M2余额: {m2_amount}")
-            m2_growth = money.get('m2_growth', 'N/A')
-            if isinstance(m2_growth, (int, float)):
-                lines.append(f"   M2增速: {m2_growth:.2f}%")
-            else:
-                lines.append(f"   M2增速: {m2_growth}%")
+                lines.append(f"\n💸 资金流向:")
+                m2_amount = money.get('m2_amount', 'N/A')
+                if isinstance(m2_amount, (int, float)):
+                    lines.append(f"   M2余额: {m2_amount/10000:.2f}万亿")
+                else:
+                    lines.append(f"   M2余额: {m2_amount}")
+                m2_growth = money.get('m2_growth', 'N/A')
+                if isinstance(m2_growth, (int, float)):
+                    lines.append(f"   M2增速: {m2_growth:.2f}%")
+                else:
+                    lines.append(f"   M2增速: {m2_growth}%")
         
         # 融资融券数据
         margin_data = report['margin_detail']
         if margin_data:
-            lines.append(f"\n💳 融资融券:")
-            margin_balance = margin_data.get('margin_balance', 'N/A')
-            if isinstance(margin_balance, (int, float)):
-                lines.append(f"   融资余额: {margin_balance/100000000:.2f}亿")
-            else:
-                lines.append(f"   融资余额: {margin_balance}")
-            
-            margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
-            if isinstance(margin_buy_balance, (int, float)):
-                lines.append(f"   融资买入: {margin_buy_balance/100000000:.2f}亿")
-            else:
-                lines.append(f"   融资买入: {margin_buy_balance}")
+            if markdown:
+                lines.append(f"\n## 💳 融资融券")
+                margin_balance = margin_data.get('margin_balance', 'N/A')
+                if isinstance(margin_balance, (int, float)):
+                    lines.append(f"- **融资余额:** {margin_balance/100000000:.2f}亿")
+                else:
+                    lines.append(f"- **融资余额:** {margin_balance}")
                 
-            change_ratio = margin_data.get('change_ratio', 'N/A')
-            if isinstance(change_ratio, (int, float)):
-                lines.append(f"   周变化率: {change_ratio:.2f}%")
+                margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
+                if isinstance(margin_buy_balance, (int, float)):
+                    lines.append(f"- **融资买入:** {margin_buy_balance/100000000:.2f}亿")
+                else:
+                    lines.append(f"- **融资买入:** {margin_buy_balance}")
+                    
+                change_ratio = margin_data.get('change_ratio', 'N/A')
+                if isinstance(change_ratio, (int, float)):
+                    lines.append(f"- **周变化率:** {change_ratio:.2f}%")
+                else:
+                    lines.append(f"- **周变化率:** {change_ratio}%")
             else:
-                lines.append(f"   周变化率: {change_ratio}%")
-        
-        # AI分析
-        ai_analysis = report.get('ai_analysis', {})
-        if ai_analysis:
-            lines.append(f"\n🤖 AI市场分析:")
-            lines.append(f"   市场趋势: {ai_analysis.get('market_trend', 'N/A')}")
-            lines.append(f"   风险评估: {ai_analysis.get('risk_assessment', 'N/A')}")
-            suggestions = ai_analysis.get('suggestions', [])
-            if suggestions:
-                lines.append(f"   投资建议: {'; '.join(suggestions[:3])}")
-        
-        lines.append("=" * 80)
+                lines.append(f"\n💳 融资融券:")
+                margin_balance = margin_data.get('margin_balance', 'N/A')
+                if isinstance(margin_balance, (int, float)):
+                    lines.append(f"   融资余额: {margin_balance/100000000:.2f}亿")
+                else:
+                    lines.append(f"   融资余额: {margin_balance}")
+                
+                margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
+                if isinstance(margin_buy_balance, (int, float)):
+                    lines.append(f"   融资买入: {margin_buy_balance/100000000:.2f}亿")
+                else:
+                    lines.append(f"   融资买入: {margin_buy_balance}")
+                    
+                change_ratio = margin_data.get('change_ratio', 'N/A')
+                if isinstance(change_ratio, (int, float)):
+                    lines.append(f"   周变化率: {change_ratio:.2f}%")
+                else:
+                    lines.append(f"   周变化率: {change_ratio}%")
+                
+        if markdown:
+            lines.append("\n---")
+        else:
+            lines.append("=" * 80)
         
         return '\n'.join(lines)
-    
-    def get_market_text_report(self, use_cache: bool = True, index_name: str = '上证指数', 
-                              has_detail: bool = False) -> str:
-        """
-        获取文本格式的市场报告 - 便捷方法
-        
-        Args:
-            use_cache: 是否使用缓存
-            index_name: 指数名称
-            has_detail: 是否包含详细信息
-            
-        Returns:
-            str: 格式化的文本报告
-        """
-        report_data = self.get_comprehensive_market_report(use_cache, index_name)
-        return self.generate_market_report(report_data, format_type='detailed' if has_detail else 'text')
     
     def _judge_rsi_level(self, rsi: float) -> str:
         """判断RSI水平"""
@@ -482,22 +528,6 @@ def get_market_tools() -> MarketTools:
     if _market_tools is None:
         _market_tools = MarketTools()
     return _market_tools
-
-
-# =========================
-# 报告格式化函数 - 向后兼容
-# =========================
-
-def get_market_report(report: Dict, has_detail: bool = False) -> str:
-    """
-    生成市场报告字符串 - 向后兼容函数
-    
-    注意：此函数已废弃，请使用 MarketDataTools.generate_market_report() 方法
-    """
-    # 创建临时实例来调用新方法
-    from providers.market_data_tools import get_market_tools
-    market_tools = get_market_tools()
-    return market_tools.generate_market_report(report, format_type='detailed' if has_detail else 'text')
 
 
 if __name__ == "__main__":

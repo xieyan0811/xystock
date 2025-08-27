@@ -234,11 +234,9 @@ def display_market_summary():
     market_tools = get_market_tools()    
     result_data = market_tools.get_comprehensive_market_report()
 
-    st.subheader("综合摘要")
-    # 使用新的格式化摘要方法
-    summary_markdown = market_tools.generate_market_report(result_data, format_type='summary_formatted')
-    
-    if not summary_markdown:
+    summary_text = market_tools.generate_market_report(result_data, format_type='summary')
+
+    if not summary_text:
         st.info("综合摘要数据准备中...")
         return
     
@@ -269,11 +267,29 @@ def display_market_summary():
                     if 'run_ai_index' in st.session_state:
                         del st.session_state['run_ai_index']
         
-    
-    # 显示各个维度的摘要 - 简化后的逻辑
-    st.markdown(summary_markdown)
-
+    # 显示AI分析报告（如果有的话）
+    current_stock_code = result_data.get('focus_index', '')
+    if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
+        ai_data = st.session_state['ai_index_report'][current_stock_code]
         
+        st.markdown("---")
+        st.subheader("🤖 AI深度分析")
+        
+        # 显示AI分析报告
+        with st.expander("📊 AI指数分析报告", expanded=True):
+            st.markdown(ai_data['report'])
+            st.caption(f"分析时间: {ai_data['timestamp']}")
+
+        st.markdown("---")
+        st.subheader("综合摘要")
+        st.markdown(summary_text)
+    else:
+        detail_text = market_tools.generate_market_report(result_data, format_type='detail')
+        st.markdown("---")
+        st.subheader("综合摘要")
+        st.markdown(detail_text)
+
+
     # 综合评级
     st.markdown("---")
     st.write("**🎯 综合评级:**")
@@ -319,20 +335,7 @@ def display_market_summary():
         st.write(f"市场综合评级: {rating} (评分: {score:.1f}/{total_indicators})")
     else:
         st.write("市场综合评级: 数据不足")
-    
-    # 显示AI分析报告（如果有的话）
-    current_stock_code = result_data.get('focus_index', '')
-    if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
-        ai_data = st.session_state['ai_index_report'][current_stock_code]
-        
-        st.markdown("---")
-        st.subheader("🤖 AI深度分析")
-        
-        # 显示AI分析报告
-        with st.expander("📊 AI指数分析报告", expanded=True):
-            st.markdown(ai_data['report'])
-            st.caption(f"分析时间: {ai_data['timestamp']}")
-            
+
             
 def display_market_overview():
     """显示大盘整体分析"""

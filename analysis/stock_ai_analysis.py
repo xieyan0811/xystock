@@ -15,7 +15,7 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.market_data_tools import get_market_report
+from providers.market_data_tools import get_market_tools
 
 def generate_stock_analysis_report(
     stock_code: str,
@@ -461,7 +461,10 @@ def generate_index_analysis_report( ## xieyan 250827
     
     # 从market_tools模块导入报告格式化函数
     try:
-        market_report_text = get_market_report(market_report_data, has_detail=True)
+        market_tools = get_market_tools()
+        market_report_text = market_tools.generate_market_report(market_report_data, 
+                                                                 format_type='detail', 
+                                                                 markdown=False)
     except Exception as e:
         market_report_text = f"市场报告数据格式化失败: {str(e)}"
     
@@ -581,7 +584,6 @@ def generate_comprehensive_analysis_report(
             print(f"获取股票基本信息失败: {e}")
     
     # 收集市场数据
-    market_data = {}
     market_report_text = ""
     market_ai_analysis = ""
     
@@ -599,13 +601,12 @@ def generate_comprehensive_analysis_report(
             # 获取综合市场报告
             market_report = market_tools.get_comprehensive_market_report(use_cache=True)
             if market_report:
-                market_data['comprehensive_report'] = market_report
                 data_sources.append({
                     'type': '市场综合报告',
                     'description': '包含技术指标、情绪、估值、资金流向等市场数据',
                     'timestamp': market_report.get('report_time', '未知时间')
                 })
-                market_report_text = get_market_report(market_report) # 单纯数据
+                market_report_text = market_tools.generate_market_report(market_report, format_type='summary')  # 单纯数据
                 
         except Exception as e:
             print(f"获取市场综合报告失败: {e}")
