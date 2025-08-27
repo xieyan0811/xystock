@@ -12,9 +12,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from utils.format_utils import format_large_number, format_percentage
+from utils.format_utils import format_large_number
 from ui.components.page_common import display_technical_indicators
-from providers.market_tools import get_market_tools
+from providers.market_data_tools import get_market_tools
+from providers.market_data_fetcher import fetch_index_technical_indicators
 
 def display_market_fundamentals():
     """显示市场基本面分析 - 包含估值水平、资金流向和融资融券数据"""
@@ -199,46 +200,6 @@ def display_market_indices():
                         delta=delta_text,
                         delta_color=delta_color
                     )
-                else:
-                    # 如果指数数据不存在，尝试使用技术指标获取
-                    try:
-                        tech_data = market_tools.get_index_technical_indicators(index_name, period=30)
-                        
-                        if tech_data and 'latest_close' in tech_data:
-                            current_price = tech_data['latest_close']
-                            change_percent = tech_data.get('change_percent', 0)
-                            change_amount = tech_data.get('change_amount', 0)
-                            
-                            # 显示指数信息
-                            if change_percent > 0:
-                                delta_color = "normal"
-                                delta_text = f"+{change_amount:.2f} (+{change_percent:.2f}%)"
-                            elif change_percent < 0:
-                                delta_color = "inverse"
-                                delta_text = f"{change_amount:.2f} ({change_percent:.2f}%)"
-                            else:
-                                delta_color = "off"
-                                delta_text = "0.00 (0.00%)"
-                            
-                            st.metric(
-                                label=index_name,
-                                value=f"{current_price:.2f}",
-                                delta=delta_text,
-                                delta_color=delta_color
-                            )
-                        else:
-                            st.metric(
-                                label=index_name,
-                                value="N/A",
-                                delta="数据获取中..."
-                            )
-                            
-                    except Exception as e:
-                        st.metric(
-                            label=index_name,
-                            value="N/A",
-                            delta="获取失败"
-                        )
         
         # 显示数据更新时间
         if 'update_time' in indices_data:
@@ -266,65 +227,6 @@ def display_market_indices():
     except Exception as e:
         st.error(f"显示指数数据时出错: {str(e)}")
         
-        # 作为备用方案，使用原来的技术指标方法
-        st.info("正在使用备用方案获取指数数据...")
-        
-        # 定义主要指数
-        indices = {
-            '上证指数': '000001',
-            '深证成指': '399001',
-            '创业板指': '399006',
-            '沪深300': '000300',
-            '中证500': '000905',
-            '科创50': '000688'
-        }
-        
-        # 获取指数数据
-        col1, col2, col3 = st.columns(3)
-            
-        for i, (index_name, index_code) in enumerate(indices.items()):
-            col = [col1, col2, col3][i % 3]
-            
-            with col:
-                try:
-                    # 获取技术指标数据
-                    tech_data = market_tools.get_index_technical_indicators(index_name, period=30)
-                    
-                    if tech_data and 'latest_close' in tech_data:
-                        current_price = tech_data['latest_close']
-                        change_percent = tech_data.get('change_percent', 0)
-                        change_amount = tech_data.get('change_amount', 0)
-                        
-                        # 显示指数信息
-                        if change_percent > 0:
-                            delta_color = "normal"
-                            delta_text = f"+{change_amount:.2f} (+{change_percent:.2f}%)"
-                        elif change_percent < 0:
-                            delta_color = "inverse"
-                            delta_text = f"{change_amount:.2f} ({change_percent:.2f}%)"
-                        else:
-                            delta_color = "off"
-                            delta_text = "0.00 (0.00%)"
-                        
-                        st.metric(
-                            label=index_name,
-                            value=f"{current_price:.2f}",
-                            delta=delta_text,
-                            delta_color=delta_color
-                        )
-                    else:
-                        st.metric(
-                            label=index_name,
-                            value="N/A",
-                            delta="数据获取中..."
-                        )
-                        
-                except Exception as e:
-                    st.metric(
-                        label=index_name,
-                        value="N/A",
-                        delta="获取失败"
-                    )
 
 def display_market_summary():
     """显示综合摘要卡片"""
@@ -490,7 +392,7 @@ def display_market_overview():
                         display_market_indices()
                     
                     with tab2:
-                        tech_data = market_tools.get_index_technical_indicators('上证指数')
+                        tech_data = fetch_index_technical_indicators('上证指数')
                         display_technical_indicators(tech_data)
 
                     with tab3:

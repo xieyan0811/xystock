@@ -1,0 +1,343 @@
+"""
+A股市场工具 - 统一的数据获取和缓存管理
+
+所有数据都支持智能缓存，避免重复请求
+"""
+
+import json
+import os
+import sys
+import warnings
+import traceback
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Any
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+warnings.filterwarnings('ignore')
+
+import akshare as ak
+import pandas as pd
+import efinance as ef
+from providers.stock_utils import get_indicators
+
+def fetch_market_sentiment() -> Dict:
+    """获取市场情绪数据的具体实现"""
+    sentiment_data = {}
+    try:
+        # 1. 涨跌家数统计
+        print("   获取涨跌家数...")
+        df_stocks = ef.stock.get_realtime_quotes()
+        df_stocks = df_stocks.dropna(subset=['涨跌幅'])
+        df_stocks["涨跌幅"] = pd.to_numeric(df_stocks["涨跌幅"], errors="coerce")
+        
+        up_count = (df_stocks["涨跌幅"] > 0).sum()
+        down_count = (df_stocks["涨跌幅"] < 0).sum()
+        flat_count = (df_stocks["涨跌幅"] == 0).sum()
+        total_count = len(df_stocks)
+        
+        sentiment_data.update({
+            'up_stocks': int(up_count),
+            'down_stocks': int(down_count),
+            'flat_stocks': int(flat_count),
+            'total_stocks': int(total_count),
+            'up_ratio': float(up_count / total_count) if total_count > 0 else 0,
+            'down_ratio': float(down_count / total_count) if total_count > 0 else 0,
+        })
+        
+        print(f"      上涨: {up_count} | 下跌: {down_count} | 平盘: {flat_count}")
+        
+    except Exception as e:
+        print(f"   ❌ 获取涨跌家数失败: {e}")
+            
+    sentiment_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return sentiment_data
+
+
+def fetch_valuation_data(debug=False) -> Dict:
+    """
+    获取估值指标
+    
+    Returns:
+        包含估值指标的字典
+    """
+    print("💰 获取估值指标...")
+    
+    valuation_data = {}
+    
+    try:
+        # 沪深300估值
+        print("   获取沪深300估值...")
+        df_hs300 = ak.stock_zh_index_value_csindex("000300")
+        if not df_hs300.empty:
+            if debug:
+                print(df_hs300)
+            latest_hs300 = df_hs300.iloc[-1]
+            valuation_data.update({
+                'hs300_pe': float(latest_hs300.get('市盈率1', 0)),
+                'hs300_dividend_yield': float(latest_hs300.get('股息率1', 0)),
+                'hs300_date': str(latest_hs300.get('日期', datetime.now().strftime('%Y-%m-%d'))),
+            })
+            print(f"      沪深300 PE: {valuation_data['hs300_pe']:.2f}")
+        
+    except Exception as e:
+        print(f"   ❌ 获取沪深300估值失败: {e}")
+    
+    # 添加更新时间
+    valuation_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    print("   ✓ 估值指标获取完成")
+    return valuation_data
+
+
+def fetch_money_flow_data(debug=False) -> Dict:
+    """获取资金流向数据的具体实现"""
+    print("💸 获取资金流向指标...")
+    
+    money_flow_data = {}
+    
+    try:
+        # M2货币供应量
+        print("   获取M2数据...")
+        df_m2 = ak.macro_china_money_supply()
+        if debug:
+            print(df_m2.head())
+        if not df_m2.empty:
+            latest_m2 = df_m2.iloc[0]
+            if debug:
+                print(latest_m2)
+            money_flow_data.update({
+                'm2_amount': float(latest_m2.get('货币和准货币(M2)-数量(亿元)', 0)),
+                'm2_growth': float(latest_m2.get('货币和准货币(M2)-同比增长', 0)),
+                'm1_amount': float(latest_m2.get('货币(M1)-数量(亿元)', 0)),
+                'm1_growth': float(latest_m2.get('货币(M1)-同比增长', 0)),
+                'm2_date': str(latest_m2.get('月份', datetime.now().strftime('%Y-%m'))),
+            })
+            print(f"      M2余额: {money_flow_data['m2_amount']/10000:.2f}万亿 | 同比增长: {money_flow_data['m2_growth']:.2f}%")
+
+    except Exception as e:
+        print(f"   ❌ 获取M2数据失败: {e}")
+    
+    # 添加更新时间
+    money_flow_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    print("   ✓ 资金流向指标获取完成")
+    return money_flow_data
+
+
+def fetch_current_indices() -> Dict:
+    """获取当前指数实时数据的具体实现"""
+    print("📊 获取当前指数实时数据...")
+    
+    indices_data = {}
+    
+    try:
+        # 使用东方财富获取沪深重要指数
+        print("   获取沪深重要指数...")
+        df_indices = ak.stock_zh_index_spot_em('沪深重要指数')
+        
+        if not df_indices.empty:
+            # 将DataFrame转换为字典格式，便于后续使用
+            indices_list = []
+            for _, row in df_indices.iterrows():
+                index_info = {
+                    'code': str(row.get('代码', '')),
+                    'name': str(row.get('名称', '')),
+                    'current_price': float(row.get('最新价', 0)),
+                    'change_percent': float(row.get('涨跌幅', 0)),
+                    'change_amount': float(row.get('涨跌额', 0)),
+                    'volume': float(row.get('成交量', 0)),
+                    'turnover': float(row.get('成交额', 0)),
+                    'amplitude': float(row.get('振幅', 0)),
+                    'high': float(row.get('最高', 0)),
+                    'low': float(row.get('最低', 0)),
+                    'open': float(row.get('今开', 0)),
+                    'prev_close': float(row.get('昨收', 0)),
+                    'volume_ratio': float(row.get('量比', 0))
+                }
+                indices_list.append(index_info)
+            
+            # 按指数名称创建索引字典
+            indices_dict = {}
+            for index in indices_list:
+                indices_dict[index['name']] = index
+            
+            indices_data = {
+                'indices_list': indices_list,
+                'indices_dict': indices_dict,
+                'total_count': len(indices_list),
+                'data_source': '东方财富-沪深重要指数',
+                'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            print(f"      成功获取 {len(indices_list)} 个指数数据")
+            
+            # 显示主要指数信息
+            main_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']
+            for name in main_indices:
+                if name in indices_dict:
+                    idx = indices_dict[name]
+                    change_sign = '+' if idx['change_percent'] >= 0 else ''
+                    print(f"      - {name}: {idx['current_price']:.2f} ({change_sign}{idx['change_percent']:.2f}%)")
+        
+    except Exception as e:
+        print(f"   ❌ 获取指数数据失败: {e}")
+        indices_data = {
+            'error': str(e),
+            'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    print("   ✓ 指数数据获取完成")
+    return indices_data
+
+
+def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
+    """统一的融资融券数据获取方法"""
+    result = {
+        'margin_balance': 0,
+        'margin_buy_balance': 0,
+        'margin_sell_balance': 0,
+        'margin_sh_balance': 0,
+        'margin_sh_buy': 0,
+        'margin_sh_sell': 0,
+        'margin_sz_balance': 0,
+        'margin_sz_buy': 0,
+        'margin_sz_sell': 0,
+        'margin_date': datetime.now().strftime('%Y-%m-%d'),
+    }
+    
+    sh_data = {}
+    sz_data = {}
+    
+    try:
+        # 获取上交所数据
+        df_margin_sh = ak.macro_china_market_margin_sh()
+        if not df_margin_sh.empty:
+            latest_sh = df_margin_sh.iloc[-1]
+            result.update({
+                'margin_sh_balance': float(latest_sh.get('融资融券余额', 0)),
+                'margin_sh_buy': float(latest_sh.get('融资余额', 0)),
+                'margin_sh_sell': float(latest_sh.get('融券余额', 0)),
+                'margin_date': str(latest_sh.get('日期', datetime.now().strftime('%Y-%m-%d'))),
+            })
+            
+            if include_historical and len(df_margin_sh) >= 7:
+                week_ago_sh = df_margin_sh.iloc[-7]
+                weekly_change_sh = result['margin_sh_buy'] - float(week_ago_sh.get('融资余额', 0))
+                sh_data = {
+                    'weekly_change': float(weekly_change_sh),
+                    'change_ratio': float(weekly_change_sh / (result['margin_sh_buy'] - weekly_change_sh) * 100) if (result['margin_sh_buy'] - weekly_change_sh) > 0 else 0
+                }
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()               
+        print(f"      ❌ 获取上交所融资融券失败: {e}")
+    
+    try:
+        # 获取深交所数据
+        df_margin_sz = ak.macro_china_market_margin_sz()
+        if not df_margin_sz.empty:
+            latest_sz = df_margin_sz.iloc[-1]
+            result.update({
+                'margin_sz_balance': float(latest_sz.get('融资融券余额', 0)),
+                'margin_sz_buy': float(latest_sz.get('融资余额', 0)),
+                'margin_sz_sell': float(latest_sz.get('融券余额', 0)),
+            })
+            
+            if include_historical and len(df_margin_sz) >= 7:
+                week_ago_sz = df_margin_sz.iloc[-7]
+                weekly_change_sz = result['margin_sz_buy'] - float(week_ago_sz.get('融资余额', 0))
+                sz_data = {
+                    'weekly_change': float(weekly_change_sz),
+                    'change_ratio': float(weekly_change_sz / (result['margin_sz_buy'] - weekly_change_sz) * 100) if (result['margin_sz_buy'] - weekly_change_sz) > 0 else 0
+                }
+            
+    except Exception as e:
+        print(f"      ❌ 获取深交所融资融券失败: {e}")
+    
+    # 汇总两市数据
+    total_margin_balance = result['margin_sh_balance'] + result['margin_sz_balance']
+    total_margin_buy = result['margin_sh_buy'] + result['margin_sz_buy']
+    total_margin_sell = result['margin_sh_sell'] + result['margin_sz_sell']
+    
+    result.update({
+        'margin_balance': float(total_margin_balance),
+        'margin_buy_balance': float(total_margin_buy),
+        'margin_sell_balance': float(total_margin_sell),
+    })
+    
+    if include_historical:
+        total_weekly_change = sh_data.get('weekly_change', 0) + sz_data.get('weekly_change', 0)
+        result.update({
+            'weekly_change': float(total_weekly_change),
+            'change_ratio': float(total_weekly_change / (total_margin_buy - total_weekly_change) * 100) if (total_margin_buy - total_weekly_change) > 0 else 0,
+            'shanghai': sh_data,
+            'shenzhen': sz_data,
+        })
+    
+    return result
+
+def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> Dict:
+    """获取指数技术指标（实时数据，不缓存）"""
+    print(f"📊 获取{index_name}技术指标...")
+    
+    # 支持的指数
+    indices = {
+        '上证指数': '000001',
+        '深证成指': '399001', 
+        '创业板指': '399006',
+        '沪深300': '000300',
+        '中证500': '000905',
+        '科创50': '000688'
+    }
+        
+    try:
+        if index_name not in indices:
+            raise ValueError(f"不支持的指数名称: {index_name}")
+        
+        # 根据指数名称获取数据
+        if index_name == '上证指数':
+            df_raw = ak.stock_zh_index_daily(symbol="sh000001")
+        elif index_name == '深证成指':
+            df_raw = ak.stock_zh_index_daily(symbol="sz399001")
+        elif index_name == '创业板指':
+            df_raw = ak.stock_zh_index_daily(symbol="sz399006")
+        elif index_name == '沪深300':
+            df_raw = ak.stock_zh_index_daily(symbol="sh000300")
+        elif index_name == '中证500':
+            df_raw = ak.stock_zh_index_daily(symbol="sh000905")
+        elif index_name == '科创50':
+            df_raw = ak.stock_zh_index_daily(symbol="sh000688")
+        
+        if df_raw.empty:
+            raise ValueError(f"无法获取{index_name}数据")
+                    
+        # 获取最近的数据
+        df = df_raw.tail(period).copy()
+        
+        # 重命名列以符合stockstats要求
+        df = df.rename(columns={
+            'open': 'open',
+            'close': 'close', 
+            'high': 'high',
+            'low': 'low',
+            'volume': 'volume'
+        })
+        
+        # 确保数据类型正确
+        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        indicators = get_indicators(df)
+        
+        print(f"   ✓ 成功获取{index_name}技术指标")
+        return indicators
+        
+    except Exception as e:
+        print(f"   ❌ 获取{index_name}技术指标失败: {e}")
+        return {}

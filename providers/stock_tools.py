@@ -882,7 +882,7 @@ class StockTools:
             
             # 导入分析函数和市场工具
             from analysis.stock_ai_analysis import generate_comprehensive_analysis_report
-            from providers.market_tools import get_market_tools
+            from providers.market_data_tools import get_market_tools
             
             # 获取市场工具实例
             market_tools = get_market_tools()

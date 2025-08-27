@@ -45,9 +45,9 @@ def main():
                     use_container_width=True,
                     help="清理所有大盘相关的数据缓存"):
             try:
-                from providers.market_data_cache import get_cache_manager
-                market_cache = get_cache_manager()
-                market_cache.clear_cache()
+                from providers.market_data_tools import get_market_tools
+                market_tools = get_market_tools()
+                market_tools.clear_cache()
                 st.success("✅ 大盘数据缓存已清理完成！")
             except Exception as e:
                 st.error(f"❌ 清理大盘缓存失败：{str(e)}")
@@ -70,9 +70,9 @@ def main():
                 clear_stock_cache()
                 
                 # 清理大盘缓存
-                from providers.market_data_cache import get_cache_manager
-                market_cache = get_cache_manager()
-                market_cache.clear_cache()
+                from providers.market_data_tools import get_market_tools
+                market_tools = get_market_tools()
+                market_tools.clear_cache()
                 
                 st.success("✅ 所有缓存已清理完成！")
             except Exception as e:

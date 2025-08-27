@@ -10,11 +10,12 @@ import sys
 import os
 
 # 添加项目根目录到Python路径
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.append(project_root)
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_dir not in sys.path:
+    sys.path.append(project_dir)
 
 from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
+from providers.market_data_tools import get_market_report
 
 def generate_stock_analysis_report(
     stock_code: str,
@@ -439,7 +440,7 @@ def generate_fundamental_analysis_report(
         return f"生成基本面分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def generate_index_analysis_report(
+def generate_index_analysis_report( ## xieyan 250827
     stock_code: str,
     stock_name: str,
     market_report_data: Dict[str, Any]
@@ -460,8 +461,7 @@ def generate_index_analysis_report(
     
     # 从market_tools模块导入报告格式化函数
     try:
-        from providers.market_tools import get_market_report
-        market_report_text = get_market_report(market_report_data)
+        market_report_text = get_market_report(market_report_data, has_detail=True)
     except Exception as e:
         market_report_text = f"市场报告数据格式化失败: {str(e)}"
     
@@ -509,6 +509,11 @@ def generate_index_analysis_report(
 列出1-3个主要风险点
 
 请保持内容精炼，每个部分2-3句话即可，总字数控制在800字以内。"""
+    
+    with open(os.path.join(project_dir, "data", "cache", "req_market.txt"), "w", encoding="utf-8") as f:
+        f.write(user_message)
+    print(f'req length {len(user_message)}')
+    #return user_message, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
         # 调用OpenAI API
@@ -583,7 +588,7 @@ def generate_comprehensive_analysis_report(
     # 如果没有传入market_tools，尝试导入并获取
     if market_tools is None:
         try:
-            from providers.market_tools import get_market_tools
+            from providers.market_data_tools import get_market_tools
             market_tools = get_market_tools()
         except Exception as e:
             print(f"导入market_tools失败: {e}")
@@ -600,9 +605,6 @@ def generate_comprehensive_analysis_report(
                     'description': '包含技术指标、情绪、估值、资金流向等市场数据',
                     'timestamp': market_report.get('report_time', '未知时间')
                 })
-                
-                # 生成市场报告文本
-                from providers.market_tools import get_market_report
                 market_report_text = get_market_report(market_report) # 单纯数据
                 
         except Exception as e:
