@@ -29,7 +29,6 @@ from .kline_cache import KLineData, KLineType
 from .stock_data_fetcher import (
     StockDataFetcher,
     RealTimeQuote, 
-    StockInfo,
     DataFetcherError,
     DataFetcherNotAvailableError,
     InvalidSymbolError,
@@ -40,7 +39,6 @@ __all__ = [
     # 数据结构
     "KLineData", 
     "RealTimeQuote",
-    "StockInfo",
     "KLineType",
     
     # 异常类

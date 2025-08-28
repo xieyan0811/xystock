@@ -474,9 +474,10 @@ def get_chip_analysis_data(stock_code):
         return chip_data
         
     except Exception as e:
-        return {"error": f"获取筹码数据失败: {str(e)}"}
+        print(f"获取筹码数据失败: {str(e)}")
+        return {"error": f"该股票暂不支持获取筹码数据"}
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from stockstats import wrap
 
 def _judge_ma_trend(stock_data) -> str:
@@ -635,20 +636,7 @@ def fetch_stock_basic_info(stock_code: str) -> Dict:
             })
         
         if stock_info:
-            basic_info.update({
-                'symbol': str(stock_info.symbol) if stock_info.symbol else '',
-                'name': str(stock_info.name) if stock_info.name else '',
-                'industry': str(stock_info.industry) if stock_info.industry else '',
-                'total_market_value': float(stock_info.total_market_value) if stock_info.total_market_value else 0,
-                'circulating_market_value': float(stock_info.circulating_market_value) if stock_info.circulating_market_value else 0,
-                'pe_ratio': str(stock_info.pe_ratio) if stock_info.pe_ratio else '',
-                'pb_ratio': str(stock_info.pb_ratio) if stock_info.pb_ratio else '',
-                'roe': str(stock_info.roe) if stock_info.roe else '',
-                'gross_profit_margin': str(stock_info.gross_profit_margin) if stock_info.gross_profit_margin else '',
-                'net_profit_margin': str(stock_info.net_profit_margin) if stock_info.net_profit_margin else '',
-                'net_profit': str(stock_info.net_profit) if stock_info.net_profit else '',
-                'sector_code': str(stock_info.sector_code) if stock_info.sector_code else '',
-            })
+            basic_info.update(stock_info)
         
     except Exception as e:
         basic_info['error'] = str(e)

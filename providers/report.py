@@ -454,7 +454,8 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
             ('成交量', format_volume(basic_info.get('volume', 0))),
             ('市盈率', basic_info.get('pe_ratio', '')),
             ('市净率', basic_info.get('pb_ratio', '')),
-            ('ROE', basic_info.get('roe', ''))
+            ('ROE', basic_info.get('roe', '')),
+            ('资产负债率', basic_info.get('debt_to_asset_ratio', ''))
         ]
         
         for label, value in metrics:

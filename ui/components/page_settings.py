@@ -123,6 +123,7 @@ def main():
             except Exception as e:
                 st.error(f"保存失败: {str(e)}")
     
+    
     # 测试连接区域
     st.subheader("测试连接")
     if st.button("🔄 测试API连接"):
@@ -140,7 +141,25 @@ def main():
                     st.warning(f"API连接成功但响应不符合预期：{response}")
             except Exception as e:
                 st.error(f"API连接测试失败：{str(e)}")
-    
+
+
+    # 新增用户画像设置区域（简化版）
+    with st.container():
+        st.subheader("用户画像")
+        user_profile = st.text_area(
+            "请描述您的用户画像",
+            value=config.get('USER_PROFILE.RAW', ''),
+            placeholder="例如：擅长领域：科技、医疗，长期关注新能源板块；交易习惯：偏好左/右侧交易，风险偏好，平均持仓时间等",
+            help="请简要描述您的擅长领域、交易习惯等，有助于系统更好地理解您的需求"
+        )
+        if st.button("💾 保存用户画像", key="save_user_profile", type="primary"):
+            try:
+                save_config('USER_PROFILE', 'RAW', user_profile)
+                st.success("用户画像已保存！")
+            except Exception as e:
+                st.error(f"保存失败: {str(e)}")
+
+
     # 页面底部信息
     st.markdown("---")
     st.markdown(

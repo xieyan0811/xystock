@@ -130,6 +130,7 @@ def generate_index_analysis_report( ## xieyan 250827
 
 5. **操作建议**：
 - 针对不同风险偏好的投资者，分别给出具体操作建议（如仓位配置、板块选择、进出场时机等）。
+- 特别提示：在市场大涨大跌、波动剧烈时，务必提醒用户避免因情绪波动而临时起意地操作，保持理性决策。
 
 6. **风险提示**：
 - 明确列出1-3个当前最需警惕的市场风险。
@@ -140,6 +141,7 @@ def generate_index_analysis_report( ## xieyan 250827
 - 结论要有明确的操作性。
 - 必须考虑当前市场变动情况对投资决策的影响。
 - 特别强调超短期（1-3天）的预测和操作建议。
+- 如遇市场大幅波动，需特别提醒用户不要因情绪波动而冲动操作。
 """
 
     user_message = f"""基于以下数据，请对{stock_name}({stock_code})提供精简分析报告：
@@ -190,5 +192,5 @@ def generate_index_analysis_report( ## xieyan 250827
         error_msg = f"生成{stock_name}AI分析报告失败: {str(e)}"
         print(f"❌ {error_msg}")
         return error_msg, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
+
 

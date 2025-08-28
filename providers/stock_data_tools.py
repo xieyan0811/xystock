@@ -30,7 +30,7 @@ warnings.filterwarnings('ignore')
 # 导入必要的模块
 from providers.stock_utils import (
     get_stock_name, get_market_info, get_indicators, 
-    normalize_stock_input, get_chip_analysis_data,
+    normalize_stock_input,
     fetch_stock_basic_info, fetch_stock_technical_indicators,
     fetch_stock_news_data, fetch_stock_chip_data
 )
@@ -356,7 +356,7 @@ class StockTools:
                 if use_cache and 'error' not in chip_data:
                     self.cache_manager.save_cached_data(data_type, stock_code, chip_data)
             except Exception as e:
-                print(f"❌ 获取筹码数据失败: {e}")
+                print(f"⚠️ 暂不支持拉取筹码数据: {e}")
                 chip_data = self.cache_manager.get_cached_data(data_type, stock_code) if use_cache else {'error': str(e)}
         
         # 如果需要AI分析且筹码数据获取成功
@@ -466,7 +466,6 @@ class StockTools:
             Tuple[str, str]: (分析报告, 时间戳)
         """
         analysis_type = "fundamental"
-        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
         
         # 检查缓存
         if use_cache and not force_refresh:

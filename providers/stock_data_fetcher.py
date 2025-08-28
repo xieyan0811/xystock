@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from providers.kline_cache import cache_manager, KLineData, KLineType
-
+import akshare as ak
 
 @dataclass
 class RealTimeQuote:
@@ -24,23 +24,6 @@ class RealTimeQuote:
     open: float            # 开盘价
     prev_close: float      # 昨收价
     timestamp: str         # 时间戳
-
-
-@dataclass
-class StockInfo:
-    """股票基本信息数据结构"""
-    symbol: str                    # 股票代码
-    name: str                      # 股票名称
-    net_profit: Optional[str]      # 净利润
-    total_market_value: Optional[float]  # 总市值
-    circulating_market_value: Optional[float]  # 流通市值
-    industry: Optional[str]        # 所处行业
-    pe_ratio: Optional[str]        # 市盈率(动)
-    pb_ratio: Optional[str]        # 市净率
-    roe: Optional[str]             # ROE
-    gross_profit_margin: Optional[str]  # 毛利率
-    net_profit_margin: Optional[str]    # 净利率
-    sector_code: Optional[str]     # 板块编号
 
 
 class DataFetcherError(Exception):
@@ -274,7 +257,7 @@ class StockDataFetcher:
                 return cached_data
             return []
     
-    def get_stock_info(self, symbol: str) -> Optional[StockInfo]:
+    def get_stock_info(self, symbol: str, detail = True):
         """
         获取股票基本信息
         
@@ -282,7 +265,7 @@ class StockDataFetcher:
             symbol: 股票代码或名称（如：'600519', '贵州茅台', '上证指数'）
             
         Returns:
-            StockInfo: 股票基本信息
+            Dict: 股票基本信息
         """
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
@@ -296,14 +279,30 @@ class StockDataFetcher:
                 data = info.to_dict()
                 
                 # 转换为标准格式
-                return self._convert_to_stock_info(data, symbol)
-            
+                if detail:
+                    ret2 = self.get_more_stock_info(symbol, ['资产负债率'])
+                data.update(ret2)
+                ret = self._convert_to_stock_info(data, symbol)
+                return ret
+
             return None
             
         except Exception as e:
             print(f"获取股票基本信息失败: {e}")
             return None
-    
+
+    def get_more_stock_info(self, symbol, key_list = None):
+        ret_dic = {}
+        try:
+            ret = ak.stock_financial_abstract(symbol=symbol)
+            for idx,item in ret.iterrows():
+                if key_list is None or item['指标'] in key_list:
+                    #print(item.iloc[1], item.iloc[2])
+                    ret_dic[item.iloc[1]] = item.iloc[2]
+        except Exception as e:
+            print(f"获取更多股票信息失败: {e}")
+        return ret_dic
+
     def _convert_to_realtime_quote(self, data: Dict[str, Any], original_symbol: str) -> RealTimeQuote:
         """将efinance返回的数据转换为标准实时行情格式"""
         try:
@@ -405,7 +404,7 @@ class StockDataFetcher:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(name='{self.name}', available={self.is_available()})>"
     
-    def _convert_to_stock_info(self, data: Dict[str, Any], original_symbol: str) -> StockInfo:
+    def _convert_to_stock_info(self, data: Dict[str, Any], original_symbol: str) -> Dict[str, Any]:
         """将efinance返回的股票基本信息转换为标准格式"""
         try:
             def safe_convert_float(value):
@@ -423,20 +422,21 @@ class StockDataFetcher:
                     return None
                 return str(value).strip() if str(value).strip() else None
             
-            return StockInfo(
-                symbol=data.get('股票代码', original_symbol),
-                name=data.get('股票名称', ''),
-                net_profit=safe_convert_str(data.get('净利润')),
-                total_market_value=safe_convert_float(data.get('总市值')),
-                circulating_market_value=safe_convert_float(data.get('流通市值')),
-                industry=safe_convert_str(data.get('所处行业')),
-                pe_ratio=safe_convert_str(data.get('市盈率(动)')),
-                pb_ratio=safe_convert_str(data.get('市净率')),
-                roe=safe_convert_str(data.get('ROE')),
-                gross_profit_margin=safe_convert_str(data.get('毛利率')),
-                net_profit_margin=safe_convert_str(data.get('净利率')),
-                sector_code=safe_convert_str(data.get('板块编号'))
-            )
+            return {
+                'symbol': data.get('股票代码', original_symbol),
+                'name': data.get('股票名称', ''),
+                'net_profit': safe_convert_str(data.get('净利润')),
+                'total_market_value': safe_convert_float(data.get('总市值')),
+                'circulating_market_value': safe_convert_float(data.get('流通市值')),
+                'industry': safe_convert_str(data.get('所处行业')),
+                'pe_ratio': safe_convert_str(data.get('市盈率(动)')),
+                'pb_ratio': safe_convert_str(data.get('市净率')),
+                'roe': safe_convert_str(data.get('ROE')),
+                'gross_profit_margin': safe_convert_str(data.get('毛利率')),
+                'net_profit_margin': safe_convert_str(data.get('净利率')),
+                'sector_code': safe_convert_str(data.get('板块编号')),
+                'debt_to_asset_ratio': safe_convert_str(data.get('资产负债率'))
+            }
         except Exception as e:
             raise DataFetcherError(f"股票信息转换失败: {e}")
 

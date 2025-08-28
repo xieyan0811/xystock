@@ -77,6 +77,11 @@ def display_market_fundamentals():
                 
                 st.write(f"**股息水平:** {div_color} {div_level}")
     
+    # 显示估值数据获取时间
+    val_time = valuation_data.get('update_time') or valuation_data.get('date')
+    if val_time:
+        st.caption(f"估值数据获取时间: {val_time}")
+    
     # 第二部分：资金流向
     st.markdown("#### 💸 资金流向")
     
@@ -120,6 +125,11 @@ def display_market_fundamentals():
                 else:
                     st.write("📉 M1增速低于M2，资金活跃度一般")
     
+    # 显示资金流向数据获取时间
+    money_time = money_data.get('update_time') or money_data.get('date')
+    if money_time:
+        st.caption(f"资金流向数据获取时间: {money_time}")
+    
     # 第三部分：融资融券数据
     st.markdown("#### 💳 融资融券数据")
     
@@ -140,6 +150,11 @@ def display_market_fundamentals():
             st.metric("融券余额", f"{format_large_number(margin_sell)}" if margin_sell else "N/A")
         
         st.metric("统计时间", margin_data.get('margin_date', 'N/A'))
+        
+        # 显示融资融券数据获取时间
+        margin_time = margin_data.get('update_time') or margin_data.get('margin_date')
+        if margin_time:
+            st.caption(f"融资融券数据获取时间: {margin_time}")
 
 
 def display_market_indices():

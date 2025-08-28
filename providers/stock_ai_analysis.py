@@ -340,7 +340,6 @@ def generate_fundamental_analysis_report(
     
     # 构建公司简介文本
     profile_text = "**公司简介:**\n"
-    # 将StockInfo对象转换为字典形式
     stock_info_dict = {
         "股票代码": company_profile['symbol'],
         "股票名称": company_profile['name'],
@@ -353,7 +352,8 @@ def generate_fundamental_analysis_report(
         "ROE": company_profile['roe'],
         "毛利率": company_profile['gross_profit_margin'],
         "净利率": company_profile['net_profit_margin'],
-        "板块编号": company_profile['sector_code']
+        "板块编号": company_profile['sector_code'],
+        "资产负债率": company_profile['debt_to_asset_ratio']
     }
     
     # 只显示有值的字段
@@ -601,6 +601,16 @@ def generate_comprehensive_analysis_report(
     else:
         basic_info_section = f"\n\n# 💹 股票实时信息\n暂无{stock_name}（{stock_code}）的实时价格信息。\n"
     
+    # 加载用户画像
+    user_profile_section = ""
+    try:
+        from config_manager import config
+        user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
+        if user_profile_raw:
+            user_profile_section = f"\n\n# 用户画像\n{user_profile_raw}\n"
+    except Exception as e:
+        user_profile_section = ""
+
     # 构建用户观点部分
     user_opinion_section = ""
     if user_opinion.strip():
@@ -610,7 +620,7 @@ def generate_comprehensive_analysis_report(
             'description': '用户提供的投资观点和看法',
             'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
-    
+
     # 构建分析提示
     system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户观点，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
 
@@ -647,6 +657,7 @@ def generate_comprehensive_analysis_report(
 - 只输出最有决策价值的内容，避免面面俱到。
 - 结论要有明确的操作性。
 - 必须考虑当前价格变动情况对投资决策的影响。
+- 如遇市场大幅波动，需特别提醒用户不要因情绪波动而频繁看盘、冲动操作。
 """
 
     # 构建用户消息
@@ -655,6 +666,7 @@ def generate_comprehensive_analysis_report(
 {basic_info_section}
 {historical_summary}
 {market_summary}
+{user_profile_section}
 {user_opinion_section}
 
 请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。当前股价的涨跌情况也是重要的分析因素。"""

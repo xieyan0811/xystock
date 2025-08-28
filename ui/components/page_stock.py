@@ -74,39 +74,22 @@ def display_stock_info(stock_code, market_type):
     with st.spinner(f"正在加载{market_type} {stock_code} ({stock_name})的数据..."):
         try:
             # 根据市场类型决定标签页配置
-            if market_type == "港股" or market_type == "指数":
-                # 港股和指数显示4个标签页（添加综合分析）
-                tab1, tab2, tab3, tab4 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🎯 综合分析"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析", "🎯 综合分析"])
+            
+            with tab1:
+                display_basic_info(stock_code)
                 
-                with tab1:
-                    display_basic_info(stock_code)
-
-                with tab2:
-                    display_market_trend(stock_code)
-                                    
-                with tab3:
-                    display_news(stock_code)
+            with tab2:
+                display_market_trend(stock_code)
+                                
+            with tab3:
+                display_news(stock_code)
                 
-                with tab4:
-                    display_comprehensive_analysis(stock_code)
-            else:
-                # A股、基金等显示5个标签页（添加综合分析）
-                tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析", "🎯 综合分析"])
-                
-                with tab1:
-                    display_basic_info(stock_code)
-                    
-                with tab2:
-                    display_market_trend(stock_code)
-                                    
-                with tab3:
-                    display_news(stock_code)
-                    
-                with tab4:
-                    display_chips_analysis(stock_code)
-                
-                with tab5:
-                    display_comprehensive_analysis(stock_code)
+            with tab4: # 支持A股和部分ETF，暂不支持港股
+                display_chips_analysis(stock_code)
+            
+            with tab5:
+                display_comprehensive_analysis(stock_code)
                     
             # 添加导出功能
             st.divider()
@@ -306,7 +289,10 @@ def display_basic_info(stock_code):
                 
                 if basic_info_data.get('net_profit'):
                     st.write(f"**净利润:** {basic_info_data['net_profit']}")
-            
+
+                if basic_info_data.get('debt_to_asset_ratio'):
+                    st.write(f"**资产负债率:** {basic_info_data['debt_to_asset_ratio']}")
+
             # 查询时间
             st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:
@@ -624,8 +610,6 @@ def display_chips_analysis(stock_code):
         else:
             chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh)
         
-        stock_name = get_stock_name(stock_code, 'stock')
-        
         # 初始化session_state
         if "ai_chip_report" not in st.session_state:
             st.session_state.ai_chip_report = {}
@@ -638,7 +622,7 @@ def display_chips_analysis(stock_code):
                     "timestamp": chip_data['ai_analysis']['timestamp']
                 }
             else:
-                st.error(f"AI筹码分析失败: {chip_data['ai_analysis']['error']}")
+                st.warning(f"AI筹码分析失败: {chip_data['ai_analysis']['error']}")
                 st.info("请稍后再试或联系管理员")
                 
         # 显示AI筹码分析报告(如果有)
@@ -649,7 +633,7 @@ def display_chips_analysis(stock_code):
         
         # 检查是否有错误信息
         if "error" in chip_data:
-            st.error(chip_data["error"])
+            st.warning(chip_data["error"])
             return
             
         # 基础筹码数据显示
