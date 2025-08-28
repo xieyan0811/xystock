@@ -227,7 +227,7 @@ class StockTools:
                         indicators = get_indicators(df)
                         
                         # 生成AI技术分析报告
-                        ai_report, ai_timestamp = self.generate_stock_analysis_with_cache(
+                        ai_report, ai_timestamp = self.generate_tech_analysis_with_cache(
                             stock_code=stock_code,
                             stock_name=stock_name,
                             market_info=market_info,
@@ -389,7 +389,7 @@ class StockTools:
         
         return chip_data
     
-    def get_ai_analysis(self, stock_code: str, analysis_type: str = 'comprehensive', use_cache: bool = True) -> Dict:
+    def get_cached_ai_analysis(self, stock_code: str, analysis_type: str = 'comprehensive', use_cache: bool = True) -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
         
@@ -409,20 +409,13 @@ class StockTools:
                     cache_meta = cache_data[cache_key].get('cache_meta', {})
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
                     expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
-                    
                     if datetime.now() < expire_time:
                         print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析")
                         return cache_data[cache_key].get('data', {})
             except Exception:
                 pass
         
-        # AI分析数据需要手动设置，这里返回现有缓存
-        print(f"📋 使用现有的 {stock_code} {analysis_type} AI分析")
-        try:
-            cache_data = self.cache_manager.load_cache()
-            return cache_data.get(cache_key, {}).get('data', {})
-        except Exception:
-            return {}
+        return {}
     
     def set_ai_analysis(self, stock_code: str, analysis_type: str, analysis_data: Dict):
         """设置AI分析数据"""
@@ -477,7 +470,7 @@ class StockTools:
         
         # 检查缓存
         if use_cache and not force_refresh:
-            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
             if cached_data and 'report' in cached_data:
                 return cached_data['report'], cached_data.get('timestamp', '')
         
@@ -517,7 +510,7 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
     
-    def generate_stock_analysis_with_cache(self, stock_code: str, stock_name: str = None,
+    def generate_tech_analysis_with_cache(self, stock_code: str, stock_name: str = None,
                                          market_info: Dict = None, df=None, indicators: Dict = None,
                                          use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
         """
@@ -536,19 +529,15 @@ class StockTools:
             Tuple[str, str]: (分析报告, 时间戳)
         """
         analysis_type = "technical"
-        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
-        
         # 检查缓存
         if use_cache and not force_refresh:
-            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
             if cached_data and 'report' in cached_data:
                 return cached_data['report'], cached_data.get('timestamp', '')
-        
         # 检查AI分析模块是否可用
         if not AI_ANALYSIS_AVAILABLE:
             error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
         try:
             # 获取必要数据
             if stock_name is None:
@@ -581,7 +570,6 @@ class StockTools:
                 'timestamp': timestamp,
                 'stock_name': stock_name
             })
-            
             return report, timestamp
             
         except Exception as e:
@@ -611,7 +599,7 @@ class StockTools:
         
         # 检查缓存
         if use_cache and not force_refresh:
-            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
             if cached_data and 'report' in cached_data:
                 return cached_data['report'], cached_data.get('timestamp', '')
         
@@ -676,7 +664,7 @@ class StockTools:
         
         # 检查缓存
         if use_cache and not force_refresh:
-            cached_data = self.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
             if cached_data and 'report' in cached_data:
                 return cached_data['report'], cached_data.get('timestamp', '')
         
@@ -851,10 +839,10 @@ class StockTools:
         
         # 获取各种AI分析
         report['ai_analysis'] = {
-            'fundamental': self.get_ai_analysis(stock_code, 'fundamental', use_cache),
-            'market': self.get_ai_analysis(stock_code, 'market', use_cache),
-            'news': self.get_ai_analysis(stock_code, 'news', use_cache),
-            'chip': self.get_ai_analysis(stock_code, 'chip', use_cache),
+            'fundamental': self.get_cached_ai_analysis(stock_code, 'fundamental', use_cache),
+            'market': self.get_cached_ai_analysis(stock_code, 'market', use_cache),
+            'news': self.get_cached_ai_analysis(stock_code, 'news', use_cache),
+            'chip': self.get_cached_ai_analysis(stock_code, 'chip', use_cache),
         }
         
         # 生成股票摘要
@@ -955,11 +943,6 @@ def set_stock_ai_analysis(stock_code: str, analysis_type: str, analysis_data: Di
     """设置股票AI分析数据"""
     tools = get_stock_tools()
     tools.set_ai_analysis(stock_code, analysis_type, analysis_data)
-
-def get_stock_ai_analysis(stock_code: str, analysis_type: str = 'comprehensive') -> Dict:
-    """获取股票AI分析数据"""
-    tools = get_stock_tools()
-    return tools.get_ai_analysis(stock_code, analysis_type)
 
 if __name__ == "__main__":
     # 测试用例

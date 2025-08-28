@@ -15,6 +15,7 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
+from utils.string_utils import remove_markdown_format
 
 def generate_stock_analysis_report(
     stock_code: str,
@@ -23,19 +24,7 @@ def generate_stock_analysis_report(
     df,  # 移除类型注解，避免pd依赖
     indicators: Dict[str, Any] = None
 ) -> str:
-    """
-    生成股票技术分析报告
-    
-    Args:
-        stock_code: 股票代码
-        stock_name: 股票名称
-        market_info: 市场信息
-        df: K线数据DataFrame
-        indicators: 技术指标数据
-        
-    Returns:
-        str: 分析报告
-    """
+    """生成股票技术分析报告"""
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
@@ -149,18 +138,7 @@ def generate_news_analysis_report(
     market_info: Dict[str, Any],
     news_data: List[Dict]
 ) -> Tuple[str, str]:
-    """
-    生成股票新闻分析报告
-    
-    Args:
-        stock_code: 股票代码
-        stock_name: 股票名称
-        market_info: 市场信息
-        news_data: 股票相关新闻数据
-        
-    Returns:
-        Tuple[str, str]: (分析报告, 时间戳)
-    """
+    """生成股票新闻分析报告，返回(分析报告, 时间戳)"""
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
@@ -263,17 +241,7 @@ def generate_chip_analysis_report(
     stock_name: str,
     chip_data: Dict[str, Any]
 ) -> Tuple[str, str]:
-    """
-    生成筹码分析报告
-    
-    Args:
-        stock_code: 股票代码
-        stock_name: 股票名称
-        chip_data: 筹码分析数据
-        
-    Returns:
-        Tuple[str, str]: (分析报告, 时间戳)
-    """
+    """生成筹码分析报告，返回(分析报告, 时间戳)"""
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
@@ -356,18 +324,7 @@ def generate_fundamental_analysis_report(
     market_info: Dict[str, Any],
     fundamental_data: Dict[str, Any]
 ) -> Tuple[str, str]:
-    """
-    生成股票基本面分析报告
-    
-    Args:
-        stock_code: 股票代码
-        stock_name: 股票名称
-        market_info: 市场信息
-        fundamental_data: 基本面数据
-        
-    Returns:
-        Tuple[str, str]: (分析报告, 时间戳)
-    """
+    """生成股票基本面分析报告，返回(分析报告, 时间戳)"""
 
     # akshare里有几个取财报的接口，我还没实现
 
@@ -476,18 +433,10 @@ def generate_comprehensive_analysis_report(
     market_tools=None,
     truncate_data: bool = False
 ) -> Tuple[str, List[Dict]]:
-    """生成综合分析报告
+    """生成综合分析报告，返回(分析报告, 数据来源列表)
     
     Args:
-        stock_code: 股票代码
-        stock_name: 股票名称  
-        user_opinion: 用户观点
-        stock_tools: 股票工具实例
-        market_tools: 市场工具实例
-        truncate_data: 是否截断数据，默认True。如果为False则使用全文数据
-        
-    Returns:
-        Tuple[str, List[Dict]]: (分析报告, 数据来源列表)
+        truncate_data: 是否截断数据，默认False。如果为True则使用摘要数据
     """
     # 初始化OpenAI客户端
     client = OpenAIClient()
@@ -542,7 +491,8 @@ def generate_comprehensive_analysis_report(
             # 获取AI市场分析
             market_ai_data = market_tools.get_ai_analysis(use_cache=True)
             if market_ai_data:
-                market_ai_analysis = market_ai_data # ai分析市场
+                if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
+                    market_ai_analysis = market_ai_data['report']
                 data_sources.append({
                     'type': 'AI市场分析',
                     'description': '基于AI模型的市场分析报告',
@@ -550,6 +500,8 @@ def generate_comprehensive_analysis_report(
                 })
         except Exception as e:
             print(f"获取AI市场分析失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     try:
         if stock_tools:
@@ -563,7 +515,7 @@ def generate_comprehensive_analysis_report(
             
             for analysis_type, description in analysis_types.items():
                 try:
-                    cached_analysis = stock_tools.get_ai_analysis(stock_code, analysis_type, use_cache=True)
+                    cached_analysis = stock_tools.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
                     if cached_analysis and 'report' in cached_analysis:
                         historical_analyses[analysis_type] = cached_analysis['report']
                         data_sources.append({
@@ -603,7 +555,8 @@ def generate_comprehensive_analysis_report(
             else:
                 # 使用全文
                 summary = report
-            historical_summary += f"\n## {analysis_types.get(analysis_type, analysis_type)}:\n{summary}\n"
+            summary = remove_markdown_format(summary)  # 移除多余的Markdown格式
+            historical_summary += f"\n## {analysis_types.get(analysis_type, analysis_type)}:\n\n{summary}\n"
     else:
         historical_summary = "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
     
@@ -613,32 +566,20 @@ def generate_comprehensive_analysis_report(
         market_summary = "\n\n# 🌐 市场环境分析\n"
         
         if market_report_text:
-            # 根据truncate_data参数决定是否截断市场报告
             if truncate_data:
-                # 截取市场报告的关键部分（前500字符）
                 market_text_summary = market_report_text[:500] + "..." if len(market_report_text) > 500 else market_report_text
             else:
-                # 使用全文
                 market_text_summary = market_report_text
-            market_summary += f"\n## 市场综合报告:\n{market_text_summary}\n"
+            market_summary += f"\n## 市场综合报告:\n\n{market_text_summary}\n\n"
         
         if market_ai_analysis:
-            # 如果有AI市场分析，添加其内容
-            if isinstance(market_ai_analysis, dict) and 'analysis' in market_ai_analysis:
-                ai_text = market_ai_analysis['analysis']
-                if truncate_data:
-                    ai_summary = ai_text[:300] + "..." if len(ai_text) > 300 else ai_text
-                else:
-                    ai_summary = ai_text
-                market_summary += f"\n## AI市场分析:\n{ai_summary}\n"
-            elif isinstance(market_ai_analysis, str):
-                if truncate_data:
-                    ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
-                else:
-                    ai_summary = market_ai_analysis
-                market_summary += f"\n### AI市场分析:\n{ai_summary}\n"
+            if truncate_data:
+                ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
+            else:
+                ai_summary = market_ai_analysis
+            market_summary += f"\n### AI市场分析:\n\n{ai_summary}\n\n"
     else:
-        market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n"
+        market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
     
     # 构建股票基本信息部分
     basic_info_section = ""
@@ -651,6 +592,7 @@ def generate_comprehensive_analysis_report(
         # 判断涨跌情况
         
         basic_info_section = f"""\n\n# 💹 股票实时信息
+
 - 股票名称：{stock_name_info}（{stock_code}）
 - 当前价格：{current_price:.2f}元
 - 涨跌金额：{change:+.2f}元
