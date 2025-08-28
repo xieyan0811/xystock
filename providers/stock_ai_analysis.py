@@ -609,6 +609,11 @@ def generate_comprehensive_analysis_report(
         user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
         if user_profile_raw:
             user_profile_section = f"\n\n# 用户画像\n{user_profile_raw}\n"
+            data_sources.append({
+                'type': '用户画像',
+                'description': '用户的投资偏好、风险承受能力等信息',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
     except Exception as e:
         user_profile_section = ""
         
@@ -618,6 +623,11 @@ def generate_comprehensive_analysis_report(
         user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
         if user_mistakes:
             user_mistakes_section = f"\n\n# 用户常犯错误\n{user_mistakes}\n"
+            data_sources.append({
+                'type': '用户常犯错误',
+                'description': '用户在投资过程中常犯的错误和误区',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
     except Exception as e:  
         user_mistakes_section = ""
         print("error", e)
