@@ -40,7 +40,7 @@ from providers.stock_data_cache import get_cache_manager
 
 # 导入AI分析模块
 try:
-    from analysis.stock_ai_analysis import (
+    from providers.stock_ai_analysis import (
         generate_fundamental_analysis_report, generate_stock_analysis_report, 
         generate_news_analysis_report, generate_chip_analysis_report
     )
@@ -767,7 +767,7 @@ class StockTools:
             print(f"🤖 生成 {stock_code} 综合AI分析...")
             
             # 导入分析函数和市场工具
-            from analysis.stock_ai_analysis import generate_comprehensive_analysis_report
+            from providers.stock_ai_analysis import generate_comprehensive_analysis_report
             from providers.market_data_tools import get_market_tools
             
             # 获取市场工具实例

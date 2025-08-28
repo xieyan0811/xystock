@@ -480,7 +480,7 @@ class MarketTools:
         """生成AI分析数据(返回结构)"""
         try:
             # 延迟导入，避免循环导入
-            from analysis.stock_ai_analysis import generate_index_analysis_report
+            from providers.market_ai_analysis import generate_index_analysis_report
             
             # 获取综合市场报告数据
             market_report_data = self.get_comprehensive_market_report(use_cache=True, index_name=index_name)
