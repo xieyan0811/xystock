@@ -166,7 +166,7 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
         # 5. 综合分析（仅当界面有AI分析时才包含）
         if has_comprehensive_ai:
             try:
-                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_code, "", use_cache=True)
+                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_code, use_cache=True)
                 if 'error' not in comprehensive_analysis:
                     report_data['comprehensive_analysis'] = comprehensive_analysis
             except Exception as e:

@@ -700,7 +700,7 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
     
-    def get_comprehensive_ai_analysis(self, stock_code: str, user_opinion: str = "", 
+    def get_comprehensive_ai_analysis(self, stock_code: str, user_opinion: str = "", user_position: str="不确定",
                                      use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取综合AI分析数据
         
@@ -765,6 +765,7 @@ class StockTools:
                 stock_code=stock_code,
                 stock_name=stock_name,
                 user_opinion=user_opinion,
+                user_position=user_position,
                 stock_tools=self,
                 market_tools=market_tools
             )

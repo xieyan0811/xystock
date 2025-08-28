@@ -108,12 +108,19 @@ def display_analysis_page():
     
     # 用户观点输入框（仅在选择AI分析时显示）
     user_opinion = ""
+    user_position = "不确定"
     if use_ai_analysis:
         user_opinion = st.text_area(
             "补充观点（可选）:",
             placeholder="请输入您对该股票的观点、看法或关注的重点...",
             help="输入您的投资观点或关注的重点，AI将结合多维度分析给出综合建议",
             height=100
+        )
+        user_position = st.selectbox(
+            "当前持仓状态:",
+            options=["不确定", "空仓", "低仓位", "重仓", "满仓"],
+            index=0,
+            help="请选择您当前的大致持仓状态"
         )
     
     # 查询按钮
@@ -137,6 +144,7 @@ def display_analysis_page():
             # 设置AI分析标志 - 使用统一的状态管理
             st.session_state['include_ai_analysis'] = True
             st.session_state['user_opinion'] = user_opinion
+            st.session_state['user_position'] = user_position
             
             # 初始化AI报告存储（如果不存在）
             for report_type in ['ai_market_report', 'ai_news_report', 'ai_chip_report', 
@@ -161,6 +169,8 @@ def display_analysis_page():
             del st.session_state['include_ai_analysis']
         if 'user_opinion' in st.session_state:
             del st.session_state['user_opinion']
+        if 'user_position' in st.session_state:
+            del st.session_state['user_position']
         st.rerun()
     
     # 显示返回内容的区域

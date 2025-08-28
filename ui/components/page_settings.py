@@ -149,12 +149,25 @@ def main():
         user_profile = st.text_area(
             "请描述您的用户画像",
             value=config.get('USER_PROFILE.RAW', ''),
-            placeholder="例如：擅长领域：科技、医疗，长期关注新能源板块；交易习惯：偏好左/右侧交易，风险偏好，平均持仓时间等",
+            placeholder="例如：\n擅长领域：科技、医疗，长期关注新能源板块\n交易习惯：偏好左/右侧交易，风险偏好，平均持仓时间等",
             help="请简要描述您的擅长领域、交易习惯等，有助于系统更好地理解您的需求"
         )
+        
+        # 常犯错误多选项
+        common_mistakes_options = [
+            "踏空", "套牢", "卖飞", "追高杀跌", "频繁操作", "重仓单一标的", "止损不坚决", "盲目跟风", "情绪化交易", "行情不好时回避关注"
+        ]
+        user_mistakes = st.multiselect(
+            "常犯的错误（可多选）",
+            options=common_mistakes_options,
+            default=config.get('USER_PROFILE.MISTAKES', []),
+            help="请选择您在投资过程中常见的错误，有助于系统个性化分析建议"
+        )
+        
         if st.button("💾 保存用户画像", key="save_user_profile", type="primary"):
             try:
                 save_config('USER_PROFILE', 'RAW', user_profile)
+                save_config('USER_PROFILE', 'MISTAKES', user_mistakes)
                 st.success("用户画像已保存！")
             except Exception as e:
                 st.error(f"保存失败: {str(e)}")

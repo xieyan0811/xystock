@@ -353,7 +353,7 @@ def generate_fundamental_analysis_report(
         "毛利率": company_profile['gross_profit_margin'],
         "净利率": company_profile['net_profit_margin'],
         "板块编号": company_profile['sector_code'],
-        "资产负债率": company_profile['debt_to_asset_ratio']
+        "资产负债率": company_profile['debt_to_asset_ratio'] if company_profile['debt_to_asset_ratio'] is not None else None,
     }
     
     # 只显示有值的字段
@@ -429,6 +429,7 @@ def generate_comprehensive_analysis_report(
     stock_code: str,
     stock_name: str,
     user_opinion: str = "",
+    user_position: str="不确定",
     stock_tools=None,
     market_tools=None,
     truncate_data: bool = False
@@ -610,6 +611,16 @@ def generate_comprehensive_analysis_report(
             user_profile_section = f"\n\n# 用户画像\n{user_profile_raw}\n"
     except Exception as e:
         user_profile_section = ""
+        
+    user_mistakes_section = ""
+    try:
+        from config_manager import config
+        user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
+        if user_mistakes:
+            user_mistakes_section = f"\n\n# 用户常犯错误\n{user_mistakes}\n"
+    except Exception as e:  
+        user_mistakes_section = ""
+        print("error", e)
 
     # 构建用户观点部分
     user_opinion_section = ""
@@ -620,9 +631,17 @@ def generate_comprehensive_analysis_report(
             'description': '用户提供的投资观点和看法',
             'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
+        
+    if user_position and user_position.strip() and user_position.strip() != "不确定":
+        user_opinion_section += f"\n用户当前持仓状态：{user_position.strip()}\n"
+        data_sources.append({
+            'type': '用户持仓',
+            'description': f'用户当前持仓状态：{user_position.strip()}',
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
 
     # 构建分析提示
-    system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户观点，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
+    system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户情况，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
 
 特别关注：
 - 当前股价的涨跌情况及其反映的市场情绪
@@ -657,7 +676,7 @@ def generate_comprehensive_analysis_report(
 - 只输出最有决策价值的内容，避免面面俱到。
 - 结论要有明确的操作性。
 - 必须考虑当前价格变动情况对投资决策的影响。
-- 如遇市场大幅波动，需特别提醒用户不要因情绪波动而频繁看盘、冲动操作。
+- 请根据用户常犯的错误，根据当前行情，给出有针对性的提醒。
 """
 
     # 构建用户消息
@@ -667,6 +686,7 @@ def generate_comprehensive_analysis_report(
 {historical_summary}
 {market_summary}
 {user_profile_section}
+{user_mistakes_section}
 {user_opinion_section}
 
 请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。当前股价的涨跌情况也是重要的分析因素。"""
