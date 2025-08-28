@@ -495,12 +495,12 @@ def generate_comprehensive_analysis_report(
                 if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
                     market_ai_analysis = market_ai_data['report']
                 data_sources.append({
-                    'type': 'AI市场分析',
+                    'type': 'AI大盘分析',
                     'description': '基于AI模型的市场分析报告',
                     'timestamp': market_ai_data.get('analysis_time', '未知时间')
                 })
         except Exception as e:
-            print(f"获取AI市场分析失败: {e}")
+            print(f"获取大盘分析失败: {e}")
             import traceback
             traceback.print_exc()
     
@@ -578,7 +578,7 @@ def generate_comprehensive_analysis_report(
                 ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
             else:
                 ai_summary = market_ai_analysis
-            market_summary += f"\n### AI市场分析:\n\n{ai_summary}\n\n"
+            market_summary += f"\n### AI大盘分析:\n\n{ai_summary}\n\n"
     else:
         market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
     
