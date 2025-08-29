@@ -157,11 +157,7 @@ class MarketTools:
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
             return self.cache_manager.get_cached_data(data_type)
         
-        # AI分析数据需要手动设置，这里返回现有缓存
-        cached_data = self.cache_manager.get_cached_data(data_type)
-        if cached_data:
-            print(f"📋 使用现有的{self.cache_configs[data_type]['description']}")
-        return cached_data
+        return self._generate_ai_analysis(index_name, user_opinion)
     
     def set_ai_analysis(self, analysis_data: Dict):
         """设置AI分析数据"""

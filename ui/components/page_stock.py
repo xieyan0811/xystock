@@ -767,33 +767,9 @@ def display_comprehensive_analysis(stock_code):
         # 检查是否需要运行综合分析
         if (st.session_state.get('include_ai_analysis', False) and 
             stock_code not in st.session_state.get('ai_comprehensive_report', {})):
-            user_opinion = st.session_state.get('user_opinion', '')
-            user_position = st.session_state.get('user_position', '不确定')
-            
-            # 获取缓存设置
             use_cache = st.session_state.get('use_cache', True)
             force_refresh = not use_cache
-            
-            # 运行综合分析
-            with st.spinner("🤖 AI正在进行综合分析..."):
-                try:
-                    # 使用 StockTools 获取综合分析
-                    analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, user_position, use_cache=use_cache, force_refresh=force_refresh)
-                    
-                    if 'error' in analysis_data:
-                        st.error(f"获取综合分析失败: {analysis_data['error']}")
-                        return
-                    
-                    # 保存分析结果到session_state
-                    if "ai_comprehensive_report" not in st.session_state:
-                        st.session_state.ai_comprehensive_report = {}
-                    st.session_state.ai_comprehensive_report[stock_code] = analysis_data
-                        
-                except Exception as e:
-                    st.error(f"AI综合分析失败: {str(e)}")
-                    import traceback
-                    traceback.print_exc()                    
-                    return
+            run_comprehensive_analysis(stock_code, force_refresh=force_refresh)
         
         # 显示已有的综合分析结果
         if "ai_comprehensive_report" in st.session_state and stock_code in st.session_state.ai_comprehensive_report:
@@ -820,41 +796,38 @@ def display_comprehensive_analysis(stock_code):
                 with st.expander("📊 数据来源详情", expanded=False):
                     for source in analysis_data['data_sources']:
                         st.write(f"- **{source.get('type', '未知类型')}**: {source.get('description', '无描述')}")
-            
         else:
             # 显示提示信息
             st.info("💡 请在查询时勾选「综合分析」选项，AI将结合历史分析结果为您提供综合投资建议")
             
-            """ later merge to 
-            # 手动触发分析按钮
-            if st.button("🚀 开始综合分析", key=f"manual_comprehensive_{stock_code}"):
-                # 手动运行综合分析
-                with st.spinner("🤖 AI正在进行综合分析..."):
-                    try:
-                        # 获取缓存设置
-                        use_cache = st.session_state.get('use_cache', True)
-                        force_refresh = not use_cache
-                        
-                        analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, "", use_cache=use_cache, force_refresh=force_refresh)
-                        
-                        if 'error' in analysis_data:
-                            st.error(f"获取综合分析失败: {analysis_data['error']}")
-                            return
-                        
-                        # 保存分析结果
-                        if "ai_comprehensive_report" not in st.session_state:
-                            st.session_state.ai_comprehensive_report = {}
-                        st.session_state.ai_comprehensive_report[stock_code] = analysis_data
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"AI综合分析失败: {str(e)}")
-                        import traceback
-                        traceback.print_exc()
-            """           
     except Exception as e:
         st.error(f"显示综合分析失败: {str(e)}")
         # 显示错误详情（调试用）
         with st.expander("🔍 错误详情", expanded=False):
             st.code(str(e), language="text")
+
+def run_comprehensive_analysis(stock_code, force_refresh):
+    with st.spinner("🤖 AI正在进行综合分析..."):    
+        try:
+            use_cache = st.session_state.get('use_cache', True)
+            user_opinion = st.session_state.get('user_opinion', '')
+            user_position = st.session_state.get('user_position', '不确定')
+
+            # 使用 StockTools 获取综合分析
+            analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, user_position, use_cache=use_cache, force_refresh=force_refresh)
+            
+            if 'error' in analysis_data:
+                st.error(f"获取综合分析失败: {analysis_data['error']}")
+                return False
+            
+            # 保存分析结果到session_state
+            if "ai_comprehensive_report" not in st.session_state:
+                st.session_state.ai_comprehensive_report = {}
+            st.session_state.ai_comprehensive_report[stock_code] = analysis_data
+            return True
+        except Exception as e:
+            st.error(f"AI综合分析失败: {str(e)}")
+            import traceback
+            traceback.print_exc()                    
+            return False
 

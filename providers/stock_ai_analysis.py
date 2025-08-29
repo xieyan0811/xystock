@@ -608,7 +608,7 @@ def generate_comprehensive_analysis_report(
         from config_manager import config
         user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
         if user_profile_raw:
-            user_profile_section = f"\n\n# 用户画像\n{user_profile_raw}\n"
+            user_profile_section = f"\n# 用户画像\n{user_profile_raw}\n"
             data_sources.append({
                 'type': '用户画像',
                 'description': '用户的投资偏好、风险承受能力等信息',
@@ -622,7 +622,7 @@ def generate_comprehensive_analysis_report(
         from config_manager import config
         user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
         if user_mistakes:
-            user_mistakes_section = f"\n\n# 用户常犯错误\n{user_mistakes}\n"
+            user_mistakes_section = f"\n# 用户常犯错误\n{user_mistakes}\n"
             data_sources.append({
                 'type': '用户常犯错误',
                 'description': '用户在投资过程中常犯的错误和误区',
@@ -635,7 +635,7 @@ def generate_comprehensive_analysis_report(
     # 构建用户观点部分
     user_opinion_section = ""
     if user_opinion.strip():
-        user_opinion_section = f"\n\n# 👤 用户观点\n{user_opinion.strip()}\n"
+        user_opinion_section = f"\n# 用户观点\n{user_opinion.strip()}\n"
         data_sources.append({
             'type': '用户观点',
             'description': '用户提供的投资观点和看法',
@@ -643,7 +643,7 @@ def generate_comprehensive_analysis_report(
         })
         
     if user_position and user_position.strip() and user_position.strip() != "不确定":
-        user_opinion_section += f"\n用户当前持仓状态：{user_position.strip()}\n"
+        user_opinion_section += f"\n# 用户当前持仓状态\n{user_position.strip()}\n"
         data_sources.append({
             'type': '用户持仓',
             'description': f'用户当前持仓状态：{user_position.strip()}',
