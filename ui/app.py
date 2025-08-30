@@ -118,7 +118,7 @@ def display_analysis_page():
         )
         user_position = st.selectbox(
             "当前持仓状态:",
-            options=["不确定", "空仓", "低仓位", "重仓", "满仓"],
+            options=["不确定", "空仓", "低仓位", "中仓位", "重仓", "满仓"],
             index=0,
             help="请选择您当前的大致持仓状态"
         )

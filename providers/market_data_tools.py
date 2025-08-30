@@ -156,7 +156,6 @@ class MarketTools:
         if use_cache and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
             return self.cache_manager.get_cached_data(data_type)
-        
         return self._generate_ai_analysis(index_name, user_opinion)
     
     def set_ai_analysis(self, analysis_data: Dict):
@@ -216,7 +215,7 @@ class MarketTools:
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
-        report['ai_analysis'] = self.get_ai_analysis(use_cache)
+        #report['ai_analysis'] = self.get_ai_analysis(use_cache)
         
         # 生成市场摘要
         #report['market_summary'] = self.generate_market_report(report, format_type='summary')
@@ -481,7 +480,7 @@ class MarketTools:
             # 获取综合市场报告数据
             market_report_data = self.get_comprehensive_market_report(use_cache=True, index_name=index_name)
             
-            print(f"🤖 正在生成{index_name}的AI分析报告...")
+            print(f"🤖 OOOOOO 正在生成{index_name}的AI分析报告...")
             
             # 调用AI分析函数，传递用户观点
             ai_report, timestamp = generate_index_analysis_report(

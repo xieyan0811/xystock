@@ -35,7 +35,7 @@ class MarketDataCache:
             'money_flow_data': {'expire_minutes': 43200, 'description': '资金流向指标'},
             'margin_data': {'expire_minutes': 60, 'description': '融资融券数据'},
             'current_indices': {'expire_minutes': 5, 'description': '当前指数实时数据'},
-            'ai_analysis': {'expire_minutes': 180, 'description': 'AI市场分析'},
+            'ai_analysis': {'expire_minutes': 180, 'description': 'AI大盘分析'},
         }
     
     def load_cache(self) -> Dict:
