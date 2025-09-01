@@ -141,7 +141,12 @@ def fetch_current_indices() -> Dict:
         if not df_indices.empty:
             # 将DataFrame转换为字典格式，便于后续使用
             indices_list = []
+            target_indices = ["上证指数", "深证成指", "北证50", "创业板指", "科创综指",
+                              "沪深300", "中证500", "科创50"]
+
             for _, row in df_indices.iterrows():
+                if str(row.get('名称', '')) not in target_indices:
+                    continue
                 index_info = {
                     'code': str(row.get('代码', '')),
                     'name': str(row.get('名称', '')),
@@ -165,14 +170,13 @@ def fetch_current_indices() -> Dict:
                 indices_dict[index['name']] = index
             
             indices_data = {
-                'indices_list': indices_list,
                 'indices_dict': indices_dict,
-                'total_count': len(indices_list),
+                'total_count': len(indices_dict),
                 'data_source': '东方财富-沪深重要指数',
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            print(f"      成功获取 {len(indices_list)} 个指数数据")
+            print(f"      成功获取 {len(indices_dict)} 个指数数据")
             
             # 显示主要指数信息
             main_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']

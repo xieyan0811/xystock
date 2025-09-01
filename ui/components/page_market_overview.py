@@ -219,26 +219,7 @@ def display_market_indices():
         # 显示数据更新时间
         if 'update_time' in indices_data:
             st.caption(f"数据更新时间: {indices_data['update_time']}")
-            
-        # 显示更多指数信息（可展开）
-        with st.expander("📊 查看更多指数", expanded=False):
-            if 'indices_list' in indices_data:
-                # 创建DataFrame显示所有指数
-                df_display = []
-                for index in indices_data['indices_list']:
-                    df_display.append({
-                        '指数名称': index['name'],
-                        '代码': index['code'],
-                        '最新价': f"{index['current_price']:.2f}",
-                        '涨跌幅': f"{index['change_percent']:+.2f}%",
-                        '涨跌额': f"{index['change_amount']:+.2f}",
-                        '成交量': f"{index['volume']:,.0f}",
-                        '振幅': f"{index['amplitude']:.2f}%"
-                    })
-                
-                df_indices = pd.DataFrame(df_display)
-                st.dataframe(df_indices, use_container_width=True, hide_index=True)
-                
+                            
     except Exception as e:
         st.error(f"显示指数数据时出错: {str(e)}")
         

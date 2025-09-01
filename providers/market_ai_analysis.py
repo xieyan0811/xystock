@@ -11,7 +11,7 @@ if project_dir not in sys.path:
 
 from providers.market_data_tools import get_market_tools
 
-def generate_index_analysis_report( ## xieyan 250827
+def generate_index_analysis_report(
     stock_code: str,
     stock_name: str,
     market_report_data: Dict[str, Any],
