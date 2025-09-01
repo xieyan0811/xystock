@@ -15,66 +15,33 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from utils.format_utils import format_large_number, format_volume, format_market_value, format_price, format_percentage, format_change
-from utils.string_utils import remove_markdown_format
+from utils.string_utils import remove_markdown_format, format_indicators_dict
 
 def generate_stock_analysis_report(
     stock_code: str,
     stock_name: str,
     market_info: Dict[str, Any],
-    df,  # 移除类型注解，避免pd依赖
-    indicators: Dict[str, Any] = None
+    indicators: Dict[str, Any] = None,
+    risk_metrics: Dict[str, Any] = None
 ) -> str:
     """生成股票技术分析报告"""
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
-    # 准备数据摘要
-    latest_data = df.iloc[-1]
-    
-    # 计算最近价格变化
-    if len(df) > 1:
-        prev_close = df.iloc[-2]['close']
-        price_change = latest_data['close'] - prev_close
-        price_change_pct = (price_change / prev_close) * 100
-    else:
-        price_change = 0
-        price_change_pct = 0
+    # 从indicators中提取所需数据, 250901，这里还要改
+    latest_date = indicators.get('latest_date', '未知日期') if indicators else '未知日期'
+    latest_open = indicators.get('latest_open', 0) if indicators else 0
+    latest_high = indicators.get('latest_high', 0) if indicators else 0
+    latest_low = indicators.get('latest_low', 0) if indicators else 0
+    latest_close = indicators.get('latest_close', 0) if indicators else 0
+    latest_volume = indicators.get('latest_volume', 0) if indicators else 0
+    price_change = indicators.get('change_amount', 0) if indicators else 0
+    price_change_pct = indicators.get('change_percent', 0) if indicators else 0
         
-    # 提取和格式化技术指标数据
-    indicators_text = ""
-    if indicators:
-        indicators_text = "技术指标：\n"
-        for key, value in indicators.items():
-            if isinstance(value, (int, float)):
-                # 数值型数据保留2位小数
-                formatted_value = round(float(value), 2)
-                indicators_text += f"- {key}: {formatted_value}\n"
-            elif isinstance(value, str):
-                # 字符串直接显示
-                indicators_text += f"- {key}: {value}\n"
-            elif isinstance(value, dict):
-                # 嵌套字典数据
-                indicators_text += f"- {key}:\n"
-                for sub_key, sub_value in value.items():
-                    if isinstance(sub_value, (int, float)):
-                        formatted_sub_value = round(float(sub_value), 2)
-                        indicators_text += f"  • {sub_key}: {formatted_sub_value}\n"
-                    else:
-                        indicators_text += f"  • {sub_key}: {sub_value}\n"
-            elif isinstance(value, list):
-                # 列表数据
-                if len(value) > 0 and isinstance(value[0], (int, float)):
-                    # 数值列表，只显示前几个值
-                    formatted_values = [round(float(v), 2) for v in value[:3]]
-                    indicators_text += f"- {key}: {formatted_values}{'...' if len(value) > 3 else ''}\n"
-                else:
-                    indicators_text += f"- {key}: {value}\n"
-            else:
-                # 其他类型数据
-                indicators_text += f"- {key}: {value}\n"
-    else:
-        indicators_text = "技术指标：无数据\n"
-    
+    # 使用新的格式化函数处理指标数据
+    indicators_text = format_indicators_dict(indicators, "技术指标")
+    risk_text = format_indicators_dict(risk_metrics, "风险指标")
+
     # 构建分析提示
     system_message = f"""你是一位专业的股票技术分析师。你必须对{stock_name}（股票代码：{stock_code}）进行详细的技术分析。
 
@@ -104,20 +71,26 @@ def generate_stock_analysis_report(
         {"role": "user", "content": f"""请基于以下数据对{stock_name}({stock_code})进行技术分析：
 
 1. 前一个交易日数据：
-- 日期：{latest_data['datetime']}
-- 开盘价：{format_price(latest_data['open'])}
-- 最高价：{format_price(latest_data['high'])}
-- 最低价：{format_price(latest_data['low'])}
-- 收盘价：{format_price(latest_data['close'])}
-- 成交量：{format_volume(latest_data['volume'])}
+- 日期：{latest_date}
+- 开盘价：{format_price(latest_open)}
+- 最高价：{format_price(latest_high)}
+- 最低价：{format_price(latest_low)}
+- 收盘价：{format_price(latest_close)}
+- 成交量：{format_volume(latest_volume)}
 - 价格变化：{format_change(price_change, price_change_pct)}
 
 2. {indicators_text}
 
+3. {risk_text}
+
 请进行详细分析，包括价格趋势、技术指标、支撑阻力位和投资建议。报告应不多于500字，必须基于数据做出专业的分析。"""
         }
     ]
-    
+
+    with open(os.path.join(project_dir, "data", "cache", "req_tech.txt"), "w", encoding="utf-8") as f:
+        f.write(messages[1]['content'])
+    #print(f'req length {len(messages[1]['content'])}')
+
     try:
         # 调用LLM生成分析报告
         response = client.chat(
@@ -214,7 +187,7 @@ def generate_news_analysis_report(
 2. 对股价的潜在影响分析
 3. 投资建议和风险评估
 
-报告应不多于800字，必须基于真实新闻数据做出专业的分析。如果新闻数据不足，请明确指出分析的局限性。"""
+报告应不超过800字，必须基于真实新闻数据做出专业的分析。如果新闻数据不足，请明确指出分析的局限性。"""
         }
     ]
     

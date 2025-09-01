@@ -35,7 +35,6 @@ from providers.stock_utils import (
     fetch_stock_news_data, fetch_stock_chip_data
 )
 from providers.stock_data_fetcher import data_manager, KLineType
-from providers.risk_metrics import calculate_portfolio_risk
 from providers.stock_data_cache import get_cache_manager
 
 # 导入AI分析模块
@@ -130,7 +129,15 @@ class StockTools:
         return basic_data
     
     def get_stock_technical_indicators(self, stock_code: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取股票技术指标和风险指标（不缓存K线数据本身）"""
+        """获取股票技术指标和风险指标（不缓存K线数据本身）
+        
+        Args:
+            stock_code: 股票代码
+            period: K线周期数
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            include_full_risk: 是否包含完整风险指标（用于图表显示）
+        """
         data_type = 'technical_indicators'
         
         # 标准化股票代码
@@ -193,26 +200,15 @@ class StockTools:
                 df['MA10'] = df['close'].rolling(window=10).mean()
                 df['MA20'] = df['close'].rolling(window=20).mean()
                 
-                # 获取缓存的技术指标（如果有的话）
-                indicators_data = self.get_stock_technical_indicators(stock_code, period, use_cache, force_refresh)
-                
-                # 计算完整的风险指标（用于显示，包含图表数据）
-                full_risk_metrics = {}
-                try:
-                    if len(df) >= 5:
-                        full_risk_metrics = calculate_portfolio_risk(df, price_col='close')
-                        # 确保summary_table是可序列化的
-                        if 'summary_table' in full_risk_metrics and hasattr(full_risk_metrics['summary_table'], 'to_dict'):
-                            full_risk_metrics['summary_table'] = full_risk_metrics['summary_table'].to_dict()
-                except Exception as e:
-                    full_risk_metrics['error'] = str(e)
+                # 获取技术指标数据（包含完整风险指标，用于显示）
+                indicators_data = self.get_stock_technical_indicators(
+                    stock_code, period, use_cache, force_refresh)
                 
                 # 组合返回完整信息
                 result = {
                     'kline_data': df.to_dict('records'),  # K线数据实时返回
                     'indicators': indicators_data.get('indicators', {}),
-                    'risk_metrics': full_risk_metrics,  # 完整风险指标（用于显示）
-                    'risk_summary': indicators_data.get('risk_metrics', {}),  # 精简风险摘要（来自缓存）
+                    'risk_metrics': indicators_data.get('risk_metrics', {}),  # 精简风险摘要（来自缓存）
                     'data_length': len(df),
                     'latest_data': df.iloc[-1].to_dict() if len(df) > 0 else {},
                     'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -224,7 +220,8 @@ class StockTools:
                         # 获取股票名称和市场信息
                         stock_name = get_stock_name(stock_code, 'stock')
                         market_info = get_market_info(stock_code)
-                        indicators = get_indicators(df)
+                        indicators = indicators_data.get('indicators', {})
+                        risk_metrics = indicators_data.get('risk_metrics', {})
                         
                         # 生成AI技术分析报告
                         ai_report, ai_timestamp = self.generate_tech_analysis_with_cache(
@@ -233,6 +230,7 @@ class StockTools:
                             market_info=market_info,
                             df=df,
                             indicators=indicators,
+                            risk_metrics=risk_metrics,
                             use_cache=use_cache,
                             force_refresh=force_refresh
                         )
@@ -511,6 +509,7 @@ class StockTools:
     
     def generate_tech_analysis_with_cache(self, stock_code: str, stock_name: str = None,
                                          market_info: Dict = None, df=None, indicators: Dict = None,
+                                         risk_metrics: Dict = None,
                                          use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
         """
         生成股票技术分析报告（带缓存）
@@ -552,13 +551,13 @@ class StockTools:
             if indicators is None:
                 indicators = get_indicators(df)
             
-            # 生成技术分析报告
+            # 生成技术分析报告（直接传递indicators，包含所有必要数据）
             report = generate_stock_analysis_report(
                 stock_code=stock_code,
                 stock_name=stock_name,
                 market_info=market_info,
-                df=df,
-                indicators=indicators
+                indicators=indicators,
+                risk_metrics=risk_metrics
             )
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

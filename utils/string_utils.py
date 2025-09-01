@@ -16,7 +16,7 @@
 """
 
 import re
-
+from typing import Dict, Any
 
 def remove_markdown_format(text: str) -> str:
     """
@@ -127,3 +127,48 @@ def normalize_whitespace(text: str) -> str:
     text = text.strip()
     
     return text
+
+
+def format_indicators_dict(data_dict: Dict[str, Any], title: str) -> str:
+    """
+    将指标字典格式化为字符串
+    
+    Args:
+        data_dict: 要格式化的指标字典
+        title: 指标类型标题（如"技术指标"、"风险指标"）
+    
+    Returns:
+        格式化后的字符串
+    """
+    if not data_dict:
+        return f"{title}：无数据\n"
+    
+    result_text = f"{title}：\n"
+    for key, value in data_dict.items():
+        if isinstance(value, (int, float)):
+            # 数值型数据保留2位小数
+            formatted_value = round(float(value), 2)
+            result_text += f"- {key}: {formatted_value}\n"
+        elif isinstance(value, str):
+            # 字符串直接显示
+            result_text += f"- {key}: {value}\n"
+        elif isinstance(value, dict):
+            # 嵌套字典数据
+            result_text += f"- {key}:\n"
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, (int, float)):
+                    formatted_sub_value = round(float(sub_value), 2)
+                    result_text += f"  • {sub_key}: {formatted_sub_value}\n"
+                else:
+                    result_text += f"  • {sub_key}: {sub_value}\n"
+        elif isinstance(value, list):
+            # 列表数据处理
+            if len(value) > 0 and isinstance(value[0], (int, float)):
+                formatted_values = [round(float(v), 2) for v in value[:3]]
+                result_text += f"- {key}: {formatted_values}{'...' if len(value) > 3 else ''}\n"
+            else:
+                result_text += f"- {key}: {value}\n"
+        else:
+            result_text += f"- {key}: {value}\n"
+    
+    return result_text

@@ -395,28 +395,19 @@ def display_market_trend(stock_code):
                     st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
             
             # 风险指标展示（使用完整版本的风险指标数据）
-            risk_metrics = kline_info.get('risk_metrics', {})
-            if risk_metrics and 'error' not in risk_metrics and 'summary_table' in risk_metrics:
+            risk_metrics = kline_info.get('risk_metrics', None)
+            if risk_metrics is None or 'error' in risk_metrics:
+                st.error(f"获取风险指标失败: {risk_metrics['error']}")
+            elif risk_metrics and 'summary_table' in risk_metrics:
                 with st.expander("风险分析", expanded=True):
                     st.table(risk_metrics['summary_table'])
-            elif 'error' in risk_metrics:
-                st.error(f"计算风险指标失败: {risk_metrics['error']}")
-            
-            # 如果没有完整风险指标，显示风险摘要（来自缓存）
-            elif kline_info.get('risk_summary'):
-                risk_summary = kline_info['risk_summary']
-                if 'error' not in risk_summary:
-                    with st.expander("风险分析摘要", expanded=True):
-                        st.json(risk_summary)
-            
+            elif 'error' not in risk_metrics:
+                with st.expander("风险分析摘要", expanded=True):
+                    st.json(risk_metrics)
+
             # 图表数据预处理
             df['datetime'] = pd.to_datetime(df['datetime'])
-            
-            # 移动平均线已在StockTools中计算，直接使用
-            # df['MA5'] = df['close'].rolling(window=5).mean()
-            # df['MA10'] = df['close'].rolling(window=10).mean()
-            # df['MA20'] = df['close'].rolling(window=20).mean()
-            
+                        
             # 使用plotly创建K线图和均线图表
             fig_price = go.Figure()
             

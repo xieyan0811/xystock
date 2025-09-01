@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 from datetime import datetime
 from typing import Dict
+from typing import Dict, Any
 
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
@@ -646,10 +647,16 @@ def fetch_stock_basic_info(stock_code: str) -> Dict:
 
 
 def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict:
-    """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）"""
+    """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）
+    
+    Args:
+        stock_code: 股票代码
+        period: K线周期数
+        include_full_risk: 是否包含完整风险指标（用于图表显示）
+    """
     # 导入必要的模块
     from providers.stock_data_fetcher import data_manager, KLineType
-    from providers.risk_metrics import calculate_portfolio_risk_summary
+    from providers.risk_metrics import calculate_portfolio_risk_summary, calculate_portfolio_risk
     
     indicators_info = {}
     
@@ -674,14 +681,16 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
             # 获取技术指标
             indicators = get_indicators(df)
             
-            # 风险指标计算（使用精简版本，只缓存统计摘要）
+            # 风险指标计算
             risk_metrics = {}
+            
             if len(df) >= 5:
                 try:
-                    risk_metrics = calculate_portfolio_risk_summary(df, price_col='close')
+                    risk_metrics = calculate_portfolio_risk_summary(df, price_col='close')                            
                 except Exception as e:
                     risk_metrics['error'] = str(e)
-            
+                    #full_risk_metrics['error'] = str(e)
+
             # 获取最新数据摘要（不包含完整K线数据）
             latest_data = {}
             if len(df) > 0:
@@ -697,11 +706,12 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
             
             indicators_info.update({
                 'indicators': indicators,
-                'risk_metrics': risk_metrics,
+                'risk_metrics': risk_metrics,  # 精简风险摘要（用于缓存）
                 'data_length': len(df),
                 'latest_data': latest_data,
                 'has_ma_data': True  # 标记移动平均线已计算
             })
+                
         else:
             indicators_info['error'] = f"未获取到股票 {stock_code} 的K线数据"
             

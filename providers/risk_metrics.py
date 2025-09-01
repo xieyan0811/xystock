@@ -125,59 +125,6 @@ class RiskCalculator:
         return risk_df
 
 
-def calculate_portfolio_risk(df: pd.DataFrame, 
-                           price_col: str = 'close',
-                           confidence_level: float = 0.05,
-                           risk_free_rate: float = 0.03) -> Dict:
-    """
-    便捷函数：计算单个资产的风险指标（完整版本，包含时间序列）
-    
-    Args:
-        df: 包含价格数据的DataFrame
-        price_col: 价格列名
-        confidence_level: VaR/CVaR置信水平
-        risk_free_rate: 无风险利率
-        
-    Returns:
-        包含计算结果的字典
-    """
-    calculator = RiskCalculator()
-    
-    if price_col not in df.columns:
-        raise ValueError(f"DataFrame中未找到列 '{price_col}'")
-    
-    prices = df[price_col].dropna()
-    
-    if len(prices) < 2:
-        raise ValueError("价格数据不足，至少需要2个数据点")
-    
-    # 计算风险指标
-    metrics = calculator.calculate_all_metrics(prices, confidence_level, risk_free_rate)
-    risk_summary = calculator.get_risk_summary(prices, confidence_level, risk_free_rate)
-    
-    # 计算额外的分析数据
-    returns = calculator.calculate_returns(prices)
-    cumulative_returns = (1 + returns).cumprod()
-    running_max = cumulative_returns.expanding().max()
-    drawdown_series = (cumulative_returns - running_max) / running_max
-    
-    return {
-        'metrics': metrics,
-        'summary_table': risk_summary,
-        'returns': returns,
-        'cumulative_returns': cumulative_returns,
-        'drawdown_series': drawdown_series,
-        'statistics': {
-            'data_length': len(df),
-            'returns_length': len(returns),
-            'returns_mean': returns.mean(),
-            'returns_std': returns.std(),
-            'returns_min': returns.min(),
-            'returns_max': returns.max()
-        }
-    }
-
-
 def calculate_portfolio_risk_summary(df: pd.DataFrame, 
                                    price_col: str = 'close',
                                    confidence_level: float = 0.05,
@@ -201,12 +148,13 @@ def calculate_portfolio_risk_summary(df: pd.DataFrame,
     
     prices = df[price_col].dropna()
     
-    if len(prices) < 2:
-        raise ValueError("价格数据不足，至少需要2个数据点")
-    
+    if len(prices) < 5:
+        raise ValueError("价格数据不足，至少需要5个数据点")
+
     # 计算风险指标（只保留关键统计数据）
     metrics = calculator.calculate_all_metrics(prices, confidence_level, risk_free_rate)
     returns = calculator.calculate_returns(prices)
+    risk_summary = calculator.get_risk_summary(prices, confidence_level, risk_free_rate)
     
     # 计算价格趋势
     price_change = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
@@ -241,7 +189,8 @@ def calculate_portfolio_risk_summary(df: pd.DataFrame,
             'risk_level': _assess_risk_level(metrics['annual_volatility'], metrics['max_drawdown']),
             'stability': _assess_stability(returns),
             'trend_strength': _assess_trend_strength(price_change, metrics['annual_volatility']),
-        }
+        },
+        'summary_table': risk_summary,
     }
     
     return risk_analysis
