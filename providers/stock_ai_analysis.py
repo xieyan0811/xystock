@@ -28,16 +28,9 @@ def generate_stock_analysis_report(
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
-    # 从indicators中提取所需数据, 250901，这里还要改
-    latest_date = indicators.get('latest_date', '未知日期') if indicators else '未知日期'
-    latest_open = indicators.get('latest_open', 0) if indicators else 0
-    latest_high = indicators.get('latest_high', 0) if indicators else 0
-    latest_low = indicators.get('latest_low', 0) if indicators else 0
-    latest_close = indicators.get('latest_close', 0) if indicators else 0
-    latest_volume = indicators.get('latest_volume', 0) if indicators else 0
-    price_change = indicators.get('change_amount', 0) if indicators else 0
-    price_change_pct = indicators.get('change_percent', 0) if indicators else 0
-        
+    # 获取当前股票信息
+    basic_info_section, _ = get_stock_info(stock_code, stock_name)
+            
     # 使用新的格式化函数处理指标数据
     indicators_text = format_indicators_dict(indicators, "技术指标")
     risk_text = format_indicators_dict(risk_metrics, "风险指标")
@@ -57,6 +50,7 @@ def generate_stock_analysis_report(
 3. 考虑市场特点进行分析
 4. 提供具体的数值和专业分析
 5. 给出明确的投资建议
+6. 重点关注当前股价变动对技术分析的影响
 
 **输出格式：**
 ## 📈 技术指标分析
@@ -70,20 +64,13 @@ def generate_stock_analysis_report(
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请基于以下数据对{stock_name}({stock_code})进行技术分析：
 
-1. 前一个交易日数据：
-- 日期：{latest_date}
-- 开盘价：{format_price(latest_open)}
-- 最高价：{format_price(latest_high)}
-- 最低价：{format_price(latest_low)}
-- 收盘价：{format_price(latest_close)}
-- 成交量：{format_volume(latest_volume)}
-- 价格变化：{format_change(price_change, price_change_pct)}
+{basic_info_section}
 
 2. {indicators_text}
 
 3. {risk_text}
 
-请进行详细分析，包括价格趋势、技术指标、支撑阻力位和投资建议。报告应不多于500字，必须基于数据做出专业的分析。"""
+请进行详细分析，包括价格趋势、技术指标、支撑阻力位和投资建议。报告应不多于500字，必须基于数据做出专业的分析。请关注当前股价表现的影响。"""
         }
     ]
 
@@ -114,6 +101,9 @@ def generate_news_analysis_report(
     """生成股票新闻分析报告，返回(分析报告, 时间戳)"""
     # 初始化OpenAI客户端
     client = OpenAIClient()
+    
+    # 获取当前股票信息
+    basic_info_section, _ = get_stock_info(stock_code, stock_name)
     
     # 准备新闻数据
     news_text = ""
@@ -148,6 +138,7 @@ def generate_news_analysis_report(
 2. 识别可能影响股价的关键信息
 3. 分析新闻的时效性和可靠性
 4. 提供基于新闻的交易建议和价格影响评估
+5. 参考当前股价表现分析做出分析和预测
 
 重点关注的新闻类型：
 - 财报发布和业绩指导
@@ -178,6 +169,8 @@ def generate_news_analysis_report(
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请分析以下关于{stock_name}({stock_code})的最新新闻，评估其对股价的潜在影响：
+
+{basic_info_section}
 
 === 最新新闻数据 ===
 {news_text}
@@ -218,6 +211,9 @@ def generate_chip_analysis_report(
     # 初始化OpenAI客户端
     client = OpenAIClient()
     
+    # 获取当前股票信息
+    basic_info_section, _ = get_stock_info(stock_code, stock_name)
+    
     # 构建分析提示
     system_message = """你是一位专业的筹码分析师，专精于A股市场的筹码分布技术分析。你能够深入解读筹码分布背后的主力意图、散户行为和市场博弈格局，为投资决策提供核心依据。
 
@@ -245,6 +241,8 @@ def generate_chip_analysis_report(
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请对{stock_name}({stock_code})进行筹码分析，基于以下筹码数据：
+
+{basic_info_section}
 
 **基础筹码数据:**
 - 最新日期: {chip_data.get('latest_date', '未知')}
@@ -303,6 +301,9 @@ def generate_fundamental_analysis_report(
 
     # 初始化OpenAI客户端
     client = OpenAIClient()
+    
+    # 获取当前股票信息
+    basic_info_section, _ = get_stock_info(stock_code, stock_name)
     
     # 解析货币信息
     currency_name = market_info.get('currency_name', '人民币')
@@ -367,6 +368,8 @@ def generate_fundamental_analysis_report(
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请基于以下真实数据，对{stock_name}({stock_code})进行全面的基本面分析：
 
+{basic_info_section}
+
 {profile_text}
 
 请提供详细的基本面分析报告，包括：
@@ -398,6 +401,44 @@ def generate_fundamental_analysis_report(
         return f"生成基本面分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+def get_stock_info(stock_code: str, stock_name: str, stock_tools=None) -> Tuple[str, Dict[str, Any]]:
+    # 获取股票基本信息（包含当前价格、涨跌额、涨跌幅）
+    basic_info_section = ""
+    info = None
+    if stock_tools is None:
+        from providers.stock_data_tools import get_stock_tools
+        stock_tools = get_stock_tools()
+
+    try:
+        basic_info = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
+        if basic_info and 'error' not in basic_info:
+            info = {
+                'type': '股票基本信息',
+                'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
+                'timestamp': basic_info.get('update_time', '未知时间')
+            }
+    except Exception as e:
+        print(f"获取股票基本信息失败: {e}")
+        return "", info
+
+    if basic_info and 'error' not in basic_info:
+        current_price = basic_info.get('current_price', 0)
+        change = basic_info.get('change', 0)
+        change_percent = basic_info.get('change_percent', 0)
+        stock_name_info = basic_info.get('name', stock_name)            
+        basic_info_section = f"""\n\n# 💹 股票实时信息
+
+- 股票名称：{stock_name_info}（{stock_code}）
+- 当前价格：{current_price:.2f}元
+- 涨跌金额：{change:+.2f}元
+- 涨跌幅度：{change_percent:+.2f}%
+- 更新时间：{basic_info.get('timestamp', '未知')}\n"""
+    else:
+        basic_info_section = f"\n\n# 💹 股票实时信息\n暂无{stock_name}（{stock_code}）的实时价格信息。\n"
+
+    return basic_info_section, info
+
+
 def generate_comprehensive_analysis_report(
     stock_code: str,
     stock_name: str,
@@ -418,20 +459,6 @@ def generate_comprehensive_analysis_report(
     # 收集历史分析数据
     historical_analyses = {}
     data_sources = []
-    
-    # 获取股票基本信息（包含当前价格、涨跌额、涨跌幅）
-    basic_info = {}
-    if stock_tools:
-        try:
-            basic_info = stock_tools.get_stock_basic_info(stock_code, use_cache=True)
-            if basic_info and 'error' not in basic_info:
-                data_sources.append({
-                    'type': '股票基本信息',
-                    'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
-                    'timestamp': basic_info.get('update_time', '未知时间')
-                })
-        except Exception as e:
-            print(f"获取股票基本信息失败: {e}")
     
     # 收集市场数据
     market_report_text = ""
@@ -556,25 +583,10 @@ def generate_comprehensive_analysis_report(
         market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
     
     # 构建股票基本信息部分
-    basic_info_section = ""
-    if basic_info and 'error' not in basic_info:
-        current_price = basic_info.get('current_price', 0)
-        change = basic_info.get('change', 0)
-        change_percent = basic_info.get('change_percent', 0)
-        stock_name_info = basic_info.get('name', stock_name)
-        
-        # 判断涨跌情况
-        
-        basic_info_section = f"""\n\n# 💹 股票实时信息
+    basic_info_section, info = get_stock_info(stock_code, stock_name, stock_tools)
+    if info is not None:
+        data_sources.append(info)
 
-- 股票名称：{stock_name_info}（{stock_code}）
-- 当前价格：{current_price:.2f}元
-- 涨跌金额：{change:+.2f}元
-- 涨跌幅度：{change_percent:+.2f}%
-- 更新时间：{basic_info.get('timestamp', '未知')}\n"""
-    else:
-        basic_info_section = f"\n\n# 💹 股票实时信息\n暂无{stock_name}（{stock_code}）的实时价格信息。\n"
-    
     # 加载用户画像
     user_profile_section = ""
     try:
