@@ -60,23 +60,57 @@ def main():
     col3, col4 = st.columns([1, 3])
     
     with col3:
+        # 使用session_state实现确认弹窗
         if st.button("🗑️ 清理所有缓存", 
                     type="secondary", 
                     use_container_width=True,
                     help="一键清理所有股票和大盘数据缓存"):
-            try:
-                # 清理股票缓存
-                from providers.stock_data_tools import clear_stock_cache
-                clear_stock_cache()
-                
-                # 清理大盘缓存
-                from providers.market_data_tools import get_market_tools
-                market_tools = get_market_tools()
-                market_tools.clear_cache()
-                
-                st.success("✅ 所有缓存已清理完成！")
-            except Exception as e:
-                st.error(f"❌ 清理所有缓存失败：{str(e)}")
+            st.session_state['show_clear_all_confirm'] = True
+
+        if st.session_state.get('show_clear_all_confirm', False):
+            st.warning(
+                "⚠️ 此操作将**删除所有缓存，包括股票名映射、K线缓存等**，后续拉取数据会变慢，请谨慎操作！",
+                icon="⚠️"
+            )
+            if st.button("确认清理", key="confirm_clear_all_cache"):
+                try:
+                    # 清理股票缓存
+                    from providers.stock_data_tools import clear_stock_cache
+                    clear_stock_cache()
+                    
+                    # 清理大盘缓存
+                    from providers.market_data_tools import get_market_tools
+                    market_tools = get_market_tools()
+                    market_tools.clear_cache()
+
+                    # 清理K线缓存
+                    from providers.kline_cache import cache_manager
+                    cache_manager.clear_cache()
+
+                    # 清理股票映射缓存
+                    from providers.stock_utils import clear_stock_map_cache, clear_hk_stock_map_cache
+                    clear_stock_map_cache()
+                    clear_hk_stock_map_cache()
+
+                    # 删除data/cache目录下所有txt文件
+                    import glob
+                    from pathlib import Path
+                    cache_dir = os.path.join(Path(__file__).parent.parent.parent, 'data', 'cache')
+                    for txt_file in glob.glob(os.path.join(cache_dir, '*.txt')):
+                        print("清除文本文件：", txt_file)
+                        try:
+                            os.remove(txt_file)
+                        except Exception as e:
+                            print(f"删除文件失败: {txt_file} {e}")
+
+                    st.success("✅ 所有缓存已清理完成！")
+                except Exception as e:
+                    st.error(f"❌ 清理所有缓存失败：{str(e)}")
+                # 清理后关闭弹窗
+                st.session_state['show_clear_all_confirm'] = False
+            # 增加一个取消按钮
+            if st.button("取消", key="cancel_clear_all_cache"):
+                st.session_state['show_clear_all_confirm'] = False
     
     # 缓存说明
     st.markdown("---")

@@ -656,7 +656,7 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
     """
     # 导入必要的模块
     from providers.stock_data_fetcher import data_manager, KLineType
-    from providers.risk_metrics import calculate_portfolio_risk_summary, calculate_portfolio_risk
+    from providers.risk_metrics import calculate_portfolio_risk_summary
     
     indicators_info = {}
     
@@ -769,3 +769,35 @@ def fetch_stock_chip_data(stock_code: str) -> Dict:
     
     chip_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return chip_info
+
+def clear_stock_map_cache():
+    """清除A股股票代码与名称映射缓存文件"""
+    try:
+        if os.path.exists(_MAP_FILE_PATH):
+            os.remove(_MAP_FILE_PATH)
+            print(f"已删除A股映射缓存文件: {_MAP_FILE_PATH}")
+        else:
+            print("A股映射缓存文件不存在")
+        # 同时清空内存中的映射
+        global _STOCK_CODE_NAME_MAP, _STOCK_NAME_CODE_MAP, _LAST_UPDATE_TIME
+        _STOCK_CODE_NAME_MAP = {}
+        _STOCK_NAME_CODE_MAP = {}
+        _LAST_UPDATE_TIME = 0
+    except Exception as e:
+        print(f"清除A股映射缓存文件失败: {e}")
+
+def clear_hk_stock_map_cache():
+    """清除港股通股票代码与名称映射缓存文件"""
+    try:
+        if os.path.exists(_HK_MAP_FILE_PATH):
+            os.remove(_HK_MAP_FILE_PATH)
+            print(f"已删除港股通映射缓存文件: {_HK_MAP_FILE_PATH}")
+        else:
+            print("港股通映射缓存文件不存在")
+        # 同时清空内存中的映射
+        global _HK_STOCK_CODE_NAME_MAP, _HK_STOCK_NAME_CODE_MAP, _HK_LAST_UPDATE_TIME
+        _HK_STOCK_CODE_NAME_MAP = {}
+        _HK_STOCK_NAME_CODE_MAP = {}
+        _HK_LAST_UPDATE_TIME = 0
+    except Exception as e:
+        print(f"清除港股通映射缓存文件失败: {e}")
