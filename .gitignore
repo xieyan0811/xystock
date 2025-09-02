@@ -4,5 +4,6 @@ config.toml
 *.ipynb
 *.csv
 *.log
-data/
 *.pyc
+data/
+reports/

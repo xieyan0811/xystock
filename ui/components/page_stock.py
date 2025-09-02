@@ -18,7 +18,8 @@ from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_utils import normalize_stock_input
 from providers.stock_data_tools import get_stock_tools
-from providers.report import generate_complete_report_safe, PDF_SUPPORT_AVAILABLE
+from providers.stock_report import generate_stock_report
+from providers.report_utils import PDF_SUPPORT_AVAILABLE
 
 stock_tools = get_stock_tools()
 
@@ -127,7 +128,7 @@ def display_stock_info(stock_code, market_type):
                     try:
                         has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                         
-                        report_content = generate_complete_report_safe(
+                        report_content = generate_stock_report(
                             stock_code, market_type, generating_format,
                             has_fundamental_ai=has_fundamental_ai,
                             has_market_ai=has_market_ai,
