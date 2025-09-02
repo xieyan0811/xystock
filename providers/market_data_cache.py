@@ -25,7 +25,6 @@ class MarketDataCache:
         project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.cache_file = os.path.join(project_dir, cache_dir, "market_data.json")
         
-        # 确保缓存目录存在
         os.makedirs(cache_dir, exist_ok=True)
         
         # 缓存配置
@@ -115,7 +114,6 @@ class MarketDataCache:
             except Exception as e:
                 print(f"❌ 清理缓存失败: {e}")
         else:
-            # 清理所有缓存
             try:
                 if os.path.exists(self.cache_file):
                     os.remove(self.cache_file)
@@ -185,7 +183,6 @@ class MarketDataCache:
             status_icon = "✅" if info['valid'] else ("📋" if info['exists'] else "❌")
             print(f"{status_icon} {info['description']:<12} | {info['remaining']:<15} | 过期时间: {info['expire_minutes']}分钟")
         
-        # 显示缓存文件大小
         try:
             if os.path.exists(self.cache_file):
                 file_size = os.path.getsize(self.cache_file)

@@ -12,10 +12,8 @@ from providers.stock_data_tools import get_stock_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.stock_utils import get_stock_name
 
-# 导入PDF生成相关库
 try:
     import pypandoc
-    # 检查pandoc是否可用
     try:
         pypandoc.get_pandoc_version()
         PANDOC_AVAILABLE = True
@@ -33,7 +31,6 @@ except ImportError:
     PANDOC_AVAILABLE = False
     print("❌ pypandoc未安装，PDF功能不可用")
 
-# 检查weasyprint是否可用
 def check_weasyprint_available():
     """检查weasyprint是否可用"""
     try:
@@ -57,8 +54,6 @@ def check_weasyprint_available():
         return False
 
 WEASYPRINT_AVAILABLE = check_weasyprint_available()
-
-# PDF支持状态
 PDF_SUPPORT_AVAILABLE = PANDOC_AVAILABLE and WEASYPRINT_AVAILABLE
 
 
@@ -67,34 +62,27 @@ def _clean_markdown_for_pandoc(content):
     if not content:
         return ""
 
-    # 确保内容不以可能被误认为YAML的字符开头
     content = content.strip()
 
-    # 如果第一行看起来像YAML分隔符，添加空行
+    # 处理可能被误认为YAML的内容
     lines = content.split('\n')
     if lines and (lines[0].startswith('---') or lines[0].startswith('...')):
         content = '\n' + content
 
-    # 替换可能导致YAML解析问题的字符序列，但保护表格分隔符
-    # 先保护表格分隔符
+    # 保护表格分隔符，然后替换其他问题字符
     content = content.replace('|------|------|', '|TABLESEP|TABLESEP|')
     content = content.replace('|------|', '|TABLESEP|')
-
-    # 然后替换其他的三连字符
-    content = content.replace('---', '—')  # 替换三个连字符
-    content = content.replace('...', '…')  # 替换三个点
-
-    # 恢复表格分隔符
+    content = content.replace('---', '—')
+    content = content.replace('...', '…')
     content = content.replace('|TABLESEP|TABLESEP|', '|------|------|')
     content = content.replace('|TABLESEP|', '|------|')
 
     # 清理特殊引号
-    content = content.replace('"', '"')  # 左双引号
-    content = content.replace('"', '"')  # 右双引号
-    content = content.replace(''', "'")  # 左单引号
-    content = content.replace(''', "'")  # 右单引号
+    content = content.replace('"', '"')
+    content = content.replace('"', '"')
+    content = content.replace(''', "'")
+    content = content.replace(''', "'")
 
-    # 确保内容以标准Markdown标题开始
     if not content.startswith('#'):
         content = '# 分析报告\n\n' + content
 
@@ -105,32 +93,14 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
                                  has_fundamental_ai=False, has_market_ai=False, 
                                  has_news_ai=False, has_chip_ai=False, 
                                  has_comprehensive_ai=False):
-    """
-    生成完整的股票分析报告（安全版本，完全独立于Streamlit）
-    
-    Args:
-        stock_code: 股票代码
-        market_type: 市场类型
-        format_type: 输出格式 ("markdown"、"pdf" 或 "docx")
-        has_fundamental_ai: 是否包含基本面AI分析
-        has_market_ai: 是否包含行情AI分析
-        has_news_ai: 是否包含新闻AI分析
-        has_chip_ai: 是否包含筹码AI分析
-        has_comprehensive_ai: 是否包含综合AI分析
-    
-    Returns:
-        报告内容字符串(markdown)或字节数据(pdf/docx)
-    """
+    """生成完整的股票分析报告（安全版本，完全独立于Streamlit）"""
     try:
         stock_tools = get_stock_tools()
-
-        # 获取股票名称
         stock_name = get_stock_name(stock_code, 'index' if market_type == "指数" else 'stock')
         
-        # 收集所有数据
         report_data = {}
         
-        # 1. 基本信息（仅当界面有AI分析时才包含AI分析）
+        # 收集基本信息
         try:
             basic_info = stock_tools.get_stock_basic_info(stock_code, use_cache=True, include_ai_analysis=has_fundamental_ai)
             if 'error' not in basic_info and basic_info:
@@ -138,7 +108,7 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
         except Exception as e:
             report_data['basic_info'] = {'error': str(e)}
         
-        # 2. 行情数据（仅当界面有AI分析时才包含AI分析）
+        # 收集行情数据
         try:
             kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True, include_ai_analysis=has_market_ai)
             if 'error' not in kline_info and kline_info:
@@ -146,7 +116,7 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
         except Exception as e:
             report_data['market_data'] = {'error': str(e)}
         
-        # 3. 新闻数据（仅当界面有AI分析时才包含AI分析）
+        # 收集新闻数据
         try:
             news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True, include_ai_analysis=has_news_ai)
             if 'error' not in news_info and news_info:
@@ -154,7 +124,7 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
         except Exception as e:
             report_data['news_data'] = {'error': str(e)}
         
-        # 4. 筹码数据（仅A股和基金，仅当界面有AI分析时才包含AI分析）
+        # 收集筹码数据（仅A股和基金）
         if market_type not in ["港股", "指数"]:
             try:
                 chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True, include_ai_analysis=has_chip_ai)
@@ -163,51 +133,42 @@ def generate_complete_report_safe(stock_code, market_type, format_type="pdf",
             except Exception as e:
                 report_data['chip_data'] = {'error': str(e)}
         
-        # 5. 综合分析（仅当界面有AI分析时才包含）
+        # 收集综合分析
         if has_comprehensive_ai:
             try:
                 comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_code, use_cache=True)
                 if 'error' not in comprehensive_analysis:
                     report_data['comprehensive_analysis'] = comprehensive_analysis
             except Exception as e:
-                # 综合分析失败不影响整体报告生成
                 pass
                 
         final_ai_reports = {}
         
-        # 基本面分析
+        # 整理AI分析报告
         if has_fundamental_ai:
             if 'ai_analysis' in report_data.get('basic_info', {}):
                 final_ai_reports['fundamental'] = report_data['basic_info']['ai_analysis']
         
-        # 行情分析
         if has_market_ai:
             if 'ai_analysis' in report_data.get('market_data', {}):
                 final_ai_reports['market'] = report_data['market_data']['ai_analysis']
         
-        # 新闻分析
         if has_news_ai:
             if 'ai_analysis' in report_data.get('news_data', {}):
                 final_ai_reports['news'] = report_data['news_data']['ai_analysis']
         
-        # 筹码分析
         if has_chip_ai:
             if 'ai_analysis' in report_data.get('chip_data', {}):
                 final_ai_reports['chip'] = report_data['chip_data']['ai_analysis']
         
-        # 综合分析
         if has_comprehensive_ai:
             if 'comprehensive_analysis' in report_data:
                 final_ai_reports['comprehensive'] = report_data['comprehensive_analysis']
         
         report_data['ai_reports'] = final_ai_reports
         
-        #print('@@@@@@@@@@@@@@@@@@ report_data', report_data)
-        
-        # 生成markdown内容
         md_content = generate_markdown_report(stock_code, stock_name, market_type, report_data)
         
-        # 根据格式类型返回相应内容
         if format_type == "pdf":
             return generate_pdf_report(md_content)
         elif format_type == "docx":
@@ -242,7 +203,7 @@ def generate_pdf_report(md_content):
 
     pdf_engines = [
         ('weasyprint', '现代HTML转PDF引擎'),
-        (None, '使用pandoc默认引擎')  # 不指定引擎，让pandoc自己选择
+        (None, '使用pandoc默认引擎')
     ]
 
     last_error = None
@@ -250,14 +211,11 @@ def generate_pdf_report(md_content):
     for engine_info in pdf_engines:
         engine, description = engine_info
         try:
-            # 创建临时文件用于PDF输出
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
                 output_file = tmp_file.name
 
-            # 使用禁用YAML解析的参数
             extra_args = ['--from=markdown-yaml_metadata_block']
 
-            # 如果指定了引擎，添加引擎参数
             if engine:
                 extra_args.append(f'--pdf-engine={engine}')
                 print(f"🔧 使用PDF引擎: {engine}")
@@ -269,22 +227,18 @@ def generate_pdf_report(md_content):
             # 清理内容避免YAML解析问题
             cleaned_content = _clean_markdown_for_pandoc(md_content)
 
-            # 使用pypandoc将markdown转换为PDF - 禁用YAML解析
             pypandoc.convert_text(
                 cleaned_content,
                 'pdf',
-                format='markdown',  # 基础markdown格式
+                format='markdown',
                 outputfile=output_file,
                 extra_args=extra_args
             )
 
-            # 检查文件是否生成且有内容
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                # 读取生成的PDF文件
                 with open(output_file, 'rb') as f:
                     pdf_content = f.read()
 
-                # 清理临时文件
                 os.unlink(output_file)
 
                 print(f"✅ PDF生成成功，使用引擎: {engine or '默认'}")
@@ -296,7 +250,6 @@ def generate_pdf_report(md_content):
             last_error = str(e)
             print(f"PDF引擎 {engine or '默认'} 失败: {e}")
 
-            # 清理可能存在的临时文件
             try:
                 if 'output_file' in locals() and os.path.exists(output_file):
                     os.unlink(output_file)
@@ -305,7 +258,7 @@ def generate_pdf_report(md_content):
 
             continue
 
-    # 如果所有引擎都失败，提供详细的错误信息和解决方案
+    # 所有引擎都失败时的错误信息
     error_msg = f"""PDF生成失败，最后错误: {last_error}
 
 可能的解决方案:
@@ -336,17 +289,14 @@ def generate_docx_report(md_content):
     print(f"✅ Markdown内容生成完成，长度: {len(md_content)} 字符")
 
     try:
-        # 创建临时文件用于Word输出
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
             output_file = tmp_file.name
 
-        # 使用禁用YAML解析的参数
         extra_args = [
             '--from=markdown-yaml_metadata_block',
             '--reference-doc=/app/templates/reference.docx' if os.path.exists('/app/templates/reference.docx') else None
         ]
         
-        # 过滤掉None值
         extra_args = [arg for arg in extra_args if arg is not None]
 
         print(f"🔧 Word转换参数: {extra_args}")
@@ -354,7 +304,6 @@ def generate_docx_report(md_content):
         # 清理内容避免YAML解析问题
         cleaned_content = _clean_markdown_for_pandoc(md_content)
 
-        # 使用pypandoc将markdown转换为Word文档
         pypandoc.convert_text(
             cleaned_content,
             'docx',
@@ -363,13 +312,10 @@ def generate_docx_report(md_content):
             extra_args=extra_args
         )
 
-        # 检查文件是否生成且有内容
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-            # 读取生成的Word文件
             with open(output_file, 'rb') as f:
                 docx_content = f.read()
 
-            # 清理临时文件
             os.unlink(output_file)
 
             print(f"✅ Word文档生成成功")
@@ -381,14 +327,12 @@ def generate_docx_report(md_content):
         error_msg = str(e)
         print(f"Word文档生成失败: {error_msg}")
 
-        # 清理可能存在的临时文件
         try:
             if 'output_file' in locals() and os.path.exists(output_file):
                 os.unlink(output_file)
         except:
             pass
 
-        # 提供详细的错误信息和解决方案
         detailed_error = f"""Word文档生成失败: {error_msg}
 
 可能的解决方案:
@@ -437,7 +381,7 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 1. 基本信息部分
+    # 基本信息部分
     basic_info = report_data.get('basic_info', {})
     if 'error' not in basic_info and basic_info:
         md_content += """# 📊 基本信息
@@ -464,7 +408,6 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         md_content += "\n"
         
-        # AI基本面分析
         if 'fundamental' in report_data['ai_reports']:
             fundamental_report = report_data['ai_reports']['fundamental']
             report_text = fundamental_report['report']
@@ -478,7 +421,7 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 2. 行情走势部分
+    # 行情走势部分
     market_data = report_data.get('market_data', {})
     if 'error' not in market_data and market_data and market_data.get('kline_data'):
         df = pd.DataFrame(market_data['kline_data'])
@@ -517,7 +460,6 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         md_content += "\n"
         
-        # AI行情分析
         if 'market' in report_data['ai_reports']:
             market_report = report_data['ai_reports']['market']
             report_text = market_report['report']
@@ -531,7 +473,7 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 3. 新闻资讯部分
+    # 新闻资讯部分
     news_data = report_data.get('news_data', {})
     if 'error' not in news_data and news_data and news_data.get('news_data'):
         news_list = news_data['news_data']
@@ -544,25 +486,19 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
         
-        for i, news in enumerate(news_list[:10], 1):  # 只显示前10条
+        for i, news in enumerate(news_list[:10], 1):
             title = news.get('新闻标题', '')
             time = news.get('发布时间', '')
-            #content = news.get('新闻内容', '')
             url = news.get('新闻链接', '')
             
             md_content += f"#### {i}. {title}\n\n"
             md_content += f"**发布时间**: {time}\n\n"
-            
-            #if content:
-            #    truncated_content = content[:300] + '...' if len(content) > 300 else content
-            #    md_content += f"{truncated_content}\n\n"
             
             if url:
                 md_content += f"[阅读原文]({url})\n\n"
             
             md_content += "---\n\n"
         
-        # AI新闻分析
         if 'news' in report_data['ai_reports']:
             news_report = report_data['ai_reports']['news']
             report_text = news_report['report']
@@ -576,7 +512,7 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 4. 筹码分析部分（仅A股）
+    # 筹码分析部分（仅A股）
     chip_data = report_data.get('chip_data', {})
     if 'error' not in chip_data and chip_data:
         md_content += """
@@ -601,7 +537,6 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
         
         md_content += "\n"
         
-        # AI筹码分析
         if 'chip' in report_data['ai_reports']:
             chip_report = report_data['ai_reports']['chip']
             report_text = chip_report['report']
@@ -615,7 +550,7 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 5. 综合分析部分
+    # 综合分析部分
     if 'comprehensive' in report_data['ai_reports']:
         analysis_data = report_data['ai_reports']['comprehensive']
         md_content += """
@@ -646,7 +581,6 @@ def generate_markdown_report(stock_code, stock_name, market_type, report_data):
 
 """
     
-    # 结束
     md_content += """---
 
 *本报告由XYStock股票分析系统自动生成，仅供参考，不构成任何投资建议*

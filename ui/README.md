@@ -85,7 +85,6 @@ streamlit run ui/app.py --server.port 8811 --server.address 0.0.0.0
 ui/
 ├── app.py              # 主应用文件
 ├── config.py          # 配置文件
-├── stock_provider.py  # 股票数据提供者
 ├── start_ui.py        # Python启动脚本
 ├── start_ui.sh        # Shell启动脚本
 └── README.md          # 说明文档

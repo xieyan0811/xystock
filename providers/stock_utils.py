@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import time
 from datetime import datetime
-from typing import Dict
 from typing import Dict, Any
+from stockstats import wrap
 
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
@@ -38,11 +38,10 @@ def _ensure_dir_exists(file_path):
     """确保文件目录存在"""
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-def _load_stock_map(force_download = False):
+def _load_stock_map(force_download=False):
     """加载股票代码和名称的映射关系"""
     global _STOCK_CODE_NAME_MAP, _STOCK_NAME_CODE_MAP, _LAST_UPDATE_TIME
     
-    # 如果已加载且距离上次更新不超过24小时，则直接返回
     current_time = time.time()
     if _STOCK_CODE_NAME_MAP and (current_time - _LAST_UPDATE_TIME < 86400):  # 86400秒 = 24小时
         return
@@ -56,34 +55,26 @@ def _load_stock_map(force_download = False):
                 _STOCK_NAME_CODE_MAP = data.get('name_to_code', {})
                 _LAST_UPDATE_TIME = data.get('update_time', 0)
                 
-                # 如果距离上次更新不超过7天，则直接返回
-                if current_time - _LAST_UPDATE_TIME < 604800:  # 604800秒 = 7天
+                if current_time - _LAST_UPDATE_TIME < 604800:
                     return
     except Exception as e:
         print(f"加载股票映射文件失败: {e}")
     
-    # 如果本地文件不存在或已过期，则重新获取
+    # 重新获取股票映射数据
     try:
-        # 获取A股上市公司基本信息
         print("正在更新股票代码与名称映射表...")
         
-        # 获取A股上市公司信息
         stock_info_a = ak.stock_info_a_code_name()
-        # 获取港股上市公司信息
-        #stock_info_hk = ak.stock_hk_info_hk_name()
         
-        # 处理A股数据
         for _, row in stock_info_a.iterrows():
             code = row['code']
             name = row['name']
             _STOCK_CODE_NAME_MAP[code] = name
             _STOCK_NAME_CODE_MAP[name] = code
         
-        # 合并指数映射数据到股票映射中
-        for code, name in _INDEX_CODE_NAME_MAP.items():
-            _STOCK_CODE_NAME_MAP[code] = name
-        for name, code in _INDEX_NAME_CODE_MAP.items():
-            _STOCK_NAME_CODE_MAP[name] = code
+        # 合并指数映射数据
+        _STOCK_CODE_NAME_MAP.update(_INDEX_CODE_NAME_MAP)
+        _STOCK_NAME_CODE_MAP.update(_INDEX_NAME_CODE_MAP)
         
         # 保存到本地文件
         _ensure_dir_exists(_MAP_FILE_PATH)
@@ -103,9 +94,8 @@ def _load_hk_stock_map(force_download=False):
     """加载港股通股票代码和名称的映射关系"""
     global _HK_STOCK_CODE_NAME_MAP, _HK_STOCK_NAME_CODE_MAP, _HK_LAST_UPDATE_TIME
     
-    # 如果已加载且距离上次更新不超过24小时，则直接返回
     current_time = time.time()
-    if _HK_STOCK_CODE_NAME_MAP and (current_time - _HK_LAST_UPDATE_TIME < 86400):  # 86400秒 = 24小时
+    if _HK_STOCK_CODE_NAME_MAP and (current_time - _HK_LAST_UPDATE_TIME < 86400):
         return
     
     # 尝试从本地文件加载
@@ -117,28 +107,23 @@ def _load_hk_stock_map(force_download=False):
                 _HK_STOCK_NAME_CODE_MAP = data.get('name_to_code', {})
                 _HK_LAST_UPDATE_TIME = data.get('update_time', 0)
                 
-                # 如果距离上次更新不超过7天，则直接返回
-                if current_time - _HK_LAST_UPDATE_TIME < 604800:  # 604800秒 = 7天
+                if current_time - _HK_LAST_UPDATE_TIME < 604800:
                     return
     except Exception as e:
         print(f"加载港股通映射文件失败: {e}")
     
-    # 如果本地文件不存在或已过期，则重新获取
+    # 重新获取港股通数据
     try:
-        # 获取港股通成分股信息
         print("正在更新港股通股票代码与名称映射表...")
         
-        # 获取港股通成分股信息
         hk_stock_info = ak.stock_hk_ggt_components_em()
         
-        # 处理港股通数据
         for _, row in hk_stock_info.iterrows():
             code = row['代码']
             name = row['名称']
             _HK_STOCK_CODE_NAME_MAP[code] = name
             _HK_STOCK_NAME_CODE_MAP[name] = code
         
-        # 保存到本地文件
         _ensure_dir_exists(_HK_MAP_FILE_PATH)
         with open(_HK_MAP_FILE_PATH, 'w', encoding='utf-8') as f:
             json.dump({
@@ -164,8 +149,13 @@ def get_hk_stock_info():
     return {
         'total_count': len(_HK_STOCK_CODE_NAME_MAP),
         'update_time': _HK_LAST_UPDATE_TIME,
-        'sample_stocks': dict(list(_HK_STOCK_CODE_NAME_MAP.items())[:10])  # 前10个样本
+        'sample_stocks': dict(list(_HK_STOCK_CODE_NAME_MAP.items())[:10])
     }
+
+def _find_fuzzy_match(target, mapping_dict):
+    """模糊匹配辅助函数"""
+    matched_items = [key for key in mapping_dict.keys() if target in key]
+    return mapping_dict[matched_items[0]] if matched_items else None
 
 def get_stock_code(stock_name_or_code, security_type='stock'):
     """
@@ -181,82 +171,36 @@ def get_stock_code(stock_name_or_code, security_type='stock'):
     if not stock_name_or_code:
         return None
     
-    # 确保映射表已加载
     _load_stock_map()
     
-    # 如果明确指定查找指数
+    # 处理指数类型
     if security_type == 'index':
-        # 检查输入是否已经是指数代码
-        if stock_name_or_code in _INDEX_CODE_NAME_MAP:
-            return stock_name_or_code
-        
-        # 检查输入是否是指数名称
-        if stock_name_or_code in _INDEX_NAME_CODE_MAP:
-            return _INDEX_NAME_CODE_MAP[stock_name_or_code]
-        
-        # 尝试模糊匹配指数名称
-        matched_names = [name for name in _INDEX_NAME_CODE_MAP.keys() 
-                        if stock_name_or_code in name]
-        
-        if matched_names:
-            # 返回第一个匹配项
-            return _INDEX_NAME_CODE_MAP[matched_names[0]]
+        return (stock_name_or_code if stock_name_or_code in _INDEX_CODE_NAME_MAP 
+                else _INDEX_NAME_CODE_MAP.get(stock_name_or_code) 
+                or _find_fuzzy_match(stock_name_or_code, _INDEX_NAME_CODE_MAP)
+                or stock_name_or_code)
     
-    # 如果明确指定查找港股通
+    # 处理港股通类型
     elif security_type == 'hk':
-        # 确保港股通映射表已加载
         _load_hk_stock_map()
-        
-        # 检查输入是否已经是港股通代码
-        if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
-            return stock_name_or_code
-        
-        # 检查输入是否是港股通名称
-        if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
-            return _HK_STOCK_NAME_CODE_MAP[stock_name_or_code]
-        
-        # 尝试模糊匹配港股通名称
-        matched_names = [name for name in _HK_STOCK_NAME_CODE_MAP.keys() 
-                        if stock_name_or_code in name]
-        
-        if matched_names:
-            # 返回第一个匹配项
-            return _HK_STOCK_NAME_CODE_MAP[matched_names[0]]
+        return (stock_name_or_code if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP 
+                else _HK_STOCK_NAME_CODE_MAP.get(stock_name_or_code)
+                or _find_fuzzy_match(stock_name_or_code, _HK_STOCK_NAME_CODE_MAP)
+                or stock_name_or_code)
     
-    # 默认查找所有(A股+港股通+指数)
-    # 先尝试加载港股通映射表
+    # 默认查找所有类型
     _load_hk_stock_map()
     
-    # 检查输入是否已经是代码
-    if stock_name_or_code in _STOCK_CODE_NAME_MAP:
-        return stock_name_or_code
-    if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
+    # 直接查找代码映射
+    if stock_name_or_code in _STOCK_CODE_NAME_MAP or stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
         return stock_name_or_code
     
-    # 检查输入是否是名称
-    if stock_name_or_code in _STOCK_NAME_CODE_MAP:
-        return _STOCK_NAME_CODE_MAP[stock_name_or_code]
-    if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
-        return _HK_STOCK_NAME_CODE_MAP[stock_name_or_code]
-    
-    # 尝试模糊匹配A股
-    matched_names = [name for name in _STOCK_NAME_CODE_MAP.keys() 
-                    if stock_name_or_code in name]
-    
-    if matched_names:
-        # 返回第一个匹配项
-        return _STOCK_NAME_CODE_MAP[matched_names[0]]
-    
-    # 尝试模糊匹配港股通
-    matched_hk_names = [name for name in _HK_STOCK_NAME_CODE_MAP.keys() 
-                       if stock_name_or_code in name]
-    
-    if matched_hk_names:
-        # 返回第一个匹配项
-        return _HK_STOCK_NAME_CODE_MAP[matched_hk_names[0]]
-    
-    # 如果都没匹配到，返回原始输入
-    return stock_name_or_code
+    # 查找名称映射
+    return (_STOCK_NAME_CODE_MAP.get(stock_name_or_code) 
+            or _HK_STOCK_NAME_CODE_MAP.get(stock_name_or_code)
+            or _find_fuzzy_match(stock_name_or_code, _STOCK_NAME_CODE_MAP)
+            or _find_fuzzy_match(stock_name_or_code, _HK_STOCK_NAME_CODE_MAP)
+            or stock_name_or_code)
 
 def get_stock_name(stock_name_or_code, security_type='stock'):
     """
@@ -272,105 +216,61 @@ def get_stock_name(stock_name_or_code, security_type='stock'):
     if not stock_name_or_code:
         return None
     
-    # 确保映射表已加载
     _load_stock_map()
     
-    # 如果明确指定查找指数
+    # 处理指数类型
     if security_type == 'index':
-        # 检查输入是否已经是指数名称
-        if stock_name_or_code in _INDEX_NAME_CODE_MAP:
-            return stock_name_or_code
-        
-        # 检查输入是否是指数代码
-        if stock_name_or_code in _INDEX_CODE_NAME_MAP:
-            return _INDEX_CODE_NAME_MAP[stock_name_or_code]
-        
-        # 尝试模糊匹配指数代码
-        matched_codes = [code for code in _INDEX_CODE_NAME_MAP.keys() 
-                        if stock_name_or_code in code]
-        
-        if matched_codes:
-            # 返回第一个匹配项
-            return _INDEX_CODE_NAME_MAP[matched_codes[0]]
+        return (stock_name_or_code if stock_name_or_code in _INDEX_NAME_CODE_MAP 
+                else _INDEX_CODE_NAME_MAP.get(stock_name_or_code)
+                or _find_fuzzy_match(stock_name_or_code, _INDEX_CODE_NAME_MAP)
+                or stock_name_or_code)
     
-    # 如果明确指定查找港股通
+    # 处理港股通类型
     elif security_type == 'hk':
-        # 确保港股通映射表已加载
         _load_hk_stock_map()
-        
-        # 检查输入是否已经是港股通名称
-        if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
-            return stock_name_or_code
-        
-        # 检查输入是否是港股通代码
-        if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
-            return _HK_STOCK_CODE_NAME_MAP[stock_name_or_code]
-        
-        # 尝试模糊匹配港股通代码
-        matched_codes = [code for code in _HK_STOCK_CODE_NAME_MAP.keys() 
-                        if stock_name_or_code in code]
-        
-        if matched_codes:
-            # 返回第一个匹配项
-            return _HK_STOCK_CODE_NAME_MAP[matched_codes[0]]
+        return (stock_name_or_code if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP
+                else _HK_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
+                or _find_fuzzy_match(stock_name_or_code, _HK_STOCK_CODE_NAME_MAP)
+                or stock_name_or_code)
     
-    # 默认查找所有(A股+港股通+指数)
-    # 先尝试加载港股通映射表
+    # 默认查找所有类型
     _load_hk_stock_map()
     
-    # 检查输入是否已经是名称
-    if stock_name_or_code in _STOCK_NAME_CODE_MAP:
-        return stock_name_or_code
-    if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
+    # 直接查找名称映射
+    if stock_name_or_code in _STOCK_NAME_CODE_MAP or stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
         return stock_name_or_code
     
-    # 检查输入是否是代码
-    if stock_name_or_code in _STOCK_CODE_NAME_MAP:
-        return _STOCK_CODE_NAME_MAP[stock_name_or_code]
-    if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
-        return _HK_STOCK_CODE_NAME_MAP[stock_name_or_code]
-    
-    # 如果都没匹配到，返回原始输入
-    return stock_name_or_code
+    # 查找代码映射
+    return (_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
+            or _HK_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
+            or stock_name_or_code)
 
 def normalize_stock_input(stock_input, security_type='stock'):
-    """
-    标准化证券输入
-    
-    Args:
-        stock_input: 用户输入的证券代码或名称
-        security_type: 证券类型，可选值为'stock'(股票)、'index'(指数)或'hk'(港股通)，默认为'stock'
-        
-    Returns:
-        元组 (stock_code, stock_name)
-    """
+    """标准化证券输入，返回 (stock_code, stock_name)"""
     code = get_stock_code(stock_input, security_type)
-    name = get_stock_name(code, security_type)  # 确保使用代码获取准确的名称
-    
+    name = get_stock_name(code, security_type)
     return code, name
 
 def explain_cyq_data(stock_code):
     """解释筹码集中度数据"""
-    "demo: explain_cyq_data('000977')"
     try:
-        # 获取筹码数据
         cyq_data = ak.stock_cyq_em(stock_code)
         
         if cyq_data is None or cyq_data.empty:
             print(f"无法获取 {stock_code} 的筹码数据")
             return
         
-        # 获取最新数据
         latest = cyq_data.iloc[-1]
         
         print(f"📊 {stock_code} 筹码集中度分析")
         print("=" * 50)
         
         # 基础指标
-        print(f"📈 获利比例: {latest['获利比例']*100:.2f}%")
-        if latest['获利比例'] > 0.7:
+        profit_ratio = latest['获利比例']
+        print(f"📈 获利比例: {profit_ratio*100:.2f}%")
+        if profit_ratio > 0.7:
             print("   → 获利盘较重，上涨可能遇到抛售压力")
-        elif latest['获利比例'] < 0.3:
+        elif profit_ratio < 0.3:
             print("   → 获利盘较轻，上涨阻力相对较小")
         else:
             print("   → 获利盘适中")
@@ -378,14 +278,14 @@ def explain_cyq_data(stock_code):
         print(f"💰 平均成本: {latest['平均成本']:.2f}元")
         
         # 90%筹码分布
+        concentration_90 = latest['90集中度']
         print(f"\n🎯 90%筹码分布:")
         print(f"   成本区间: {latest['90成本-低']:.2f} - {latest['90成本-高']:.2f}元")
-        print(f"   集中度: {latest['90集中度']*100:.2f}%")
+        print(f"   集中度: {concentration_90*100:.2f}%")
         
-        range_90 = latest['90成本-高'] - latest['90成本-低']
-        if latest['90集中度'] < 0.1:
+        if concentration_90 < 0.1:
             print("   → 筹码高度集中，可能形成重要支撑/阻力")
-        elif latest['90集中度'] > 0.2:
+        elif concentration_90 > 0.2:
             print("   → 筹码较为分散，成本分布较广")
         else:
             print("   → 筹码集中度适中")
@@ -397,8 +297,6 @@ def explain_cyq_data(stock_code):
         
         # 交易策略建议
         print(f"\n💡 交易策略参考:")
-        
-        # 支撑阻力分析
         support_level = latest['90成本-低']
         resistance_level = latest['90成本-高']
         avg_cost = latest['平均成本']
@@ -408,9 +306,9 @@ def explain_cyq_data(stock_code):
         print(f"   ⚖️ 成本中枢: {avg_cost:.2f}元 (平均成本)")
         
         # 风险提示
-        if latest['获利比例'] > 0.8 and latest['90集中度'] < 0.15:
+        if profit_ratio > 0.8 and concentration_90 < 0.15:
             print("\n⚠️ 风险提示: 获利盘重且筹码集中，注意高位回调风险")
-        elif latest['获利比例'] < 0.2 and latest['90集中度'] < 0.15:
+        elif profit_ratio < 0.2 and concentration_90 < 0.15:
             print("\n💎 机会提示: 套牢盘重且筹码集中，可能形成强支撑")
         
         return latest
@@ -420,56 +318,45 @@ def explain_cyq_data(stock_code):
         return None
 
 def get_chip_analysis_data(stock_code):
-    """
-    获取股票筹码分析数据
-    
-    Args:
-        stock_code: 股票代码
-        
-    Returns:
-        dict: 包含筹码分布和关键指标的字典
-    """
+    """获取股票筹码分析数据"""
     try:
-        # 获取筹码数据
         cyq_data = ak.stock_cyq_em(stock_code)
         
         if cyq_data is None or cyq_data.empty:
             return {"error": f"无法获取 {stock_code} 的筹码数据"}
         
-        # 获取最新数据
         latest = cyq_data.iloc[-1]
+        profit_ratio = latest['获利比例']
+        concentration_90 = latest['90集中度']
         
-        # 获取历史数据
+        # 获取历史数据（最近30天）
         historical_data = {
-            "dates": cyq_data['日期'].tolist()[-30:],  # 最近30天
-            "profit_ratio": cyq_data['获利比例'].tolist()[-30:],  # 获利比例
-            "avg_cost": cyq_data['平均成本'].tolist()[-30:],  # 平均成本
+            "dates": cyq_data['日期'].tolist()[-30:],
+            "profit_ratio": cyq_data['获利比例'].tolist()[-30:],
+            "avg_cost": cyq_data['平均成本'].tolist()[-30:],
         }
         
-        # 构建筹码数据字典
         chip_data = {
             "latest_date": latest['日期'],
-            "profit_ratio": latest['获利比例'],
+            "profit_ratio": profit_ratio,
             "avg_cost": latest['平均成本'],
             "cost_90_low": latest['90成本-低'],
             "cost_90_high": latest['90成本-高'],
-            "concentration_90": latest['90集中度'],
+            "concentration_90": concentration_90,
             "cost_70_low": latest['70成本-低'],
             "cost_70_high": latest['70成本-高'],
             "concentration_70": latest['70集中度'],
             "historical": historical_data,
-            
-            # 分析结果
-            "support_level": latest['90成本-低'],  # 支撑位
-            "resistance_level": latest['90成本-高'],  # 阻力位
-            "cost_center": latest['平均成本'],  # 成本中枢
+            "support_level": latest['90成本-低'],
+            "resistance_level": latest['90成本-高'],
+            "cost_center": latest['平均成本'],
         }
         
-        # 添加简单的分析指标
+        # 添加分析指标
         chip_data["analysis"] = {
-            "profit_status": "高获利" if latest['获利比例'] > 0.7 else ("低获利" if latest['获利比例'] < 0.3 else "中性获利"),
-            "concentration_status": "高度集中" if latest['90集中度'] < 0.1 else ("分散" if latest['90集中度'] > 0.2 else "适中"),
-            "risk_level": "高" if latest['获利比例'] > 0.8 and latest['90集中度'] < 0.15 else ("低" if latest['获利比例'] < 0.2 and latest['90集中度'] < 0.15 else "中"),
+            "profit_status": "高获利" if profit_ratio > 0.7 else ("低获利" if profit_ratio < 0.3 else "中性获利"),
+            "concentration_status": "高度集中" if concentration_90 < 0.1 else ("分散" if concentration_90 > 0.2 else "适中"),
+            "risk_level": "高" if profit_ratio > 0.8 and concentration_90 < 0.15 else ("低" if profit_ratio < 0.2 and concentration_90 < 0.15 else "中"),
         }
         
         return chip_data
@@ -477,9 +364,6 @@ def get_chip_analysis_data(stock_code):
     except Exception as e:
         print(f"获取筹码数据失败: {str(e)}")
         return {"error": f"该股票暂不支持获取筹码数据"}
-
-from datetime import datetime
-from stockstats import wrap
 
 def _judge_ma_trend(stock_data) -> str:
     """判断移动平均线趋势"""
@@ -495,7 +379,6 @@ def _judge_ma_trend(stock_data) -> str:
             return "空头排列"
         else:
             return "震荡整理"
-            
     except:
         return "无法判断"
 
@@ -512,26 +395,16 @@ def _judge_macd_trend(stock_data) -> str:
             return "死叉向下"
         else:
             return "震荡调整"
-            
     except:
         return "无法判断"
 
 def get_market_info(stock_code):
-    """
-    获取股票市场信息
-    
-    Args:
-        stock_code: 股票代码
-    
-    Returns:
-        dict: 包含市场类型、货币等信息的字典
-    """
-    # 简单判断市场类型
+    """获取股票市场信息"""
     is_china = stock_code.isdigit() and len(stock_code) == 6
     is_hk = '.HK' in stock_code or stock_code.startswith('HK')
     is_us = not is_china and not is_hk
     
-    market_info = {
+    return {
         'is_china': is_china,
         'is_hk': is_hk,
         'is_us': is_us,
@@ -539,48 +412,46 @@ def get_market_info(stock_code):
         'currency_name': '人民币' if is_china else ('港币' if is_hk else '美元'),
         'currency_symbol': '¥' if is_china else ('HK$' if is_hk else '$')
     }
-    
-    return market_info
 
 def get_indicators(df):
-    # 使用stockstats计算技术指标
+    """使用stockstats计算技术指标"""
     stock = wrap(df)
+    stock_len = len(stock)
     
-    # 计算主要技术指标
     indicators = {
         # 移动平均线
-        'ma_5': stock['close_5_sma'].iloc[-1] if len(stock) > 5 else None,
-        'ma_10': stock['close_10_sma'].iloc[-1] if len(stock) > 10 else None,
-        'ma_20': stock['close_20_sma'].iloc[-1] if len(stock) > 20 else None,
-        'ma_60': stock['close_60_sma'].iloc[-1] if len(stock) > 60 else None,
+        'ma_5': stock['close_5_sma'].iloc[-1] if stock_len > 5 else None,
+        'ma_10': stock['close_10_sma'].iloc[-1] if stock_len > 10 else None,
+        'ma_20': stock['close_20_sma'].iloc[-1] if stock_len > 20 else None,
+        'ma_60': stock['close_60_sma'].iloc[-1] if stock_len > 60 else None,
         
         # 指数移动平均
-        'ema_12': stock['close_12_ema'].iloc[-1] if len(stock) > 12 else None,
-        'ema_26': stock['close_26_ema'].iloc[-1] if len(stock) > 26 else None,
+        'ema_12': stock['close_12_ema'].iloc[-1] if stock_len > 12 else None,
+        'ema_26': stock['close_26_ema'].iloc[-1] if stock_len > 26 else None,
         
         # MACD指标
-        'macd': stock['macd'].iloc[-1] if len(stock) > 26 else None,
-        'macd_signal': stock['macds'].iloc[-1] if len(stock) > 26 else None,
-        'macd_histogram': stock['macdh'].iloc[-1] if len(stock) > 26 else None,
+        'macd': stock['macd'].iloc[-1] if stock_len > 26 else None,
+        'macd_signal': stock['macds'].iloc[-1] if stock_len > 26 else None,
+        'macd_histogram': stock['macdh'].iloc[-1] if stock_len > 26 else None,
         
         # KDJ指标
-        'kdj_k': stock['kdjk'].iloc[-1] if len(stock) > 9 else None,
-        'kdj_d': stock['kdjd'].iloc[-1] if len(stock) > 9 else None,
-        'kdj_j': stock['kdjj'].iloc[-1] if len(stock) > 9 else None,
+        'kdj_k': stock['kdjk'].iloc[-1] if stock_len > 9 else None,
+        'kdj_d': stock['kdjd'].iloc[-1] if stock_len > 9 else None,
+        'kdj_j': stock['kdjj'].iloc[-1] if stock_len > 9 else None,
         
         # RSI指标
-        'rsi_14': stock['rsi_14'].iloc[-1] if len(stock) > 14 else None,
+        'rsi_14': stock['rsi_14'].iloc[-1] if stock_len > 14 else None,
         
         # 布林带
-        'boll_upper': stock['boll_ub'].iloc[-1] if len(stock) > 20 else None,
-        'boll_middle': stock['boll'].iloc[-1] if len(stock) > 20 else None,
-        'boll_lower': stock['boll_lb'].iloc[-1] if len(stock) > 20 else None,
+        'boll_upper': stock['boll_ub'].iloc[-1] if stock_len > 20 else None,
+        'boll_middle': stock['boll'].iloc[-1] if stock_len > 20 else None,
+        'boll_lower': stock['boll_lb'].iloc[-1] if stock_len > 20 else None,
         
         # 威廉指标
-        'wr_14': stock['wr_14'].iloc[-1] if len(stock) > 14 else None,
+        'wr_14': stock['wr_14'].iloc[-1] if stock_len > 14 else None,
         
         # CCI指标
-        'cci_14': stock['cci_14'].iloc[-1] if len(stock) > 14 else None,
+        'cci_14': stock['cci_14'].iloc[-1] if stock_len > 14 else None,
         
         # 基础数据
         'latest_close': stock['close'].iloc[-1],
@@ -590,35 +461,38 @@ def get_indicators(df):
         'latest_volume': stock['volume'].iloc[-1],
         'latest_date': df.iloc[-1].get('datetime', datetime.now().strftime('%Y-%m-%d')),
         
-        # 价格变化（如果有前一日数据）
-        'prev_close': stock['close'].iloc[-2] if len(stock) > 1 else None,
-        'change_amount': stock['close'].iloc[-1] - stock['close'].iloc[-2] if len(stock) > 1 else 0,
-        'change_percent': ((stock['close'].iloc[-1] - stock['close'].iloc[-2]) / stock['close'].iloc[-2] * 100) if len(stock) > 1 and stock['close'].iloc[-2] != 0 else 0,
-        
         # 趋势判断
         'ma_trend': _judge_ma_trend(stock),
         'macd_trend': _judge_macd_trend(stock),
     }
+    
+    # 价格变化计算
+    if stock_len > 1:
+        prev_close = stock['close'].iloc[-2]
+        indicators.update({
+            'prev_close': prev_close,
+            'change_amount': stock['close'].iloc[-1] - prev_close,
+            'change_percent': ((stock['close'].iloc[-1] - prev_close) / prev_close * 100) if prev_close != 0 else 0,
+        })
+    else:
+        indicators.update({
+            'prev_close': None,
+            'change_amount': 0,
+            'change_percent': 0,
+        })
+    
     return indicators
-
-
-# =========================
-# 独立的数据获取函数（纯外部API调用）
-# =========================
 
 def fetch_stock_basic_info(stock_code: str) -> Dict:
     """获取股票基本信息的具体实现"""
-    # 导入必要的模块
     from providers.stock_data_fetcher import data_manager
     
     basic_info = {}
     
     try:
-        if not data_manager.is_available():
-            if not data_manager.initialize():
-                raise Exception("数据提供者初始化失败")
+        if not data_manager.is_available() and not data_manager.initialize():
+            raise Exception("数据提供者初始化失败")
                 
-        # 获取实时行情
         realtime_data = data_manager.get_realtime_quote(stock_code)
         stock_info = data_manager.get_stock_info(stock_code)
         
@@ -645,75 +519,53 @@ def fetch_stock_basic_info(stock_code: str) -> Dict:
     basic_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return basic_info
 
-
 def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict:
-    """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）
-    
-    Args:
-        stock_code: 股票代码
-        period: K线周期数
-        include_full_risk: 是否包含完整风险指标（用于图表显示）
-    """
-    # 导入必要的模块
+    """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）"""
     from providers.stock_data_fetcher import data_manager, KLineType
     from providers.risk_metrics import calculate_portfolio_risk_summary
     
     indicators_info = {}
     
     try:
-        # 固定使用日K数据（利用现有的CSV缓存机制）
-        kline_data = data_manager.get_kline_data(
-            stock_code, 
-            KLineType.DAY, 
-            period
-        )
+        kline_data = data_manager.get_kline_data(stock_code, KLineType.DAY, period)
         
-        if kline_data and len(kline_data) > 0:
-            # 转换为DataFrame
-            df = pd.DataFrame([k.__dict__ for k in kline_data])
-            df = df.sort_values('datetime')
+        if not kline_data:
+            indicators_info['error'] = f"未获取到股票 {stock_code} 的K线数据"
+        else:
+            df = pd.DataFrame([k.__dict__ for k in kline_data]).sort_values('datetime')
             
             # 计算移动平均线
-            df['MA5'] = df['close'].rolling(window=5).mean()
-            df['MA10'] = df['close'].rolling(window=10).mean()
-            df['MA20'] = df['close'].rolling(window=20).mean()
+            for period in [5, 10, 20]:
+                df[f'MA{period}'] = df['close'].rolling(window=period).mean()
             
-            # 获取技术指标
             indicators = get_indicators(df)
             
             # 风险指标计算
             risk_metrics = {}
-            
             if len(df) >= 5:
                 try:
                     risk_metrics = calculate_portfolio_risk_summary(df, price_col='close')                            
                 except Exception as e:
                     risk_metrics['error'] = str(e)
-                    #full_risk_metrics['error'] = str(e)
 
-            # 获取最新数据摘要（不包含完整K线数据）
-            latest_data = {}
-            if len(df) > 0:
-                latest_row = df.iloc[-1]
-                latest_data = {
-                    'date': latest_row['datetime'].isoformat() if hasattr(latest_row['datetime'], 'isoformat') else str(latest_row['datetime']),
-                    'open': float(latest_row['open']) if pd.notna(latest_row['open']) else None,
-                    'high': float(latest_row['high']) if pd.notna(latest_row['high']) else None,
-                    'low': float(latest_row['low']) if pd.notna(latest_row['low']) else None,
-                    'close': float(latest_row['close']) if pd.notna(latest_row['close']) else None,
-                    'volume': int(latest_row['volume']) if pd.notna(latest_row['volume']) else None,
-                }
+            # 获取最新数据摘要
+            latest_row = df.iloc[-1]
+            latest_data = {
+                'date': latest_row['datetime'].isoformat() if hasattr(latest_row['datetime'], 'isoformat') else str(latest_row['datetime']),
+                'open': float(latest_row['open']) if pd.notna(latest_row['open']) else None,
+                'high': float(latest_row['high']) if pd.notna(latest_row['high']) else None,
+                'low': float(latest_row['low']) if pd.notna(latest_row['low']) else None,
+                'close': float(latest_row['close']) if pd.notna(latest_row['close']) else None,
+                'volume': int(latest_row['volume']) if pd.notna(latest_row['volume']) else None,
+            }
             
             indicators_info.update({
                 'indicators': indicators,
-                'risk_metrics': risk_metrics,  # 精简风险摘要（用于缓存）
+                'risk_metrics': risk_metrics,
                 'data_length': len(df),
                 'latest_data': latest_data,
-                'has_ma_data': True  # 标记移动平均线已计算
+                'has_ma_data': True
             })
-                
-        else:
-            indicators_info['error'] = f"未获取到股票 {stock_code} 的K线数据"
             
     except Exception as e:
         indicators_info['error'] = str(e)
@@ -721,25 +573,21 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
     indicators_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return indicators_info
 
-
 def fetch_stock_news_data(stock_code: str, day=7) -> Dict:
     """获取股票新闻数据的具体实现"""
-    # 导入必要的模块
     from providers.news_tools import get_stock_news_by_akshare
     
     news_info = {}
     
     try:
-        # 使用news_tools模块获取新闻
         stock_data = get_stock_news_by_akshare(stock_code, day=day)
         
         if stock_data and 'company_news' in stock_data:
             news_data = stock_data['company_news']
-            
             news_info.update({
                 'news_data': news_data,
                 'news_count': len(news_data),
-                'latest_news': news_data[:5] if len(news_data) >= 5 else news_data  # 前5条最新新闻
+                'latest_news': news_data[:5] if len(news_data) >= 5 else news_data
             })
         else:
             news_info['error'] = "未能获取到相关新闻"
@@ -750,54 +598,52 @@ def fetch_stock_news_data(stock_code: str, day=7) -> Dict:
     news_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return news_info
 
-
 def fetch_stock_chip_data(stock_code: str) -> Dict:
     """获取股票筹码数据的具体实现"""
     chip_info = {}
     
     try:
-        # 获取筹码分析数据
         chip_data = get_chip_analysis_data(stock_code)
-        
-        if "error" not in chip_data:
-            chip_info.update(chip_data)
-        else:
-            chip_info['error'] = chip_data["error"]
-            
+        chip_info.update(chip_data if "error" not in chip_data else {'error': chip_data["error"]})
     except Exception as e:
         chip_info['error'] = str(e)
     
     chip_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return chip_info
 
+def _clear_cache_files_and_vars(file_path, code_map, name_map, update_time_var, var_names):
+    """清除缓存文件和全局变量的通用函数"""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"已删除缓存文件: {file_path}")
+        else:
+            print(f"缓存文件不存在: {file_path}")
+        
+        # 清空全局变量
+        globals()[var_names[0]].clear()
+        globals()[var_names[1]].clear()
+        globals()[var_names[2]] = 0
+        
+    except Exception as e:
+        print(f"清除缓存失败: {e}")
+
 def clear_stock_map_cache():
     """清除A股股票代码与名称映射缓存文件"""
-    try:
-        if os.path.exists(_MAP_FILE_PATH):
-            os.remove(_MAP_FILE_PATH)
-            print(f"已删除A股映射缓存文件: {_MAP_FILE_PATH}")
-        else:
-            print("A股映射缓存文件不存在")
-        # 同时清空内存中的映射
-        global _STOCK_CODE_NAME_MAP, _STOCK_NAME_CODE_MAP, _LAST_UPDATE_TIME
-        _STOCK_CODE_NAME_MAP = {}
-        _STOCK_NAME_CODE_MAP = {}
-        _LAST_UPDATE_TIME = 0
-    except Exception as e:
-        print(f"清除A股映射缓存文件失败: {e}")
+    _clear_cache_files_and_vars(
+        _MAP_FILE_PATH, 
+        _STOCK_CODE_NAME_MAP, 
+        _STOCK_NAME_CODE_MAP, 
+        _LAST_UPDATE_TIME,
+        ['_STOCK_CODE_NAME_MAP', '_STOCK_NAME_CODE_MAP', '_LAST_UPDATE_TIME']
+    )
 
 def clear_hk_stock_map_cache():
     """清除港股通股票代码与名称映射缓存文件"""
-    try:
-        if os.path.exists(_HK_MAP_FILE_PATH):
-            os.remove(_HK_MAP_FILE_PATH)
-            print(f"已删除港股通映射缓存文件: {_HK_MAP_FILE_PATH}")
-        else:
-            print("港股通映射缓存文件不存在")
-        # 同时清空内存中的映射
-        global _HK_STOCK_CODE_NAME_MAP, _HK_STOCK_NAME_CODE_MAP, _HK_LAST_UPDATE_TIME
-        _HK_STOCK_CODE_NAME_MAP = {}
-        _HK_STOCK_NAME_CODE_MAP = {}
-        _HK_LAST_UPDATE_TIME = 0
-    except Exception as e:
-        print(f"清除港股通映射缓存文件失败: {e}")
+    _clear_cache_files_and_vars(
+        _HK_MAP_FILE_PATH,
+        _HK_STOCK_CODE_NAME_MAP,
+        _HK_STOCK_NAME_CODE_MAP,
+        _HK_LAST_UPDATE_TIME,
+        ['_HK_STOCK_CODE_NAME_MAP', '_HK_STOCK_NAME_CODE_MAP', '_HK_LAST_UPDATE_TIME']
+    )

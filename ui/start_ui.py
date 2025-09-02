@@ -12,7 +12,6 @@ from pathlib import Path
 def main():
     """启动Streamlit应用"""
     
-    # 获取项目根目录
     project_root = Path(__file__).parent.parent
     ui_file = project_root / "ui" / "app.py"
     
@@ -22,7 +21,6 @@ def main():
     print("⏹️  按 Ctrl+C 停止服务")
     print("-" * 50)
     
-    # 检查streamlit是否已安装
     try:
         import streamlit
         print(f"✅ Streamlit 版本: {streamlit.__version__}")
@@ -31,12 +29,10 @@ def main():
         print("请运行: pip install streamlit")
         return 1
     
-    # 检查应用文件是否存在
     if not ui_file.exists():
         print(f"❌ 错误: 应用文件不存在: {ui_file}")
         return 1
     
-    # 构建streamlit命令
     cmd = [
         sys.executable, "-m", "streamlit", "run",
         str(ui_file),
@@ -46,10 +42,7 @@ def main():
     ]
     
     try:
-        # 切换到项目根目录
-        os.chdir(project_root)
-        
-        # 启动streamlit
+        os.chdir(project_root)        
         subprocess.run(cmd, check=True)
         
     except KeyboardInterrupt:

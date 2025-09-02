@@ -6,7 +6,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from utils.format_utils import format_volume, format_price
+from utils.format_utils import format_price
 
 def display_technical_indicators(tech_data):
     """显示技术指标分析卡片"""

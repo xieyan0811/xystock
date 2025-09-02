@@ -1,5 +1,5 @@
 """
-基于 efinance 的A股数据获取器（集成缓存管理）
+基于 efinance 的A股数据获取器
 """
 
 import time
@@ -12,18 +12,18 @@ import akshare as ak
 @dataclass
 class RealTimeQuote:
     """实时行情数据结构"""
-    symbol: str            # 股票代码
-    name: str              # 股票名称
-    current_price: float   # 当前价格
-    change: float          # 涨跌额
-    change_percent: float  # 涨跌幅(%)
-    volume: int            # 成交量
-    amount: float          # 成交额
-    high: float            # 最高价
-    low: float             # 最低价
-    open: float            # 开盘价
-    prev_close: float      # 昨收价
-    timestamp: str         # 时间戳
+    symbol: str
+    name: str
+    current_price: float
+    change: float
+    change_percent: float
+    volume: int
+    amount: float
+    high: float
+    low: float
+    open: float
+    prev_close: float
+    timestamp: str
 
 
 class DataFetcherError(Exception):
@@ -42,7 +42,7 @@ class InvalidSymbolError(DataFetcherError):
 
 
 class StockDataFetcher:
-    """efinance 数据获取器，专门用于A股数据"""
+    """efinance 数据获取器"""
     
     def __init__(self):
         self.name = "EFinance"
@@ -61,27 +61,18 @@ class StockDataFetcher:
         }
     
     def _get_previous_trading_day(self) -> str:
-        """
-        计算前一个交易日
-        
-        规则：
-        - 如果当前日期是周二至周六（1-5），则为前一天
-        - 如果是周一（0）或周日（6），则为上个周五
-        
-        Returns:
-            str: 前一个交易日，格式为 YYYY-MM-DD
-        """
+        """计算前一个交易日"""
         today = datetime.now()
         weekday = today.weekday()  # 0=Monday, 1=Tuesday, ..., 6=Sunday
         
-        if weekday == 0:  # 周一
-            # 前一个交易日是上周五
+        if weekday == 0:
+            # 周一，前一个交易日是上周五
             prev_trading_day = today - timedelta(days=3)
-        elif weekday == 6:  # 周日
-            # 前一个交易日是上周五
+        elif weekday == 6:
+            # 周日，前一个交易日是上周五
             prev_trading_day = today - timedelta(days=2)
-        else:  # 周二到周六
-            # 前一个交易日是前一天
+        else:
+            # 周二到周六，前一个交易日是前一天
             prev_trading_day = today - timedelta(days=1)
         
         return prev_trading_day.strftime("%Y-%m-%d")
@@ -103,16 +94,7 @@ class StockDataFetcher:
             return False
     
     def get_realtime_quote(self, symbol: str, max_retry: int = 3) -> Optional[RealTimeQuote]:
-        """
-        获取A股实时行情数据
-        
-        Args:
-            symbol: 股票范围（如：沪深A股，可转债，期货……）
-            max_retry: 最大重试次数
-            
-        Returns:
-            RealTimeQuote: 实时行情数据
-        """
+        """获取A股实时行情数据"""
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
         
@@ -120,24 +102,20 @@ class StockDataFetcher:
         
         for attempt in range(1, max_retry + 1):
             try:
-                # 获取实时行情
                 quotes_df = self._ef.stock.get_latest_quote(formatted_symbol)
                 
                 if quotes_df is not None and not quotes_df.empty:
-                    # 处理DataFrame数据
+                    # 处理DataFrame/Series数据格式差异
                     if hasattr(quotes_df, "to_dict"):
                         if hasattr(quotes_df, "shape") and len(quotes_df.shape) > 1:
-                            # DataFrame
                             records = quotes_df.to_dict(orient="records")
                             if records:
                                 data = records[0]
                             else:
                                 continue
                         else:
-                            # Series
                             data = quotes_df.to_dict()
                         
-                        # 转换为标准格式
                         return self._convert_to_realtime_quote(data, symbol)
                 
                 print(f"第{attempt}次尝试获取{symbol}数据为空")
@@ -157,17 +135,7 @@ class StockDataFetcher:
                       symbol: str, 
                       kline_type: KLineType = KLineType.DAY, 
                       count: int = 30) -> List[KLineData]:
-        """
-        获取K线数据（支持缓存）
-        
-        Args:
-            symbol: 股票代码（如:600519, AAPL, 微软，ETF Code）
-            kline_type: K线类型
-            count: 获取条数
-            
-        Returns:
-            List[KLineData]: K线数据列表
-        """
+        """获取K线数据（支持缓存）"""
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
         
@@ -176,7 +144,6 @@ class StockDataFetcher:
         
         symbol = symbol.upper().strip()
         
-        # 检查缓存数据
         cached_data = cache_manager.get_cached_kline(symbol, kline_type, count)
         if cached_data:
             # 检查是否包含前一个交易日的数据
@@ -196,11 +163,9 @@ class StockDataFetcher:
             formatted_symbol = self.format_symbol(symbol)
             klt = self._kline_type_mapping[kline_type]
             
-            # 获取K线数据
             kline_df = self._ef.stock.get_quote_history(formatted_symbol, klt=klt)
 
             if kline_df is not None and not kline_df.empty:
-                # 转换为标准格式
                 kline_list = []
                 if hasattr(kline_df, "to_dict"):
                     records = kline_df.to_dict(orient="records")
@@ -241,7 +206,6 @@ class StockDataFetcher:
                     if len(filtered_kline_list) > count:
                         filtered_kline_list = filtered_kline_list[-count:]
                     
-                    # 缓存数据
                     cache_manager.cache_kline(symbol, kline_type, count, filtered_kline_list)
                     print(log_message)
                     
@@ -258,27 +222,16 @@ class StockDataFetcher:
             return []
     
     def get_stock_info(self, symbol: str, detail = True):
-        """
-        获取股票基本信息
-        
-        Args:
-            symbol: 股票代码或名称（如：'600519', '贵州茅台', '上证指数'）
-            
-        Returns:
-            Dict: 股票基本信息
-        """
+        """获取股票基本信息"""
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
         
         try:
-            # 获取股票基本信息
             info = self._ef.stock.get_base_info(symbol)
             
             if info is not None and hasattr(info, 'to_dict'):
-                # 将Series转换为字典
                 data = info.to_dict()
                 
-                # 转换为标准格式
                 if detail:
                     ret2 = self.get_more_stock_info(symbol, ['资产负债率'])
                 data.update(ret2)
@@ -297,7 +250,6 @@ class StockDataFetcher:
             ret = ak.stock_financial_abstract(symbol=symbol)
             for idx,item in ret.iterrows():
                 if key_list is None or item['指标'] in key_list:
-                    #print(item.iloc[1], item.iloc[2])
                     ret_dic[item.iloc[1]] = item.iloc[2]
         except Exception as e:
             print(f"获取更多股票信息失败: {e}")
@@ -341,33 +293,15 @@ class StockDataFetcher:
             return None
     
     def format_symbol(self, symbol: str) -> str:
-        """
-        格式化股票代码为数据源要求的格式
-        
-        Args:
-            symbol: 原始股票代码
-            
-        Returns:
-            str: 格式化后的股票代码
-        """
+        """格式化股票代码为数据源要求的格式"""
         return symbol
     
     def is_available(self) -> bool:
-        """
-        检查数据源是否可用
-        
-        Returns:
-            bool: 是否可用
-        """
+        """检查数据源是否可用"""
         return self._is_initialized
     
     def clear_cache(self, symbol: Optional[str] = None):
-        """
-        清理K线数据缓存
-        
-        Args:
-            symbol: 指定股票代码，不指定则清理所有缓存
-        """
+        """清理K线数据缓存"""
         cache_manager.clear_cache(symbol)
     
     def get_cache_stats(self) -> Dict[str, any]:
@@ -443,7 +377,6 @@ class StockDataFetcher:
 
 # 全局数据获取器实例
 data_manager = StockDataFetcher()
-# 自动初始化
 if data_manager.initialize():
     print(f"✅ {data_manager.name} 初始化成功")
 else:
