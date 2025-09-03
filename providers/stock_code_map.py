@@ -176,31 +176,11 @@ def get_stock_code(stock_name_or_code, market_type='A股'):
         return None
     
     _load_stock_map()
-
-    """
-    # 处理ETF类型
-    if market_type == 'ETF':
-        return (stock_name_or_code if stock_name_or_code in _INDEX_CODE_NAME_MAP 
-                else _INDEX_NAME_CODE_MAP.get(stock_name_or_code) 
-                or _find_fuzzy_match(stock_name_or_code, _INDEX_NAME_CODE_MAP)
-                or stock_name_or_code)
-    
-    # 处理港股通类型
-    elif market_type == '港股':
-        _load_hk_stock_map()
-        return (stock_name_or_code if stock_name_or_code in _HK_STOCK_CODE_NAME_MAP 
-                else _HK_STOCK_NAME_CODE_MAP.get(stock_name_or_code)
-                or _find_fuzzy_match(stock_name_or_code, _HK_STOCK_NAME_CODE_MAP)
-                or stock_name_or_code)
-    """
-    # 默认查找所有类型
     _load_hk_stock_map()
     
-    # 直接查找代码映射
     if stock_name_or_code in _STOCK_CODE_NAME_MAP or stock_name_or_code in _HK_STOCK_CODE_NAME_MAP:
         return stock_name_or_code
     
-    # 查找名称映射
     return (_STOCK_NAME_CODE_MAP.get(stock_name_or_code) 
             or _HK_STOCK_NAME_CODE_MAP.get(stock_name_or_code)
             or _find_fuzzy_match(stock_name_or_code, _STOCK_NAME_CODE_MAP)
@@ -222,30 +202,11 @@ def get_stock_name(stock_name_or_code, market_type='A股'):
         return None
     
     _load_stock_map()
-    """
-    # 处理指数类型
-    if market_type == 'ETF':
-        return (stock_name_or_code if stock_name_or_code in _INDEX_NAME_CODE_MAP 
-                else _INDEX_CODE_NAME_MAP.get(stock_name_or_code)
-                or _find_fuzzy_match(stock_name_or_code, _INDEX_CODE_NAME_MAP)
-                or stock_name_or_code)
-    
-    # 处理港股通类型
-    elif market_type == '港股':
-        _load_hk_stock_map()
-        return (stock_name_or_code if stock_name_or_code in _HK_STOCK_NAME_CODE_MAP
-                else _HK_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
-                or _find_fuzzy_match(stock_name_or_code, _HK_STOCK_CODE_NAME_MAP)
-                or stock_name_or_code)
-    """
-    # 默认查找所有类型
     _load_hk_stock_map()
     
-    # 直接查找名称映射
     if stock_name_or_code in _STOCK_NAME_CODE_MAP or stock_name_or_code in _HK_STOCK_NAME_CODE_MAP:
         return stock_name_or_code
     
-    # 查找代码映射
     return (_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
             or _HK_STOCK_CODE_NAME_MAP.get(stock_name_or_code)
             or stock_name_or_code)

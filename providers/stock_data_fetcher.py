@@ -242,8 +242,6 @@ class StockDataFetcher:
             
         except Exception as e:
             print(f"获取股票基本信息失败: {e}")
-            import traceback
-            traceback.print_exc()
             return None
 
     def get_more_stock_info(self, symbol, key_list = None):
