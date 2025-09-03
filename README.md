@@ -27,13 +27,28 @@
 
 ## 安装和使用
 
+拉取最新代码
+
+```bash
+git clone https://github.com/xieyan0811/xystock.git
+cd xystock
+```
+
+### 方式一：直接使用 Docker Hub 镜像（推荐）
+
+直接拉取预构建的镜像：
+
+```bash
+docker pull xieyan800811/xystock:latest
+```
+
+### 方式二：本地构建 Docker 镜像
+
 克隆仓库并构建Docker镜像
 
-   ```bash
-   git clone git@github.com:xieyan0811/xystock.git
-   cd xystock
-   docker build . -t xystock:latest
-   ```
+```bash
+docker build . -t xieyan800811/xystock:latest
+```
 
 启动Docker Compose容器
 
@@ -122,4 +137,14 @@
 
 
 *如果你觉得项目对你有帮助或能解决你的实际问题，请帮我点亮小星星～*
+
+## 更新日志
+
+查看详细的版本更新历史和功能变化，请参考 [CHANGELOG.md](./CHANGELOG.md)。
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](./LICENSE) 文件。
+
+MIT 许可证允许您自由地使用、修改、分发本软件，包括商业用途，只需保留原始的版权声明和许可证声明。
 

@@ -4,7 +4,7 @@ services:
   # XY Stock Web 应用服务
   xystock-web:
     build: .
-    image: xystock:latest
+    image: xieyan800811/xystock:latest
     container_name: xystock-web
     ports:
       - "8811:8811"

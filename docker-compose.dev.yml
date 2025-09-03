@@ -6,7 +6,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile  # 使用相同的 Dockerfile
-    image: xystock:latest
+    image: xieyan800811/xystock:latest
     container_name: xystock-web
     ports:
       - "8811:8811"
