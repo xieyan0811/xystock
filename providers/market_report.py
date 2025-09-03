@@ -40,12 +40,14 @@ def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_
             report_data['technical_indicators'] = {'error': str(e)}
         
         # 收集市场情绪数据
+        """
         try:
             sentiment_data = market_tools.get_market_sentiment(use_cache=True)
             if 'error' not in sentiment_data and sentiment_data:
                 report_data['sentiment_data'] = sentiment_data
         except Exception as e:
             report_data['sentiment_data'] = {'error': str(e)}
+        """
         
         # 收集估值数据
         try:
@@ -222,6 +224,7 @@ def generate_markdown_market_report(index_name, report_data):
             md_content += f"## RSI水平分析\n\n当前RSI值为 **{rsi_14:.2f}**，处于 **{rsi_level}** 状态。\n\n"
     
     # 市场情绪部分
+
     sentiment_data = report_data.get('sentiment_data', {})
     if 'error' not in sentiment_data and sentiment_data:
         md_content += """---
@@ -263,7 +266,7 @@ def generate_markdown_market_report(index_name, report_data):
     valuation_data = report_data.get('valuation_data', {})
     if 'error' not in valuation_data and valuation_data:
         md_content += """---
-
+'''
 # 💰 估值水平分析
 
 """
@@ -298,7 +301,6 @@ def generate_markdown_market_report(index_name, report_data):
             ('M2同比增长', f"{money_flow_data.get('m2_growth', 0):.2f}%"),
             ('社会融资规模', f"{money_flow_data.get('social_financing', 0) / 10000:.2f}万亿元"),
             ('新增人民币贷款', f"{money_flow_data.get('new_loans', 0) / 10000:.2f}万亿元"),
-            ('央行逆回购', f"{money_flow_data.get('reverse_repo', 0):.0f}亿元"),
             ('北向资金净流入', f"{money_flow_data.get('northbound_flow', 0):.2f}亿元")
         ]
         
@@ -321,7 +323,7 @@ def generate_markdown_market_report(index_name, report_data):
             ('融资余额', f"{margin_data.get('margin_buy_balance', 0) / 100000000:.2f}亿元"),
             ('融券余额', f"{margin_data.get('margin_sell_balance', 0) / 100000000:.2f}亿元"),
             ('融资融券总额', f"{margin_data.get('margin_balance', 0) / 100000000:.2f}亿元"),
-            ('较前日变化', f"{margin_data.get('change_ratio', 0):.2f}%"),
+            ('周变化率', f"{margin_data.get('change_ratio', 0):.2f}%"),
             ('融资买入额', f"{margin_data.get('margin_buy_amount', 0) / 100000000:.2f}亿元"),
             ('融资偿还额', f"{margin_data.get('margin_repay_amount', 0) / 100000000:.2f}亿元")
         ]

@@ -16,11 +16,22 @@ from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
 from ui.components.page_market_overview import display_market_overview
 from ui.components.page_cache_management import main as display_cache_management
-from providers.stock_utils import normalize_stock_input
+from providers.stock_code_map import get_stock_identity
+
+def set_requests_timeout(timeout=30):
+    """全局设置 requests 默认超时时间（monkey patch）"""
+    import requests.sessions
+    old_request = requests.sessions.Session.request
+    def new_request(self, *args, **kwargs):
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = timeout
+        return old_request(self, *args, **kwargs)
+    requests.sessions.Session.request = new_request
 
 def main():
     """主应用程序"""
     
+    set_requests_timeout(30)
     st.set_page_config(
         page_title="XY Stock 股票分析系统",
         page_icon="📈",
@@ -164,13 +175,16 @@ def display_analysis_page():
         with result_container:
             with st.spinner("正在查询数据..."):
                 try:
-                    normalized_stock_code, name = normalize_stock_input(current_stock_code)
-                    display_stock_info(normalized_stock_code, current_market_type)
-                    with st.expander("📊 详细信息", expanded=False):
-                        st.write(f"**查询时间:** {query_time}")
-                        st.write(f"**市场类型:** {current_market_type}")
-                        st.write(f"**股票代码:** {normalized_stock_code}")
-                        st.write(f"**股票名称:** {name}")
+                    stock_identity = get_stock_identity(current_stock_code, current_market_type)
+                    if stock_identity is None or stock_identity.get('error'):
+                        st.error(f"获取股票代码失败")
+                    else:
+                        display_stock_info(stock_identity)
+                        with st.expander("📊 详细信息", expanded=False):
+                            st.write(f"**查询时间:** {query_time}")
+                            st.write(f"**市场类型:** {current_market_type}")
+                            st.write(f"**股票代码:** {stock_identity['code']}")
+                            st.write(f"**股票名称:** {stock_identity['name']}")
                         
                 except Exception as e:
                     st.error(f"查询失败: {str(e)}")

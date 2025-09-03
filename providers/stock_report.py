@@ -2,6 +2,7 @@ import sys
 import os
 import datetime
 import pandas as pd
+from typing import Dict, Any
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -9,24 +10,22 @@ if project_root not in sys.path:
 
 from providers.stock_data_tools import get_stock_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.stock_utils import get_stock_name
 from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file
 
 
-def generate_stock_report(stock_code, market_type, format_type="pdf",
-                                 has_fundamental_ai=False, has_market_ai=False, 
-                                 has_news_ai=False, has_chip_ai=False, 
-                                 has_comprehensive_ai=False):
+def generate_stock_report(stock_identity: Dict[str, Any], 
+                          format_type="pdf",
+                          has_fundamental_ai=False, has_market_ai=False,
+                          has_news_ai=False, has_chip_ai=False,
+                          has_comprehensive_ai=False):
     """生成完整的股票分析报告（安全版本，完全独立于Streamlit）"""
     try:
         stock_tools = get_stock_tools()
-        stock_name = get_stock_name(stock_code, 'index' if market_type == "指数" else 'stock')
-        
         report_data = {}
         
         # 收集基本信息
         try:
-            basic_info = stock_tools.get_stock_basic_info(stock_code, use_cache=True, include_ai_analysis=has_fundamental_ai)
+            basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True, include_ai_analysis=has_fundamental_ai)
             if 'error' not in basic_info and basic_info:
                 report_data['basic_info'] = basic_info
         except Exception as e:
@@ -34,7 +33,7 @@ def generate_stock_report(stock_code, market_type, format_type="pdf",
         
         # 收集行情数据
         try:
-            kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=True, include_ai_analysis=has_market_ai)
+            kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=True, include_ai_analysis=has_market_ai)
             if 'error' not in kline_info and kline_info:
                 report_data['market_data'] = kline_info
         except Exception as e:
@@ -42,16 +41,16 @@ def generate_stock_report(stock_code, market_type, format_type="pdf",
         
         # 收集新闻数据
         try:
-            news_info = stock_tools.get_stock_news_data(stock_code, use_cache=True, include_ai_analysis=has_news_ai)
+            news_info = stock_tools.get_stock_news_data(stock_identity, use_cache=True, include_ai_analysis=has_news_ai)
             if 'error' not in news_info and news_info:
                 report_data['news_data'] = news_info
         except Exception as e:
             report_data['news_data'] = {'error': str(e)}
         
         # 收集筹码数据（仅A股和基金）
-        if market_type not in ["港股", "指数"]:
+        if stock_identity.get('market_name', "") != '港股':
             try:
-                chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=True, include_ai_analysis=has_chip_ai)
+                chip_data = stock_tools.get_stock_chip_data(stock_identity, use_cache=True, include_ai_analysis=has_chip_ai)
                 if 'error' not in chip_data and chip_data:
                     report_data['chip_data'] = chip_data
             except Exception as e:
@@ -60,7 +59,7 @@ def generate_stock_report(stock_code, market_type, format_type="pdf",
         # 收集综合分析
         if has_comprehensive_ai:
             try:
-                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_code, use_cache=True)
+                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_identity, use_cache=True)
                 if 'error' not in comprehensive_analysis:
                     report_data['comprehensive_analysis'] = comprehensive_analysis
             except Exception as e:
@@ -91,7 +90,7 @@ def generate_stock_report(stock_code, market_type, format_type="pdf",
         
         report_data['ai_reports'] = final_ai_reports
         
-        md_content = generate_markdown_report(stock_code, stock_name, market_type, report_data)
+        md_content = generate_markdown_report(stock_identity, report_data)
         
         if format_type == "pdf":
             return generate_pdf_report(md_content)
@@ -114,9 +113,12 @@ def generate_stock_report(stock_code, market_type, format_type="pdf",
             return f"# 错误\n\n{error_msg}"
 
 
-def generate_markdown_report(stock_code, stock_name, market_type, report_data):
+def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[str, Any]) -> str:
     """生成Markdown格式报告"""
-    
+    stock_code = stock_identity['code']
+    stock_name = stock_identity['name']
+    market_type = stock_identity['market_name']
+
     md_content = f"""# {stock_name}({stock_code}) 完整分析报告
 
 **市场类型**: {market_type}  

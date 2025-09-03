@@ -11,7 +11,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from providers.stock_report import generate_stock_report
-
+from providers.stock_code_map import get_stock_identity
 
 def test_stock_report(stock_code="600519", stock_name="贵州茅台", market_type="A股", 
                      format_type="markdown", use_ai=False):
@@ -27,10 +27,18 @@ def test_stock_report(stock_code="600519", stock_name="贵州茅台", market_typ
         has_news_ai = use_ai
         has_chip_ai = use_ai and market_type not in ["港股", "指数"]  # 港股和指数不支持筹码分析
         has_comprehensive_ai = use_ai
-        
+
+        if stock_code and len(stock_code) > 6 and stock_code.isdigit():
+            stock_identity = get_stock_identity(stock_code, market_type)
+        else:
+            stock_identity = get_stock_identity(stock_name, market_type)
+
+        if not stock_identity or 'error' in stock_identity:
+            print(f"❌ 获取股票代码失败")
+            return
+
         report = generate_stock_report(
-            stock_code=stock_code,
-            market_type=market_type,
+            stock_identity=stock_identity,
             format_type=format_type,
             has_fundamental_ai=has_fundamental_ai,
             has_market_ai=has_market_ai,
@@ -46,7 +54,7 @@ def test_stock_report(stock_code="600519", stock_name="贵州茅台", market_typ
             ext = format_type
         
         ai_suffix = "_ai" if use_ai else ""
-        filename = f"test_stock_report_{stock_name}_{stock_code}{ai_suffix}.{ext}"
+        filename = f"stock_report_{stock_name}_{stock_code}{ai_suffix}.{ext}"
         path = os.path.join(project_root, "reports", filename)
         
         # 保存报告

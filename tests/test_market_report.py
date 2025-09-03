@@ -24,7 +24,7 @@ def test_market_ai_report():
             user_opinion="当前市场处于调整期，建议关注政策面变化"
         )
         
-        path = os.path.join(project_root, "reports", "test_market_ai_report.md")
+        path = os.path.join(project_root, "reports", "market_ai_report.md")
         with open(path, "wb") as f:
             f.write(report)
             

@@ -16,7 +16,6 @@ if project_root not in sys.path:
 
 from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.stock_utils import normalize_stock_input
 from providers.stock_data_tools import get_stock_tools
 from providers.stock_report import generate_stock_report
 from providers.report_utils import PDF_SUPPORT_AVAILABLE
@@ -44,34 +43,32 @@ def get_ai_analysis_status_and_reports(stock_code):
     return has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai
 
 
-def display_stock_info(stock_code, market_type):
+def display_stock_info(stock_identity):
     """显示证券信息"""
+    stock_code = stock_identity['code']
     if not stock_code:
         st.warning("请输入证券代码或名称")
         return
-    
-    security_type = 'index' if market_type == "指数" else 'stock'
-    stock_code,stock_name = normalize_stock_input(stock_code, security_type)
 
-    with st.spinner(f"正在加载{market_type} {stock_code} ({stock_name})的数据..."):
+    with st.spinner(f"正在加载{stock_identity['market_name']} {stock_code} ({stock_identity['name']})的数据..."):
         try:
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 基本信息", "📈 行情走势", "📰 新闻资讯", "🧮 筹码分析", "🎯 综合分析"])
             
             with tab1:
-                display_basic_info(stock_code)
+                display_basic_info(stock_identity)
                 
             with tab2:
-                display_market_trend(stock_code)
+                display_market_trend(stock_identity)
                                 
             with tab3:
-                display_news(stock_code)
-                
+                display_news(stock_identity)
+
             with tab4:
-                display_chips_analysis(stock_code)
-            
+                display_chips_analysis(stock_identity)
+
             with tab5:
-                display_comprehensive_analysis(stock_code)
-                    
+                display_comprehensive_analysis(stock_identity)
+
             st.divider()
             st.subheader("📋 导出完整报告")
             
@@ -129,7 +126,7 @@ def display_stock_info(stock_code, market_type):
                         has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                         
                         report_content = generate_stock_report(
-                            stock_code, market_type, generating_format,
+                            stock_identity, generating_format,
                             has_fundamental_ai=has_fundamental_ai,
                             has_market_ai=has_market_ai,
                             has_news_ai=has_news_ai,
@@ -186,15 +183,16 @@ def display_stock_info(stock_code, market_type):
                 st.code(str(e), language="text")
 
 
-def display_basic_info(stock_code):
+def display_basic_info(stock_identity):
     """显示股票基本信息"""
     st.subheader("基本信息")
-    
+
+    stock_code = stock_identity['code']
     try:
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
         
-        basic_info_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh)
+        basic_info_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
         
         if 'error' in basic_info_data:
             st.error(f"获取股票基本信息失败: {basic_info_data['error']}")
@@ -228,8 +226,10 @@ def display_basic_info(stock_code):
                 st.write(f"**开盘价:** {format_price(basic_info_data.get('open', 0))}")
                 st.write(f"**最高价:** {format_price(basic_info_data.get('high', 0))}")
                 st.write(f"**最低价:** {format_price(basic_info_data.get('low', 0))}")
-                st.write(f"**昨收价:** {format_price(basic_info_data.get('prev_close', 0))}")
-                
+                prev_close = basic_info_data.get('prev_close', 0)
+                if prev_close > 0:
+                    st.write(f"**昨收价:** {format_price(prev_close)}")
+
                 if basic_info_data.get('pe_ratio'):
                     st.write(f"**市盈率(动):** {basic_info_data['pe_ratio']}")
                 
@@ -268,9 +268,9 @@ def display_basic_info(stock_code):
             
             if include_ai_analysis:
                 with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                    fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
             else:
-                fundamental_data = stock_tools.get_stock_basic_info(stock_code, use_cache=use_cache, force_refresh=force_refresh)
+                fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
             
             if "ai_fundamental_report" not in st.session_state:
                 st.session_state.ai_fundamental_report = {}
@@ -297,10 +297,10 @@ def display_basic_info(stock_code):
         st.error(f"获取基本信息失败: {str(e)}")
 
 
-def display_market_trend(stock_code):
+def display_market_trend(stock_identity):
     """显示股票行情走势"""
     st.subheader("行情走势")
-    
+    stock_code = stock_identity['code']
     try:
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
@@ -310,9 +310,9 @@ def display_market_trend(stock_code):
         
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
-                kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            kline_info = stock_tools.get_stock_kline_data(stock_code, period=160, use_cache=use_cache, force_refresh=force_refresh)
+            kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh)
         
         if 'error' in kline_info:
             st.error(f"获取K线数据失败: {kline_info['error']}")
@@ -437,9 +437,10 @@ def display_market_trend(stock_code):
         st.error(f"加载行情数据失败: {str(e)}")
 
 
-def display_news(stock_code):
+def display_news(stock_identity):
     """显示股票相关新闻"""
     st.subheader("新闻资讯")
+    stock_code = stock_identity['code']
     
     try:
         use_cache = st.session_state.get('use_cache', True)
@@ -450,10 +451,10 @@ def display_news(stock_code):
         
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析相关新闻，请稍候..."):
-                news_info = stock_tools.get_stock_news_data(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                news_info = stock_tools.get_stock_news_data(stock_identity=stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            news_info = stock_tools.get_stock_news_data(stock_code, use_cache=use_cache, force_refresh=force_refresh)
-        
+            news_info = stock_tools.get_stock_news_data(stock_identity=stock_identity, use_cache=use_cache, force_refresh=force_refresh)
+
         if 'error' in news_info:
             st.info(f"获取新闻数据失败: {news_info['error']}")
             return
@@ -502,10 +503,11 @@ def display_news(stock_code):
         st.error(f"加载新闻数据失败: {str(e)}")
 
 
-def display_chips_analysis(stock_code):
+def display_chips_analysis(stock_identity):
     """显示筹码分析"""
     st.subheader("筹码分析")
-    
+    stock_code = stock_identity['code']
+
     try:
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
@@ -515,9 +517,9 @@ def display_chips_analysis(stock_code):
         
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析筹码分布，请稍候..."):
-                chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                chip_data = stock_tools.get_stock_chip_data(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
         else:
-            chip_data = stock_tools.get_stock_chip_data(stock_code, use_cache=use_cache, force_refresh=force_refresh)
+            chip_data = stock_tools.get_stock_chip_data(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
         
         if "ai_chip_report" not in st.session_state:
             st.session_state.ai_chip_report = {}
@@ -585,9 +587,12 @@ def display_chips_analysis(stock_code):
                 st.metric("成本中枢", f"{format_price(chip_data['cost_center'])}元")
         
         try:
-            cyq_data = ak.stock_cyq_em(stock_code)
-            
-            if not cyq_data.empty:
+            if 'raw_data' in chip_data and chip_data['raw_data']:
+                if isinstance(chip_data['raw_data'], list):
+                    cyq_data = pd.DataFrame(chip_data['raw_data'])
+                else:
+                    cyq_data = chip_data['raw_data']
+                
                 st.subheader("获利比例变化趋势")
                 fig_profit = go.Figure()
                 cyq_data['日期'] = pd.to_datetime(cyq_data['日期'])
@@ -629,6 +634,8 @@ def display_chips_analysis(stock_code):
                 )
                 
                 st.plotly_chart(fig_cost, use_container_width=True, config={"scrollZoom": False})
+            else:
+                st.info("未获取到筹码历史数据，无法绘制趋势图表")
         except Exception as e:
             st.error(f"绘制筹码图表失败: {str(e)}")
     
@@ -636,17 +643,18 @@ def display_chips_analysis(stock_code):
         st.error(f"加载筹码分析数据失败: {str(e)}")
 
 
-def display_comprehensive_analysis(stock_code):
+def display_comprehensive_analysis(stock_identity):
     """显示综合分析"""
     
     st.subheader("🎯 综合分析")
-    
+    stock_code = stock_identity['code']
+
     try:
         if (st.session_state.get('include_ai_analysis', False) and 
             stock_code not in st.session_state.get('ai_comprehensive_report', {})):
             use_cache = st.session_state.get('use_cache', True)
             force_refresh = not use_cache
-            run_comprehensive_analysis(stock_code, force_refresh=force_refresh)
+            run_comprehensive_analysis(stock_identity, force_refresh=force_refresh)
         
         # 显示已有的综合分析结果
         if "ai_comprehensive_report" in st.session_state and stock_code in st.session_state.ai_comprehensive_report:
@@ -681,14 +689,14 @@ def display_comprehensive_analysis(stock_code):
         with st.expander("🔍 错误详情", expanded=False):
             st.code(str(e), language="text")
 
-def run_comprehensive_analysis(stock_code, force_refresh):
+def run_comprehensive_analysis(stock_identity, force_refresh):
     with st.spinner("🤖 AI正在进行综合分析..."):    
         try:
             use_cache = st.session_state.get('use_cache', True)
             user_opinion = st.session_state.get('user_opinion', '')
             user_position = st.session_state.get('user_position', '不确定')
 
-            analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_code, user_opinion, user_position, use_cache=use_cache, force_refresh=force_refresh)
+            analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_identity, user_opinion, user_position, use_cache=use_cache, force_refresh=force_refresh)
             
             if 'error' in analysis_data:
                 st.error(f"获取综合分析失败: {analysis_data['error']}")
@@ -696,7 +704,7 @@ def run_comprehensive_analysis(stock_code, force_refresh):
             
             if "ai_comprehensive_report" not in st.session_state:
                 st.session_state.ai_comprehensive_report = {}
-            st.session_state.ai_comprehensive_report[stock_code] = analysis_data
+            st.session_state.ai_comprehensive_report[stock_identity['code']] = analysis_data
             return True
         except Exception as e:
             st.error(f"AI综合分析失败: {str(e)}")

@@ -80,7 +80,7 @@ def main():
                     from providers.kline_cache import cache_manager
                     cache_manager.clear_cache()
 
-                    from providers.stock_utils import clear_stock_map_cache, clear_hk_stock_map_cache
+                    from providers.stock_code_map import clear_stock_map_cache, clear_hk_stock_map_cache
                     clear_stock_map_cache()
                     clear_hk_stock_map_cache()
 

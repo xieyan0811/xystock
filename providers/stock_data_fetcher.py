@@ -221,7 +221,7 @@ class StockDataFetcher:
                 return cached_data
             return []
     
-    def get_stock_info(self, symbol: str, detail = True):
+    def fetch_stock_info(self, symbol: str, detail = True):
         """获取股票基本信息"""
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
@@ -242,6 +242,8 @@ class StockDataFetcher:
             
         except Exception as e:
             print(f"获取股票基本信息失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def get_more_stock_info(self, symbol, key_list = None):
