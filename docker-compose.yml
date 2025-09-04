@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # XY Stock Web 应用服务
   xystock-web:
-    build: .
+    #build: .
     image: xieyan800811/xystock:latest
     container_name: xystock-web
     ports:
@@ -35,10 +35,3 @@ services:
 networks:
   xystock-network:
     driver: bridge
-
-volumes:
-  # 数据持久化卷
-  xystock-data:
-    driver: local
-  xystock-logs:
-    driver: local
