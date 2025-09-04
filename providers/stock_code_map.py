@@ -44,7 +44,7 @@ def get_stock_identity(stock_code, market_type='A股'):
 
     market_name = market_type
     currency_name = '人民币' if market_type in ['A股', 'ETF'] else '港币'
-    currency_symbol = '¥' if market_type in ['A股', 'ETF'] else 'HK$'
+    currency_symbol = '元' if market_type in ['A股', 'ETF'] else 'HK$'
     return {
         'code': stock_code,
         'name': stock_name,

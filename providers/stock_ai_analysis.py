@@ -9,27 +9,31 @@ import datetime
 import sys
 import os
 
-# 添加项目根目录到Python路径
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_dir not in sys.path:
     sys.path.append(project_dir)
 
-from utils.format_utils import format_large_number, format_market_value, format_price, format_percentage
-from utils.string_utils import remove_markdown_format, format_indicators_dict
+from utils.string_utils import remove_markdown_format
+from providers.data_formatters import get_stock_formatter
+
+def get_stock_info(stock_identity):
+    from providers.stock_data_tools import get_stock_tools
+    stock_tools = get_stock_tools()
+    return stock_tools.get_basic_info(stock_identity, use_cache=True)
 
 def generate_stock_analysis_report(
     stock_identity: Dict[str, Any],
-    indicators: Dict[str, Any] = None,
-    risk_metrics: Dict[str, Any] = None
+    kline_info: Dict[str, Any] = None,
 ) -> str:
     """生成股票技术分析报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
 
     client = OpenAIClient()
-    basic_info_section, _ = get_stock_info(stock_identity)
-    indicators_text = format_indicators_dict(indicators, "技术指标")
-    risk_text = format_indicators_dict(risk_metrics, "风险指标")
+    
+    formatter = get_stock_formatter()
+    basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
+    kline_text = formatter.format_kline_data(kline_info)
 
     # 构建分析提示
     system_message = f"""你是一位专业的股票技术分析师。你必须对{stock_name}（股票代码：{stock_code}）进行详细的技术分析。
@@ -62,9 +66,7 @@ def generate_stock_analysis_report(
 
 {basic_info_section}
 
-2. {indicators_text}
-
-3. {risk_text}
+{kline_text}
 
 请进行详细分析，包括价格趋势、技术指标、支撑阻力位和投资建议。报告应不多于500字，必须基于数据做出专业的分析。请关注当前股价表现的影响。"""
         }
@@ -94,23 +96,10 @@ def generate_news_analysis_report(
     stock_name = stock_identity.get('name', '')
 
     client = OpenAIClient()
-    basic_info_section, _ = get_stock_info(stock_identity)
-    news_text = ""
-    if news_data and len(news_data) > 0:
-        for idx, news in enumerate(news_data):
-            title = news.get('新闻标题', '')
-            time = news.get('发布时间', '')
-            content = news.get('新闻内容', '')
-            url = news.get('新闻链接', '')
-            news_text += f"新闻 {idx+1}：\n"
-            news_text += f"标题: {title}\n"
-            news_text += f"时间: {time}\n"
-            if content:
-                summary = content[:200] + ('...' if len(content) > 200 else '')
-                news_text += f"内容摘要: {summary}\n"
-            news_text += f"链接: {url}\n\n"
-    else:
-        news_text = f"未找到关于{stock_name}({stock_code})的新闻数据。"
+    
+    formatter = get_stock_formatter()
+    basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
+    news_text = formatter.format_news_data(news_data, has_content=True)
     
     # 构建分析提示
     system_message = f"""您是一位专业的财经新闻分析师，负责分析最新的市场新闻和事件对股票价格的潜在影响。
@@ -160,6 +149,7 @@ def generate_news_analysis_report(
 {basic_info_section}
 
 === 最新新闻数据 ===
+
 {news_text}
 
 请提供详细分析，包括：
@@ -171,6 +161,9 @@ def generate_news_analysis_report(
         }
     ]
     
+    with open(os.path.join(project_dir, "data", "cache", "req_news.txt"), "w", encoding="utf-8") as f:
+        f.write(messages[1]['content'])
+
     try:
         response = client.chat(
             messages=messages,
@@ -193,7 +186,10 @@ def generate_chip_analysis_report(
     stock_name = stock_identity.get('name', '')
 
     client = OpenAIClient()
-    basic_info_section, _ = get_stock_info(stock_identity)
+    
+    formatter = get_stock_formatter()
+    basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
+    chip_text = formatter.format_chip_data(chip_data)
     
     # 构建分析提示
     system_message = """你是一位专业的筹码分析师，专精于A股市场的筹码分布技术分析。你能够深入解读筹码分布背后的主力意图、散户行为和市场博弈格局，为投资决策提供核心依据。
@@ -225,33 +221,15 @@ def generate_chip_analysis_report(
 
 {basic_info_section}
 
-**基础筹码数据:**
-- 最新日期: {chip_data.get('latest_date', '未知')}
-- 获利比例: {format_percentage(chip_data.get('profit_ratio', 0) * 100)}
-- 平均成本: {format_price(chip_data.get('avg_cost', 0))}元
-
-**90%筹码分布:**
-- 成本区间: {format_price(chip_data.get('cost_90_low', 0))} - {format_price(chip_data.get('cost_90_high', 0))}元
-- 集中度: {format_percentage(chip_data.get('concentration_90', 0)*100)}
-
-**70%筹码分布:**
-- 成本区间: {format_price(chip_data.get('cost_70_low', 0))} - {format_price(chip_data.get('cost_70_high', 0))}元
-- 集中度: {format_percentage(chip_data.get('concentration_70', 0)*100)}
-
-**分析指标:**
-- 获利状态: {chip_data.get('analysis', {}).get('profit_status', '未知')}
-- 集中度状态: {chip_data.get('analysis', {}).get('concentration_status', '未知')}
-- 风险水平: {chip_data.get('analysis', {}).get('risk_level', '未知')}
-
-**技术参考位:**
-- 支撑位: {format_price(chip_data.get('support_level', 0))}元
-- 阻力位: {format_price(chip_data.get('resistance_level', 0))}元
-- 成本中枢: {format_price(chip_data.get('cost_center', 0))}元
+{chip_text}
 
 请进行专业的筹码分析，包括主力行为判断、套牢盘分析、支撑压力位和交易建议。分析报告不超过500字。"""
         }
     ]
     
+    with open(os.path.join(project_dir, "data", "cache", "req_chip.txt"), "w", encoding="utf-8") as f:
+        f.write(messages[1]['content'])
+
     try:
         response = client.chat(
             messages=messages,
@@ -275,31 +253,12 @@ def generate_fundamental_analysis_report(
     stock_name = stock_identity.get('name', '')
 
     client = OpenAIClient()
-    basic_info_section, _ = get_stock_info(stock_identity)
+    
+    formatter = get_stock_formatter()
+    basic_info_section = formatter.format_basic_info(fundamental_data, stock_identity)
     currency_name = stock_identity.get('currency_name', '人民币')
     currency_symbol = stock_identity.get('currency_symbol', '¥')
-    company_profile = fundamental_data
-    profile_text = "**公司简介:**\n"
-    stock_info_dict = {
-        "股票代码": company_profile['symbol'],
-        "股票名称": company_profile['name'],
-        "净利润": format_large_number(company_profile['net_profit']) if company_profile['net_profit'] else None,
-        "总市值": f"{format_market_value(company_profile['total_market_value'])}{currency_symbol}" if company_profile['total_market_value'] else None,
-        "流通市值": f"{format_market_value(company_profile['circulating_market_value'])}{currency_symbol}" if company_profile['circulating_market_value'] else None,
-        "所处行业": company_profile['industry'],
-        "市盈率(动)": company_profile['pe_ratio'],
-        "市净率": company_profile['pb_ratio'],
-        "ROE": company_profile['roe'],
-        "毛利率": company_profile['gross_profit_margin'],
-        "净利率": company_profile['net_profit_margin'],
-        "板块编号": company_profile['sector_code'],
-        "资产负债率": company_profile['debt_to_asset_ratio'] if company_profile['debt_to_asset_ratio'] is not None else None,
-    }
-    for key, value in stock_info_dict.items():
-        if value is not None and str(value).strip() != "":
-            profile_text += f"- {key}: {value}\n"
     
-    # 构建分析提示
     system_message = f"""你是一位专业的股票基本面分析师，专注于{stock_identity.get('market_name', '股票市场')}。
 你的任务是对{stock_name}（股票代码：{stock_code}）进行全面的基本面分析，提供专业、深入且客观的投资建议。
 
@@ -327,14 +286,11 @@ def generate_fundamental_analysis_report(
 所有货币单位必须使用{currency_name}（{currency_symbol}）。
 投资建议必须使用中文：买入、持有或卖出，不要使用英文术语。"""
 
-    # 构建消息
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": f"""请基于以下真实数据，对{stock_name}({stock_code})进行全面的基本面分析：
 
 {basic_info_section}
-
-{profile_text}
 
 请提供详细的基本面分析报告，包括：
 1. 基本面概况和主营业务分析
@@ -346,7 +302,10 @@ def generate_fundamental_analysis_report(
 报告必须基于提供的真实数据，不要编造或假设。请使用专业、客观的语言，报告不超过500字。"""
         }
     ]
-    
+
+    with open(os.path.join(project_dir, "data", "cache", "req_basic_info.txt"), "w", encoding="utf-8") as f:
+        f.write(messages[1]['content'])
+        
     try:
         response = client.chat(
             messages=messages,
@@ -359,45 +318,6 @@ def generate_fundamental_analysis_report(
     except Exception as e:
         return f"生成基本面分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-
-def get_stock_info(stock_identity: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-    """获取股票基本信息（包含当前价格、涨跌额、涨跌幅）"""
-    basic_info_section = ""
-    info = None
-    stock_code = stock_identity['code']
-    stock_name = stock_identity['name']
-
-    from providers.stock_data_tools import get_stock_tools
-    stock_tools = get_stock_tools()
-    
-    try:
-        basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True)
-        if basic_info and 'error' not in basic_info:
-            info = {
-                'type': '股票基本信息',
-                'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
-                'timestamp': basic_info.get('update_time', '未知时间')
-            }
-    except Exception as e:
-        print(f"获取股票基本信息失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return "", info
-    if basic_info and 'error' not in basic_info:
-        current_price = basic_info.get('current_price', 0)
-        change = basic_info.get('change', 0)
-        change_percent = basic_info.get('change_percent', 0)
-        stock_name_info = basic_info.get('name', stock_name)
-        basic_info_section = f"""\n\n# 💹 股票实时信息
-
-- 股票名称：{stock_name_info}（{stock_code}）
-- 当前价格：{current_price:.2f}元
-- 涨跌金额：{change:+.2f}元
-- 涨跌幅度：{change_percent:+.2f}%
-- 更新时间：{basic_info.get('timestamp', '未知')}\n"""
-    else:
-        basic_info_section = f"\n\n# 💹 股票实时信息\n暂无{stock_name}（{stock_code}）的实时价格信息。\n"
-    return basic_info_section, info
 
 
 def generate_comprehensive_analysis_report(
@@ -512,9 +432,23 @@ def generate_comprehensive_analysis_report(
             market_summary += f"\n### AI大盘分析:\n\n{ai_summary}\n\n"
     else:
         market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
-    basic_info_section, info = get_stock_info(stock_identity)
-    if info is not None:
-        data_sources.append(info)
+
+    formatter = get_stock_formatter()    
+    basic_info_section = ""
+    try:
+        from providers.stock_data_tools import get_stock_tools
+        stock_tools = get_stock_tools()
+        basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True)
+        if basic_info and 'error' not in basic_info:
+            basic_info_section = formatter.format_basic_info(basic_info, stock_identity)
+            info = {
+                'type': '股票基本信息',
+                'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
+                'timestamp': basic_info.get('update_time', '未知时间')
+            }
+            data_sources.append(info)
+    except Exception as e:
+        print(f"获取股票基本信息失败: {e}")
     user_profile_section = ""
     try:
         from config_manager import config
@@ -608,7 +542,7 @@ def generate_comprehensive_analysis_report(
 
 请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。当前股价的涨跌情况也是重要的分析因素。"""
 
-    with open("data/cache/req.txt", "w", encoding="utf-8") as f:
+    with open(os.path.join(project_dir, "data", "cache", "req.txt"), "w", encoding="utf-8") as f:
         f.write(user_message)
     print(f'req length {len(user_message)}')
     #return user_message, data_sources # for test

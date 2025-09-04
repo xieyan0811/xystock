@@ -18,7 +18,6 @@ warnings.filterwarnings('ignore')
 
 # 导入必要的模块
 from providers.stock_utils import (
-    get_indicators, 
     fetch_stock_basic_info, fetch_stock_technical_indicators,
     fetch_stock_news_data, fetch_stock_chip_data
 )
@@ -140,14 +139,9 @@ class StockTools:
                 
                 if include_ai_analysis:
                     try:
-                        indicators = indicators_data.get('indicators', {})
-                        risk_metrics = indicators_data.get('risk_metrics', {})
-                        
                         ai_report, ai_timestamp = self.generate_tech_analysis_with_cache(
                             stock_identity,
-                            df=df,
-                            indicators=indicators,
-                            risk_metrics=risk_metrics,
+                            kline_info=result,
                             use_cache=use_cache,
                             force_refresh=force_refresh
                         )
@@ -341,9 +335,7 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
 
-    def generate_tech_analysis_with_cache(self, stock_identity: Dict,
-                                         df=None, indicators: Dict = None,
-                                         risk_metrics: Dict = None,
+    def generate_tech_analysis_with_cache(self, stock_identity: Dict, kline_info: Dict = None,
                                          use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
         """生成股票技术分析报告（带缓存）"""
         analysis_type = "technical"
@@ -359,21 +351,10 @@ class StockTools:
             error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        try:
-            if df is None:
-                kline_data = self.get_stock_kline_data(stock_identity)
-                if 'data' in kline_data and 'df' in kline_data['data']:
-                    df = kline_data['data']['df']
-                else:
-                    raise ValueError("无法获取K线数据")
-            if indicators is None:
-                indicators = get_indicators(df)
-            
-            # 生成技术分析报告（直接传递indicators，包含所有必要数据）
+        try:            
             report = generate_stock_analysis_report(
                 stock_identity=stock_identity,
-                indicators=indicators,
-                risk_metrics=risk_metrics
+                kline_info=kline_info,
             )
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

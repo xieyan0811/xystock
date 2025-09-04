@@ -11,6 +11,7 @@ if project_root not in sys.path:
 from providers.stock_data_tools import get_stock_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
 from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
+from providers.data_formatters import get_stock_formatter
 
 
 def generate_stock_report(stock_identity: Dict[str, Any], 
@@ -35,9 +36,9 @@ def generate_stock_report(stock_identity: Dict[str, Any],
         try:
             kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=True, include_ai_analysis=has_market_ai)
             if 'error' not in kline_info and kline_info:
-                report_data['market_data'] = kline_info
+                report_data['kline_info'] = kline_info
         except Exception as e:
-            report_data['market_data'] = {'error': str(e)}
+            report_data['kline_info'] = {'error': str(e)}
         
         # 收集新闻数据
         try:
@@ -73,9 +74,9 @@ def generate_stock_report(stock_identity: Dict[str, Any],
                 final_ai_reports['fundamental'] = report_data['basic_info']['ai_analysis']
         
         if has_market_ai:
-            if 'ai_analysis' in report_data.get('market_data', {}):
-                final_ai_reports['market'] = report_data['market_data']['ai_analysis']
-        
+            if 'ai_analysis' in report_data.get('kline_info', {}):
+                final_ai_reports['market'] = report_data['kline_info']['ai_analysis']
+
         if has_news_ai:
             if 'ai_analysis' in report_data.get('news_data', {}):
                 final_ai_reports['news'] = report_data['news_data']['ai_analysis']
@@ -139,23 +140,11 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 
 """
         
-        metrics = [
-            ('股票名称', basic_info.get('name', '')),
-            ('所属行业', basic_info.get('industry', '')),
-            ('当前价格', format_price(basic_info.get('current_price', 0))),
-            ('涨跌幅', format_change(basic_info.get('change', 0), basic_info.get('change_percent', 0))),
-            ('总市值', format_market_value(basic_info.get('total_market_value', 0))),
-            ('流通市值', format_market_value(basic_info.get('circulating_market_value', 0))),
-            ('成交量', format_volume(basic_info.get('volume', 0))),
-            ('市盈率', basic_info.get('pe_ratio', '')),
-            ('市净率', basic_info.get('pb_ratio', '')),
-            ('ROE', basic_info.get('roe', '')),
-            ('资产负债率', basic_info.get('debt_to_asset_ratio', ''))
-        ]
-        
-        for label, value in metrics:
-            if value:
-                md_content += f"- **{label}**: {value}\n"
+        # 使用统一格式化器
+        formatter = get_stock_formatter()
+        basic_info_text = formatter.format_basic_info(basic_info, stock_identity)
+
+        md_content += basic_info_text + "\n\n"
         
         md_content += "\n"
         
@@ -173,49 +162,28 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 """
     
     # 行情走势部分
-    market_data = report_data.get('market_data', {})
-    if 'error' not in market_data and market_data and market_data.get('kline_data'):
-        df = pd.DataFrame(market_data['kline_data'])
-        last_row = df.iloc[-1]
+    kline_info = report_data.get('kline_info', {})
+    if 'error' not in kline_info and kline_info:
+        formatter = get_stock_formatter()
+        kline_text = formatter.format_kline_data(kline_info)
+
+        #df = pd.DataFrame(kline_info['kline_data']) # later remove
+        #last_row = df.iloc[-1]
         
         md_content += """
 ---
 
 # 📈 行情走势
 
-## 最新价格信息
-
 """
         
-        price_metrics = [
-            ('开盘价', format_price(last_row['open'])),
-            ('最高价', format_price(last_row['high'])),
-            ('最低价', format_price(last_row['low'])),
-            ('收盘价', format_price(last_row['close'])),
-            ('成交量', format_volume(last_row['volume']))
-        ]
-        
-        for label, value in price_metrics:
-            md_content += f"- **{label}**: {value}\n"
-        
-        # 技术指标
-        indicators = market_data.get('indicators', {})
-        if indicators:
-            md_content += "\n## 技术指标\n\n"
-            for indicator_name, indicator_data in indicators.items():
-                if isinstance(indicator_data, dict) and 'current' in indicator_data:
-                    value = str(indicator_data['current'])
-                else:
-                    value = str(indicator_data)
-                md_content += f"- **{indicator_name}**: {value}\n"
-        
-        md_content += "\n"
-        
+        md_content += kline_text + "\n\n"
+
         if 'market' in report_data['ai_reports']:
             market_report = report_data['ai_reports']['market']
             report_text = market_report['report']
             report_time = market_report.get('timestamp', '')
-            
+
             md_content += f"""## 🤖 AI行情分析
 
 {report_text}
@@ -233,22 +201,13 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 
 # 📰 新闻资讯
 
-共获取到 {len(news_list)} 条相关新闻
-
 """
         
-        for i, news in enumerate(news_list[:10], 1):
-            title = news.get('新闻标题', '')
-            time = news.get('发布时间', '')
-            url = news.get('新闻链接', '')
-            
-            md_content += f"#### {i}. {title}\n\n"
-            md_content += f"**发布时间**: {time}\n\n"
-            
-            if url:
-                md_content += f"[阅读原文]({url})\n\n"
-            
-            md_content += "---\n\n"
+        # 使用统一格式化器
+        formatter = get_stock_formatter()
+        news_text = formatter.format_news_data(news_list, has_content=False)
+        
+        md_content += news_text + "\n\n"
         
         if 'news' in report_data['ai_reports']:
             news_report = report_data['ai_reports']['news']
@@ -273,18 +232,11 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 
 """
         
-        chip_metrics = [
-            ('获利比例', format_percentage(chip_data['profit_ratio'] * 100)),
-            ('平均成本', f"{format_price(chip_data['avg_cost'])}元"),
-            ('90%成本区间', f"{format_price(chip_data['cost_90_low'])}-{format_price(chip_data['cost_90_high'])}"),
-            ('70%成本区间', f"{format_price(chip_data['cost_70_low'])}-{format_price(chip_data['cost_70_high'])}"),
-            ('支撑位', f"{format_price(chip_data['support_level'])}元"),
-            ('阻力位', f"{format_price(chip_data['resistance_level'])}元"),
-            ('成本中枢', f"{format_price(chip_data['cost_center'])}元")
-        ]
-        
-        for label, value in chip_metrics:
-            md_content += f"- **{label}**: {value}\n"
+        # 使用统一格式化器
+        formatter = get_stock_formatter()
+        chip_text = formatter.format_chip_data(chip_data)
+
+        md_content += chip_text + "\n\n"
         
         md_content += "\n"
         
