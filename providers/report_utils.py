@@ -254,3 +254,76 @@ def generate_markdown_file(md_content):
         # 生成错误信息的字节数据
         error_content = f"# Markdown文件生成失败\n\n{error_msg}\n"
         return error_content.encode('utf-8')
+
+
+def generate_html_report(md_content):
+    """将Markdown内容转换为HTML"""
+    
+    print("🌐 开始生成HTML文档...")
+    
+    if not PANDOC_AVAILABLE:
+        print("❌ Pandoc不可用")
+        raise Exception("Pandoc不可用，无法生成HTML文档。请安装pandoc或使用Markdown格式导出。")
+
+    print(f"✅ Markdown内容生成完成，长度: {len(md_content)} 字符")
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as tmp_file:
+            output_file = tmp_file.name
+
+        extra_args = [
+            '--from=markdown-yaml_metadata_block',
+            '--standalone',
+            '--css=/app/templates/style.css' if os.path.exists('/app/templates/style.css') else None,
+            '--metadata', 'title=分析报告',
+            '--template=/app/templates/template.html' if os.path.exists('/app/templates/template.html') else None
+        ]
+        
+        extra_args = [arg for arg in extra_args if arg is not None]
+
+        print(f"🔧 HTML转换参数: {extra_args}")
+
+        cleaned_content = _clean_markdown_for_pandoc(md_content)
+
+        pypandoc.convert_text(
+            cleaned_content,
+            'html',
+            format='markdown',
+            outputfile=output_file,
+            extra_args=extra_args
+        )
+
+        if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            with open(output_file, 'rb') as f:
+                html_content = f.read()
+
+            os.unlink(output_file)
+
+            print(f"✅ HTML文档生成成功")
+            return html_content
+        else:
+            raise Exception("HTML文档生成失败或为空")
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"HTML文档生成失败: {error_msg}")
+
+        try:
+            if 'output_file' in locals() and os.path.exists(output_file):
+                os.unlink(output_file)
+        except:
+            pass
+
+        detailed_error = f"""HTML文档生成失败: {error_msg}
+
+可能的解决方案:
+1. 确保pandoc已正确安装:
+   Windows: choco install pandoc
+   macOS: brew install pandoc
+   Linux: sudo apt-get install pandoc
+
+2. 检查系统权限，确保可以创建临时文件
+
+3. 使用Markdown格式导出作为替代方案
+"""
+        raise Exception(detailed_error)

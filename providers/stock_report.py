@@ -10,7 +10,7 @@ if project_root not in sys.path:
 
 from providers.stock_data_tools import get_stock_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file
+from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 
 
 def generate_stock_report(stock_identity: Dict[str, Any], 
@@ -96,6 +96,8 @@ def generate_stock_report(stock_identity: Dict[str, Any],
             return generate_pdf_report(md_content)
         elif format_type == "docx":
             return generate_docx_report(md_content)
+        elif format_type == "html":
+            return generate_html_report(md_content)
         elif format_type == "markdown":
             return generate_markdown_file(md_content)
         else:
@@ -107,6 +109,8 @@ def generate_stock_report(stock_identity: Dict[str, Any],
             return generate_pdf_report(f"# 错误\n\n{error_msg}")
         elif format_type == "docx":
             return generate_docx_report(f"# 错误\n\n{error_msg}")
+        elif format_type == "html":
+            return generate_html_report(f"# 错误\n\n{error_msg}")
         elif format_type == "markdown":
             return generate_markdown_file(f"# 错误\n\n{error_msg}")
         else:

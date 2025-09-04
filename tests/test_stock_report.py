@@ -25,7 +25,7 @@ def test_stock_report(stock_code="600519", stock_name="贵州茅台", market_typ
         has_fundamental_ai = use_ai
         has_market_ai = use_ai
         has_news_ai = use_ai
-        has_chip_ai = use_ai and market_type not in ["港股", "指数"]  # 港股和指数不支持筹码分析
+        has_chip_ai = use_ai and market_type not in ["港股", "ETF"]
         has_comprehensive_ai = use_ai
 
         if stock_code and len(stock_code) > 6 and stock_code.isdigit():
@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--stock-code", default="600519", help="股票代码 (默认: 600519)")
     parser.add_argument("--stock-name", default="贵州茅台", help="股票名称 (默认: 贵州茅台)")
     parser.add_argument("--market-type", default="A股", choices=["A股", "港股", "指数"], help="市场类型 (默认: A股)")
-    parser.add_argument("--format", default="markdown", choices=["pdf", "docx", "markdown"], help="报告格式 (默认: markdown)")
+    parser.add_argument("--format", default="markdown", choices=["pdf", "docx", "markdown", "html"], help="报告格式 (默认: markdown)")
     parser.add_argument("--use-ai", action="store_true", help="启用所有AI分析功能")
     
     args = parser.parse_args()

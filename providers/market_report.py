@@ -9,7 +9,7 @@ if project_root not in sys.path:
 
 from providers.market_data_tools import get_market_tools
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_large_number
-from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file
+from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 
 
 def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
@@ -93,6 +93,8 @@ def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_
             return generate_pdf_report(md_content)
         elif format_type == "docx":
             return generate_docx_report(md_content)
+        elif format_type == "html":
+            return generate_html_report(md_content)
         elif format_type == "markdown":
             return generate_markdown_file(md_content)
         else:
@@ -104,6 +106,8 @@ def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_
             return generate_pdf_report(f"# 错误\n\n{error_msg}")
         elif format_type == "docx":
             return generate_docx_report(f"# 错误\n\n{error_msg}")
+        elif format_type == "html":
+            return generate_html_report(f"# 错误\n\n{error_msg}")
         elif format_type == "markdown":
             return generate_markdown_file(f"# 错误\n\n{error_msg}")
         else:
@@ -131,13 +135,11 @@ def generate_markdown_market_report(index_name, report_data):
 
 """
         
-        # 主要指数表格
+        # 主要指数列表
         indices_dict = current_indices.get('indices_dict', {})
         if indices_dict:
             md_content += """## 主要指数
 
-| 指数名称 | 当前点位 | 涨跌幅 | 涨跌点数 |
-|---------|----------|--------|----------|
 """
             
             # 定义要显示的主要指数顺序
@@ -150,20 +152,23 @@ def generate_markdown_market_report(index_name, report_data):
                     change_pct = idx_data.get('change_percent', 0)
                     change = idx_data.get('change_amount', 0)
                     
-                    # 格式化涨跌幅颜色
                     if change_pct > 0:
                         change_str = f"🔴 +{change_pct:.2f}%"
                         change_val_str = f"+{change:.2f}"
+                        arrow = "📈"
                     elif change_pct < 0:
                         change_str = f"🟢 {change_pct:.2f}%"
                         change_val_str = f"{change:.2f}"
+                        arrow = "📉"
                     else:
                         change_str = f"⚪ {change_pct:.2f}%"
                         change_val_str = f"{change:.2f}"
+                        arrow = "➡️"
                     
-                    md_content += f"| {idx_name} | {current:.2f} | {change_str} | {change_val_str} |\n"
-            
-            md_content += "\n"
+                    md_content += f"### {arrow} {idx_name}\n"
+                    md_content += f"- **当前点位**: {current:.2f}\n"
+                    md_content += f"- **涨跌幅**: {change_str}\n"
+                    md_content += f"- **涨跌点数**: {change_val_str}\n\n"
         
         # 焦点指数详细信息
         if focus_index_data:
