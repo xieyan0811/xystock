@@ -129,14 +129,46 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 **市场类型**: {market_type}  
 **报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
+"""
+
+    # 综合分析部分
+    if 'comprehensive' in report_data['ai_reports']:
+        analysis_data = report_data['ai_reports']['comprehensive']
+        md_content += """
 ---
 
+# 🎯 综合分析
+
 """
-    
+        
+        if 'analysis_info' in analysis_data:
+            info = analysis_data['analysis_info']
+            md_content += f"""## 分析信息
+
+- **分析时间**: {info.get('analysis_time', '未知')}
+- **数据来源**: {info.get('data_sources_count', 0)}个数据源
+
+"""
+        
+        if 'report' in analysis_data:
+            report_text = analysis_data['report']
+            report_time = analysis_data.get('timestamp', '')
+            
+            md_content += f"""## 🤖 AI综合分析报告
+
+{report_text}
+
+*分析生成时间: {report_time}*
+
+"""
+
     # 基本信息部分
     basic_info = report_data.get('basic_info', {})
     if 'error' not in basic_info and basic_info:
-        md_content += """# 📊 基本信息
+        md_content += """
+---
+        
+# 📊 基本信息
 
 """
         
@@ -252,38 +284,7 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 *分析生成时间: {report_time}*
 
 """
-    
-    # 综合分析部分
-    if 'comprehensive' in report_data['ai_reports']:
-        analysis_data = report_data['ai_reports']['comprehensive']
-        md_content += """
----
-
-# 🎯 综合分析
-
-"""
         
-        if 'analysis_info' in analysis_data:
-            info = analysis_data['analysis_info']
-            md_content += f"""## 分析信息
-
-- **分析时间**: {info.get('analysis_time', '未知')}
-- **数据来源**: {info.get('data_sources_count', 0)}个数据源
-
-"""
-        
-        if 'report' in analysis_data:
-            report_text = analysis_data['report']
-            report_time = analysis_data.get('timestamp', '')
-            
-            md_content += f"""## 🤖 AI综合分析报告
-
-{report_text}
-
-*分析生成时间: {report_time}*
-
-"""
-    
     md_content += """---
 
 *本报告由XYStock股票分析系统自动生成，仅供参考，不构成任何投资建议*

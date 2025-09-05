@@ -131,46 +131,68 @@ def normalize_whitespace(text: str) -> str:
 
 def format_indicators_dict(data_dict: Dict[str, Any], title: str, desc = None) -> str:
     """
-    将指标字典格式化为字符串
+    将指标字典格式化为标准 Markdown 字符串
     
     Args:
         data_dict: 要格式化的指标字典
         title: 指标类型标题（如"技术指标"、"风险指标"）
+        desc: 可选的描述文本
     
     Returns:
-        格式化后的字符串
+        格式化后的标准 Markdown 字符串
     """
     if not data_dict:
-        return f"{title}：无数据\n"
+        return f"**{title}**：无数据\n\n"
     
-    result_text = f"{title}：\n"
+    result_text = f"**{title}**：\n\n"
     if desc:
-        result_text += f"{desc}\n"
+        result_text += f"{desc}\n\n"
+    
     for key, value in data_dict.items():
         if isinstance(value, (int, float)):
             # 数值型数据保留2位小数
             formatted_value = round(float(value), 2)
-            result_text += f"- {key}: {formatted_value}\n"
+            result_text += f"- **{key}**: {formatted_value}\n"
         elif isinstance(value, str):
             # 字符串直接显示
-            result_text += f"- {key}: {value}\n"
+            result_text += f"- **{key}**: {value}\n"
         elif isinstance(value, dict):
             # 嵌套字典数据
-            result_text += f"- {key}:\n"
+            result_text += f"- **{key}**:\n"
             for sub_key, sub_value in value.items():
                 if isinstance(sub_value, (int, float)):
                     formatted_sub_value = round(float(sub_value), 2)
-                    result_text += f"  • {sub_key}: {formatted_sub_value}\n"
+                    result_text += f"  - {sub_key}: {formatted_sub_value}\n"
                 else:
-                    result_text += f"  • {sub_key}: {sub_value}\n"
+                    result_text += f"  - {sub_key}: {sub_value}\n"
         elif isinstance(value, list):
             # 列表数据处理
-            if len(value) > 0 and isinstance(value[0], (int, float)):
-                formatted_values = [round(float(v), 2) for v in value[:3]]
-                result_text += f"- {key}: {formatted_values}{'...' if len(value) > 3 else ''}\n"
+            if len(value) > 0:
+                if isinstance(value[0], (int, float)):
+                    # 数值列表
+                    formatted_values = [round(float(v), 2) for v in value[:3]]
+                    result_text += f"- **{key}**: {formatted_values}{'...' if len(value) > 3 else ''}\n"
+                elif isinstance(value[0], dict):
+                    # 字典列表，如 summary_table
+                    result_text += f"- **{key}**:\n"
+                    for i, item in enumerate(value):
+                        if isinstance(item, dict):
+                            result_text += f"  - {i+1}:\n"
+                            for sub_key, sub_value in item.items():
+                                if isinstance(sub_value, (int, float)):
+                                    formatted_sub_value = round(float(sub_value), 4)
+                                    result_text += f"    - {sub_key}: {formatted_sub_value}\n"
+                                else:
+                                    result_text += f"    - {sub_key}: {sub_value}\n"
+                else:
+                    # 其他类型的列表
+                    result_text += f"- **{key}**: {value}\n"
             else:
-                result_text += f"- {key}: {value}\n"
+                result_text += f"- **{key}**: {value}\n"
         else:
-            result_text += f"- {key}: {value}\n"
+            result_text += f"- **{key}**: {value}\n"
+    
+    # 在末尾添加空行，确保与后续内容分隔
+    result_text += "\n"
     
     return result_text
