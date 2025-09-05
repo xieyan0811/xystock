@@ -22,9 +22,10 @@ import akshare as ak
 import pandas as pd
 import efinance as ef
 from providers.stock_utils import get_indicators
+from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 
 def fetch_market_sentiment() -> Dict:
-    """获取市场情绪数据的具体实现"""
+    """获取市场情绪数据"""
     sentiment_data = {}
     try:
         # 1. 涨跌家数统计
@@ -57,18 +58,12 @@ def fetch_market_sentiment() -> Dict:
 
 
 def fetch_valuation_data(debug=False) -> Dict:
-    """
-    获取估值指标
-    
-    Returns:
-        包含估值指标的字典
-    """
+    """获取估值指标"""
     print("💰 获取估值指标...")
     
     valuation_data = {}
     
     try:
-        # 沪深300估值
         print("   获取沪深300估值...")
         df_hs300 = ak.stock_zh_index_value_csindex("000300")
         if not df_hs300.empty:
@@ -85,7 +80,6 @@ def fetch_valuation_data(debug=False) -> Dict:
     except Exception as e:
         print(f"   ❌ 获取沪深300估值失败: {e}")
     
-    # 添加更新时间
     valuation_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     print("   ✓ 估值指标获取完成")
@@ -93,13 +87,12 @@ def fetch_valuation_data(debug=False) -> Dict:
 
 
 def fetch_money_flow_data(debug=False) -> Dict:
-    """获取资金流向数据的具体实现"""
+    """获取资金流向数据"""
     print("💸 获取资金流向指标...")
     
     money_flow_data = {}
     
     try:
-        # M2货币供应量
         print("   获取M2数据...")
         df_m2 = ak.macro_china_money_supply()
         if debug:
@@ -120,7 +113,6 @@ def fetch_money_flow_data(debug=False) -> Dict:
     except Exception as e:
         print(f"   ❌ 获取M2数据失败: {e}")
     
-    # 添加更新时间
     money_flow_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     print("   ✓ 资金流向指标获取完成")
@@ -128,20 +120,21 @@ def fetch_money_flow_data(debug=False) -> Dict:
 
 
 def fetch_current_indices() -> Dict:
-    """获取当前指数实时数据的具体实现"""
+    """获取当前指数实时数据"""
     print("📊 获取当前指数实时数据...")
     
     indices_data = {}
     
     try:
-        # 使用东方财富获取沪深重要指数
         print("   获取沪深重要指数...")
         df_indices = ak.stock_zh_index_spot_em('沪深重要指数')
         
         if not df_indices.empty:
-            # 将DataFrame转换为字典格式，便于后续使用
             indices_list = []
+
             for _, row in df_indices.iterrows():
+                if str(row.get('名称', '')) not in FOCUS_INDICES:
+                    continue
                 index_info = {
                     'code': str(row.get('代码', '')),
                     'name': str(row.get('名称', '')),
@@ -159,24 +152,20 @@ def fetch_current_indices() -> Dict:
                 }
                 indices_list.append(index_info)
             
-            # 按指数名称创建索引字典
             indices_dict = {}
             for index in indices_list:
                 indices_dict[index['name']] = index
             
             indices_data = {
-                'indices_list': indices_list,
                 'indices_dict': indices_dict,
-                'total_count': len(indices_list),
+                'total_count': len(indices_dict),
                 'data_source': '东方财富-沪深重要指数',
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            print(f"      成功获取 {len(indices_list)} 个指数数据")
+            print(f"      成功获取 {len(indices_dict)} 个指数数据")
             
-            # 显示主要指数信息
-            main_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']
-            for name in main_indices:
+            for name in FOCUS_INDICES:
                 if name in indices_dict:
                     idx = indices_dict[name]
                     change_sign = '+' if idx['change_percent'] >= 0 else ''
@@ -212,7 +201,6 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
     sz_data = {}
     
     try:
-        # 获取上交所数据
         df_margin_sh = ak.macro_china_market_margin_sh()
         if not df_margin_sh.empty:
             latest_sh = df_margin_sh.iloc[-1]
@@ -223,6 +211,7 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
                 'margin_date': str(latest_sh.get('日期', datetime.now().strftime('%Y-%m-%d'))),
             })
             
+            # 计算一周变化
             if include_historical and len(df_margin_sh) >= 7:
                 week_ago_sh = df_margin_sh.iloc[-7]
                 weekly_change_sh = result['margin_sh_buy'] - float(week_ago_sh.get('融资余额', 0))
@@ -237,7 +226,6 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
         print(f"      ❌ 获取上交所融资融券失败: {e}")
     
     try:
-        # 获取深交所数据
         df_margin_sz = ak.macro_china_market_margin_sz()
         if not df_margin_sz.empty:
             latest_sz = df_margin_sz.iloc[-1]
@@ -258,7 +246,6 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
     except Exception as e:
         print(f"      ❌ 获取深交所融资融券失败: {e}")
     
-    # 汇总两市数据
     total_margin_balance = result['margin_sh_balance'] + result['margin_sz_balance']
     total_margin_buy = result['margin_sh_buy'] + result['margin_sz_buy']
     total_margin_sell = result['margin_sh_sell'] + result['margin_sz_sell']
@@ -283,42 +270,20 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
 def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> Dict:
     """获取指数技术指标（实时数据，不缓存）"""
     print(f"📊 获取{index_name}技术指标...")
-    
-    # 支持的指数
-    indices = {
-        '上证指数': '000001',
-        '深证成指': '399001', 
-        '创业板指': '399006',
-        '沪深300': '000300',
-        '中证500': '000905',
-        '科创50': '000688'
-    }
         
     try:
-        if index_name not in indices:
+        if index_name not in INDEX_SYMBOL_MAPPING:
             raise ValueError(f"不支持的指数名称: {index_name}")
         
-        # 根据指数名称获取数据
-        if index_name == '上证指数':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000001")
-        elif index_name == '深证成指':
-            df_raw = ak.stock_zh_index_daily(symbol="sz399001")
-        elif index_name == '创业板指':
-            df_raw = ak.stock_zh_index_daily(symbol="sz399006")
-        elif index_name == '沪深300':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000300")
-        elif index_name == '中证500':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000905")
-        elif index_name == '科创50':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000688")
+        symbol = INDEX_SYMBOL_MAPPING[index_name]
+        df_raw = ak.stock_zh_index_daily(symbol=symbol)
         
         if df_raw.empty:
             raise ValueError(f"无法获取{index_name}数据")
                     
-        # 获取最近的数据
         df = df_raw.tail(period).copy()
         
-        # 重命名列以符合stockstats要求
+        # stockstats要求的列名
         df = df.rename(columns={
             'open': 'open',
             'close': 'close', 
@@ -327,7 +292,6 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
             'volume': 'volume'
         })
         
-        # 确保数据类型正确
         numeric_columns = ['open', 'high', 'low', 'close', 'volume']
         for col in numeric_columns:
             if col in df.columns:

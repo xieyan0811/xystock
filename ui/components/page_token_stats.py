@@ -8,15 +8,12 @@ import os
 import sys
 import altair as alt
 
-# 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-# 导入相关模块
 from llm.usage_logger import UsageLogger
 
-# 配置UsageLogger
 usage_logger = UsageLogger()
 
 def format_cost(cost):
@@ -56,7 +53,6 @@ def show_usage_overview(days=30):
 
 def show_model_distribution(days=30):
     """显示模型使用分布"""
-    # 获取使用统计
     stats = usage_logger.get_usage_stats(days=days)
     
     if not stats or 'model_distribution' not in stats or not stats['model_distribution']:
@@ -69,13 +65,11 @@ def show_model_distribution(days=30):
     models = list(model_dist.keys())
     counts = list(model_dist.values())
     
-    # 创建模型分布图表
     model_df = pd.DataFrame({
         'model': models,
         'count': counts
     })
     
-    # 使用Altair创建条形图
     chart = alt.Chart(model_df).mark_bar().encode(
         x=alt.X('model', sort='-y', title='模型'),
         y=alt.Y('count', title='使用次数'),
@@ -84,7 +78,6 @@ def show_model_distribution(days=30):
     
     st.altair_chart(chart, use_container_width=True)
     
-    # 展示模型使用数据表格
     with st.expander("模型使用详细数据", expanded=False):
         st.dataframe(model_df, use_container_width=True)
 
@@ -92,7 +85,6 @@ def show_detailed_logs():
     """显示详细日志"""
     st.subheader("详细使用记录")
     
-    # 尝试读取CSV文件
     try:
         df = pd.read_csv(usage_logger.log_file)
         
@@ -100,11 +92,9 @@ def show_detailed_logs():
             st.warning("暂无使用记录")
             return
         
-        # 处理时间戳
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.sort_values('timestamp', ascending=False)
         
-        # 简化输入和输出文本显示
         df['input_preview'] = df['input_text'].str[:50] + '...'
         df['output_preview'] = df['output_text'].str[:50] + '...'
         
@@ -131,16 +121,13 @@ def show_detailed_logs():
             }
         )
         
-        # 详细查看选项
         with st.expander("查看详细请求内容", expanded=False):
-            # 选择一条记录查看详情
             record_idx = st.selectbox(
                 "选择记录查看详情:", 
                 range(len(df)),
                 format_func=lambda i: f"{df.iloc[i]['timestamp']} - {df.iloc[i]['model']} (Tokens: {df.iloc[i]['total_tokens']})"
             )
             
-            # 显示选中记录的详情
             record = df.iloc[record_idx]
             
             st.write("#### 请求详情")
@@ -161,7 +148,6 @@ def show_detailed_logs():
                     st.error(f"错误信息: {record['error_message']}")
                 st.write("**温度参数:**", record['temperature'])
             
-            # 显示输入和输出文本
             st.text_area("输入文本", record['input_text'], height=150)
             st.text_area("输出文本", record['output_text'], height=150)
         
@@ -172,7 +158,6 @@ def main():
     """API使用统计页面主函数"""
     st.title("🔍 API使用统计")
     
-    # 选择时间范围
     period_options = {
         "过去7天": 7,
         "过去30天": 30, 
@@ -189,7 +174,6 @@ def main():
     
     days = period_options[selected_period]
     
-    # 创建标签页
     tab1, tab2 = st.tabs(["📊 使用概览", "📝 详细记录"])
     
     with tab1:

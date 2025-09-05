@@ -1,13 +1,8 @@
-"""
-A股市场工具 - 统一的数据获取和缓存管理
-
-所有数据都支持智能缓存，避免重复请求
-"""
+"""A股市场工具 - 统一的数据获取和缓存管理"""
 
 import os
 import sys
 import warnings
-import traceback
 from datetime import datetime
 from typing import Dict
 from typing import Dict, Optional
@@ -34,24 +29,17 @@ class MarketTools:
     def __init__(self, cache_dir: str = "data/cache"):
         """初始化市场工具"""
         self.cache_manager = get_cache_manager()
-        # 兼容性设置
         self.cache_file = self.cache_manager.cache_file
         self.cache_configs = self.cache_manager.cache_configs
-    
-    # =========================
-    # 数据获取方法（带缓存）
-    # =========================
     
     def get_market_sentiment(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取市场情绪指标"""
         data_type = 'market_sentiment'
         
-        # 检查缓存
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
             return self.cache_manager.get_cached_data(data_type)
         
-        # 获取新数据
         print(f"📡 获取{self.cache_configs[data_type]['description']}...")
         try:
             data = fetch_market_sentiment()
@@ -60,7 +48,6 @@ class MarketTools:
             return data
         except Exception as e:
             print(f"❌ 获取市场情绪失败: {e}")
-            # 返回缓存数据作为备份
             return self.cache_manager.get_cached_data(data_type) if use_cache else {}
     
     def get_valuation_data(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
@@ -163,10 +150,6 @@ class MarketTools:
         analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cache_manager.save_cached_data('ai_analysis', analysis_data)
     
-    # =========================
-    # 缓存管理方法
-    # =========================
-    
     def clear_cache(self, data_type: Optional[str] = None):
         self.cache_manager.clear_cache(data_type)
     
@@ -188,12 +171,8 @@ class MarketTools:
         print("✅ 所有缓存数据刷新完成!")
         self.print_cache_status()
     
-    # =========================
-    # 综合报告方法
-    # =========================
-    
     def get_comprehensive_market_report(self, use_cache: bool = True, index_name: str = '上证指数') -> Dict:
-        """获取综合市场报告(返回结构)"""
+        """获取综合市场报告"""
         print(f"📋 生成{index_name}综合市场报告...")
         print("=" * 60)
         
@@ -209,7 +188,6 @@ class MarketTools:
             'market_summary': {}
         }
         
-        # 获取各类指标
         report['technical_indicators'] = fetch_index_technical_indicators(index_name)
         #report['sentiment_indicators'] = self.get_market_sentiment(use_cache)
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
@@ -217,7 +195,6 @@ class MarketTools:
         report['margin_detail'] = self.get_margin_data(use_cache)
         #report['ai_analysis'] = self.get_ai_analysis(use_cache)
         
-        # 生成市场摘要
         #report['market_summary'] = self.generate_market_report(report, format_type='summary')
         
         print("=" * 60)
@@ -232,10 +209,10 @@ class MarketTools:
         Args:
             report: 原始报告数据
             format_type: 报告格式类型
-                - 'summary_formatted': 格式化的摘要markdown字符串 (str格式)
-                - 'detailed': 详细字符串报告 (str格式)
-                - 'text': 纯文本格式报告 (str格式)
-            markdown: 对于detail格式，是否输出为Markdown格式，默认为False（纯文本格式）
+                - 'summary_formatted': 格式化的摘要markdown字符串
+                - 'detailed': 详细字符串报告
+                - 'text': 纯文本格式报告
+            markdown: 对于detail格式，是否输出为Markdown格式
         
         Returns:
             Dict或str: 根据format_type返回不同格式的报告
@@ -248,38 +225,31 @@ class MarketTools:
             raise ValueError(f"不支持的报告格式类型: {format_type}")
     
     def _generate_summary_text(self, report: Dict) -> str:
-        """生成格式化的摘要markdown字符串，直接用于UI显示"""
-        # 生成简要结构化摘要数据
+        """生成格式化的摘要markdown字符串"""
         summary = {}
         
-        # 技术面摘要
         tech = report['technical_indicators']
         if tech:
             summary['technical_trend'] = f"{tech.get('ma_trend', '未知')} | MACD {tech.get('macd_trend', '未知')}"
             summary['current_price'] = tech.get('latest_close', 0)
             summary['rsi_level'] = self._judge_rsi_level(tech.get('rsi_14', 50))
         
-        # 情绪面摘要
         margin = report['margin_detail']
         if margin:
             summary['margin_balance'] = f"融资余额 {margin.get('margin_buy_balance', 0)/100000000:.2f}亿"
         
-        # 估值面摘要
         valuation = report['valuation_indicators']
         if valuation:
             pe = valuation.get('hs300_pe', 0)
             summary['valuation_level'] = f"沪深300 PE {pe:.2f}"
         
-        # 资金面摘要
         money = report['money_flow_indicators']
         if money:
             m2_growth = money.get('m2_growth', 0)
             summary['liquidity_condition'] = f"M2同比增长 {m2_growth:.1f}%"
         
-        # 生成格式化的markdown字符串
         markdown_lines = []
         
-        # 定义维度映射和图标
         dimension_map = {
             'technical_trend': ('📈', '技术面'),
             'margin_balance': ('💳', '融资面'),
@@ -290,7 +260,6 @@ class MarketTools:
             'current_price': ('💹', '当前价格')
         }
         
-        # 按顺序生成格式化行
         for key, (icon, label) in dimension_map.items():
             if key in summary and summary[key]:
                 markdown_lines.append(f"**{icon} {label}:** {summary[key]}")
@@ -298,12 +267,7 @@ class MarketTools:
         return '\n\n'.join(markdown_lines)
     
     def _generate_detailed_text(self, report: Dict, markdown: bool = False) -> str:
-        """生成详细文本报告
-        
-        Args:
-            report: 报告数据
-            markdown: 是否输出为Markdown格式，默认为False（纯文本格式）
-        """
+        """生成详细文本报告"""
         lines = []
         
         if markdown:
@@ -317,7 +281,6 @@ class MarketTools:
             lines.append(f"🎯 关注指数: {report['focus_index']}")
             lines.append("=" * 80)
         
-        # 技术指标
         tech = report['technical_indicators']
         if tech:
             if markdown:
@@ -339,7 +302,6 @@ class MarketTools:
                 else:
                     lines.append(f"   RSI(14): {rsi_14}")
         
-        # 市场情绪
         sentiment = report['sentiment_indicators']
         if sentiment:
             if markdown:
@@ -353,7 +315,6 @@ class MarketTools:
                 up_ratio = sentiment.get('up_ratio', 0)
                 lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
         
-        # 估值水平
         valuation = report['valuation_indicators']
         if valuation:
             if markdown:
@@ -381,7 +342,6 @@ class MarketTools:
                 else:
                     lines.append(f"   股息率: {dividend_yield}%")
         
-        # 资金面
         money = report['money_flow_indicators']
         if money:
             if markdown:
@@ -409,7 +369,6 @@ class MarketTools:
                 else:
                     lines.append(f"   M2增速: {m2_growth}%")
         
-        # 融资融券数据
         margin_data = report['margin_detail']
         if margin_data:
             if markdown:
@@ -472,17 +431,14 @@ class MarketTools:
             return "超卖"
     
     def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:
-        """生成AI分析数据(返回结构)"""
+        """生成AI分析数据"""
         try:
-            # 延迟导入，避免循环导入
             from providers.market_ai_analysis import generate_index_analysis_report
             
-            # 获取综合市场报告数据
             market_report_data = self.get_comprehensive_market_report(use_cache=True, index_name=index_name)
             
             print(f"🤖 OOOOOO 正在生成{index_name}的AI分析报告...")
             
-            # 调用AI分析函数，传递用户观点
             ai_report, timestamp = generate_index_analysis_report(
                 index_name,
                 index_name, 
@@ -490,7 +446,6 @@ class MarketTools:
                 user_opinion
             )
             
-            # 构建AI分析数据
             ai_data = {
                 'report': ai_report,
                 'timestamp': timestamp,
@@ -499,7 +454,6 @@ class MarketTools:
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            # 保存到缓存
             self.cache_manager.save_cached_data('ai_analysis', ai_data)
             
             print(f"✅ AI分析报告生成完成")
@@ -514,10 +468,6 @@ class MarketTools:
                 'user_opinion': user_opinion
             }
 
-# =========================
-# 全局实例和便捷函数
-# =========================
-
 # 全局市场工具实例
 _market_tools = None
 
@@ -530,7 +480,6 @@ def get_market_tools() -> MarketTools:
 
 
 if __name__ == "__main__":
-    # 测试用例
     print("🧪 测试统一市场工具模块...")
     
     tools = get_market_tools()

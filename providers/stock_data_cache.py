@@ -1,19 +1,9 @@
 """
 股票数据缓存管理器
-
-本模块提供股票数据的缓存管理功能，包括：
-1. 股票基本信息缓存
-2. 技术指标缓存
-3. 新闻数据缓存
-4. 筹码分析数据缓存
-5. AI分析报告缓存
-
-支持不同数据类型的差异化过期策略
 """
 
 import json
 import os
-import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 
@@ -22,25 +12,20 @@ class StockDataCache:
     """股票数据缓存管理器"""
     
     def __init__(self, cache_dir: str = "data/cache"):
-        """初始化缓存管理器"""
         self.cache_dir = cache_dir
         project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.cache_file = os.path.join(project_dir, cache_dir, "stock_data.json")
-        
-        # 确保缓存目录存在
         os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
-        
-        # 缓存配置
         self.cache_configs = {
             'basic_info': {'expire_minutes': 5, 'description': '股票基本信息'},
             'technical_indicators': {'expire_minutes': 30, 'description': '技术指标和风险指标'},
             'news_data': {'expire_minutes': 60, 'description': '新闻资讯数据'},
-            'chip_data': {'expire_minutes': 1440, 'description': '筹码分析数据'},  # 1天
+            'chip_data': {'expire_minutes': 1440, 'description': '筹码分析数据'},
             'ai_analysis': {'expire_minutes': 180, 'description': 'AI分析报告'},
         }
     
     def _make_json_safe(self, obj):
-        """将对象转换为JSON安全的格式"""
+        """对象转为JSON安全格式"""
         import numpy as np
         import pandas as pd
         
@@ -60,7 +45,7 @@ class StockDataCache:
             return obj.tolist()
         elif pd.isna(obj):
             return None
-        elif hasattr(obj, 'isoformat'):  # datetime, date objects
+        elif hasattr(obj, 'isoformat'):
             return obj.isoformat()
         else:
             return obj
@@ -78,7 +63,6 @@ class StockDataCache:
     def save_cache(self, cache_data: Dict):
         """保存缓存文件"""
         try:
-            # 确保数据是JSON安全的
             safe_cache_data = self._make_json_safe(cache_data)
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(safe_cache_data, f, ensure_ascii=False, indent=2)
@@ -94,15 +78,12 @@ class StockDataCache:
         try:
             cache_data = self.load_cache()
             cache_key = self.get_cache_key(data_type, stock_code)
-            
             if cache_key not in cache_data:
                 return False
-            
             cache_meta = cache_data[cache_key].get('cache_meta', {})
             cache_time = datetime.fromisoformat(cache_meta['timestamp'])
             expire_minutes = self.cache_configs[data_type]['expire_minutes']
             expire_time = cache_time + timedelta(minutes=expire_minutes)
-            
             return datetime.now() < expire_time
         except Exception:
             return False
@@ -121,7 +102,6 @@ class StockDataCache:
         try:
             cache_data = self.load_cache()
             cache_key = self.get_cache_key(data_type, stock_code)
-            
             cache_data[cache_key] = {
                 'cache_meta': {
                     'timestamp': datetime.now().isoformat(),
@@ -178,7 +158,6 @@ class StockDataCache:
                     print(f"ℹ️  无 {data_type} 缓存数据")
                     
             else:
-                # 清理所有缓存
                 if os.path.exists(self.cache_file):
                     os.remove(self.cache_file)
                     cache_cleared = True
@@ -186,9 +165,7 @@ class StockDataCache:
                 else:
                     print("ℹ️  缓存文件不存在")
             
-            # 如果清理了缓存，强制重新加载以确保内存中的缓存也被清空
             if cache_cleared:
-                # 通过重新读取文件来刷新内存缓存
                 self.load_cache()
                     
         except Exception as e:
@@ -206,26 +183,20 @@ class StockDataCache:
                 cached_stock_code = cache_meta.get('stock_code', '')
                 data_type = cache_meta.get('data_type', '')
                 analysis_type = cache_meta.get('analysis_type', '')
-                
-                # 如果指定了股票代码，只显示该股票的缓存
                 if stock_code and cached_stock_code != stock_code:
                     continue
-                
                 cache_time = datetime.fromisoformat(cache_meta['timestamp'])
                 expire_minutes = cache_meta.get('expire_minutes', 60)
                 expire_time = cache_time + timedelta(minutes=expire_minutes)
                 is_valid = current_time < expire_time
-                
                 remaining_minutes = (expire_time - current_time).total_seconds() / 60
                 if remaining_minutes > 0:
                     remaining_text = f"剩余 {int(remaining_minutes)} 分钟"
                 else:
                     remaining_text = "已过期"
-                
                 display_key = cache_key
                 if analysis_type:
                     display_key = f"{cached_stock_code}_{analysis_type}_AI分析"
-                
                 status[display_key] = {
                     'stock_code': cached_stock_code,
                     'data_type': data_type,
@@ -263,7 +234,6 @@ class StockDataCache:
                 status_icon = "✅" if info['valid'] else "❌"
                 print(f"{status_icon} {info['stock_code']:<8} | {info['description']:<12} | {info['remaining']:<15} | 过期: {info['expire_minutes']}分钟")
         
-        # 显示缓存文件大小
         try:
             if os.path.exists(self.cache_file):
                 file_size = os.path.getsize(self.cache_file) / 1024  # KB

@@ -16,13 +16,12 @@ from utils.format_utils import format_large_number
 from ui.components.page_common import display_technical_indicators
 from providers.market_data_tools import get_market_tools
 from providers.market_data_fetcher import fetch_index_technical_indicators
+from ui.config import FOCUS_INDICES
 
 def display_market_fundamentals():
-    """显示市场基本面分析 - 包含估值水平、资金流向和融资融券数据"""
-    
+    """显示市场基本面分析"""
     st.subheader("市场基本面分析")
     
-    # 第一部分：估值水平
     st.markdown("#### 💰 估值水平")
     
     valuation_data = get_market_tools().get_valuation_data()
@@ -41,7 +40,6 @@ def display_market_fundamentals():
             dividend_yield = valuation_data.get('hs300_dividend_yield')
             st.metric("股息率", f"{dividend_yield:.2f}%" if dividend_yield else "N/A")
             
-        # 估值分析
         with st.expander("📈 估值分析", expanded=True):
             pe_value = valuation_data.get('hs300_pe', 0)
             if pe_value:
@@ -77,12 +75,10 @@ def display_market_fundamentals():
                 
                 st.write(f"**股息水平:** {div_color} {div_level}")
     
-    # 显示估值数据获取时间
     val_time = valuation_data.get('update_time') or valuation_data.get('date')
     if val_time:
         st.caption(f"估值数据获取时间: {val_time}")
     
-    # 第二部分：资金流向
     st.markdown("#### 💸 资金流向")
     
     money_data = get_market_tools().get_money_flow_data()
@@ -90,7 +86,6 @@ def display_market_fundamentals():
     if not money_data:
         st.warning("未获取到资金流向数据")
     else:
-        # M2数据
         money_col1, money_col2 = st.columns(2)
         with money_col1:
             m2_amount = money_data.get('m2_amount')
@@ -99,7 +94,6 @@ def display_market_fundamentals():
             m2_growth = money_data.get('m2_growth')
             st.metric("M2增速", f"{m2_growth:.2f}%" if m2_growth else "N/A")
         
-        # M1数据
         m1_col1, m1_col2 = st.columns(2)
         with m1_col1:
             m1_amount = money_data.get('m1_amount')
@@ -108,7 +102,6 @@ def display_market_fundamentals():
             m1_growth = money_data.get('m1_growth')
             st.metric("M1增速", f"{m1_growth:.2f}%" if m1_growth else "N/A")
         
-        # 流动性分析
         with st.expander("💧 流动性分析", expanded=True):
             if money_data.get('m2_growth') and money_data.get('m1_growth'):
                 m2_gr = money_data['m2_growth']
@@ -125,12 +118,10 @@ def display_market_fundamentals():
                 else:
                     st.write("📉 M1增速低于M2，资金活跃度一般")
     
-    # 显示资金流向数据获取时间
     money_time = money_data.get('update_time') or money_data.get('date')
     if money_time:
         st.caption(f"资金流向数据获取时间: {money_time}")
     
-    # 第三部分：融资融券数据
     st.markdown("#### 💳 融资融券数据")
     
     margin_data = get_market_tools().get_margin_data()
@@ -151,7 +142,6 @@ def display_market_fundamentals():
         
         st.metric("统计时间", margin_data.get('margin_date', 'N/A'))
         
-        # 显示融资融券数据获取时间
         margin_time = margin_data.get('update_time') or margin_data.get('margin_date')
         if margin_time:
             st.caption(f"融资融券数据获取时间: {margin_time}")
@@ -164,7 +154,6 @@ def display_market_indices():
     
     st.subheader("大盘指数")
     
-    # 获取当前指数数据
     try:
         indices_data = market_tools.get_current_indices(use_cache=True, force_refresh=False)
         
@@ -178,13 +167,8 @@ def display_market_indices():
         
         indices_dict = indices_data['indices_dict']
         
-        # 定义主要指数及其显示顺序
-        main_indices = [
-            '上证指数', '深证成指', '创业板指', 
-            '沪深300', '中证500', '科创50'
-        ]
+        main_indices = FOCUS_INDICES
         
-        # 显示指数数据
         col1, col2, col3 = st.columns(3)
         
         for i, index_name in enumerate(main_indices):
@@ -216,29 +200,9 @@ def display_market_indices():
                         delta_color=delta_color
                     )
         
-        # 显示数据更新时间
         if 'update_time' in indices_data:
             st.caption(f"数据更新时间: {indices_data['update_time']}")
-            
-        # 显示更多指数信息（可展开）
-        with st.expander("📊 查看更多指数", expanded=False):
-            if 'indices_list' in indices_data:
-                # 创建DataFrame显示所有指数
-                df_display = []
-                for index in indices_data['indices_list']:
-                    df_display.append({
-                        '指数名称': index['name'],
-                        '代码': index['code'],
-                        '最新价': f"{index['current_price']:.2f}",
-                        '涨跌幅': f"{index['change_percent']:+.2f}%",
-                        '涨跌额': f"{index['change_amount']:+.2f}",
-                        '成交量': f"{index['volume']:,.0f}",
-                        '振幅': f"{index['amplitude']:.2f}%"
-                    })
-                
-                df_indices = pd.DataFrame(df_display)
-                st.dataframe(df_indices, use_container_width=True, hide_index=True)
-                
+                            
     except Exception as e:
         st.error(f"显示指数数据时出错: {str(e)}")
         
@@ -248,7 +212,6 @@ def display_market_summary():
 
     market_tools = get_market_tools()    
     result_data = market_tools.get_comprehensive_market_report()
-
     summary_text = market_tools.generate_market_report(result_data, format_type='summary')
 
     if not summary_text:
@@ -256,15 +219,13 @@ def display_market_summary():
         return
     
     if st.session_state.get('run_ai_index', False):        
-        # 检查是否已经生成过这个股票的AI报告
+        # 检查是否已经生成过AI报告
         stock_code_for_ai = '上证指数'
         if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
             with st.spinner("🤖 AI正在分析指数数据..."):
                 try:
-                    # 获取用户观点
                     user_opinion = st.session_state.get('market_user_opinion', '')
                     
-                    # 调用market_tools中的AI分析方法，传递用户观点
                     ai_data = market_tools.get_ai_analysis(
                         use_cache=False, 
                         index_name=stock_code_for_ai, 
@@ -272,21 +233,17 @@ def display_market_summary():
                         user_opinion=user_opinion
                     )
                     
-                    # 保存AI报告到session_state
                     if "ai_index_report" not in st.session_state:
                         st.session_state.ai_index_report = {}
                     st.session_state.ai_index_report[stock_code_for_ai] = ai_data
                     
-                    # 清除标记，避免重复执行
                     if 'run_ai_index' in st.session_state:
                         del st.session_state['run_ai_index']
                 except Exception as e:
                     st.error(f"AI分析失败: {str(e)}")
-                    # 清除标记，即使失败也要清除
                     if 'run_ai_index' in st.session_state:
                         del st.session_state['run_ai_index']
         
-    # 显示AI分析报告（如果有的话）
     current_stock_code = result_data.get('focus_index', '')
     if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
         ai_data = st.session_state['ai_index_report'][current_stock_code]
@@ -294,11 +251,9 @@ def display_market_summary():
         st.markdown("---")
         st.subheader("🤖 AI深度分析")
         
-        # 显示AI分析报告
         with st.expander("📊 AI指数分析报告", expanded=True):
             st.markdown(ai_data['report'])
             
-            # 显示分析信息
             col1, col2 = st.columns(2)
             with col1:
                 st.caption(f"分析时间: {ai_data['timestamp']}")
@@ -317,19 +272,15 @@ def display_market_summary():
         st.subheader("综合摘要")
         st.markdown(detail_text)
 
-
-    # 综合评级
     st.markdown("---")
     st.write("**🎯 综合评级:**")
     
-    # 根据各项指标给出综合评级
     tech_data = result_data.get('technical_indicators', {})
     margin_data = get_market_tools().get_margin_data()
     
     score = 0
     total_indicators = 0
     
-    # 技术面评分
     if tech_data.get('ma_trend') == '多头排列':
         score += 1
     total_indicators += 1
@@ -338,15 +289,13 @@ def display_market_summary():
         score += 1
     total_indicators += 1
     
-    # 资金面评分（基于融资融券数据）
     margin_balance = margin_data.get('margin_balance', 0)
-    if margin_balance and margin_balance > 15000:  # 1.5万亿以上表示资金活跃
+    if margin_balance and margin_balance > 15000:
         score += 1
-    elif margin_balance and margin_balance > 12000:  # 1.2万亿以上表示资金正常
+    elif margin_balance and margin_balance > 12000:
         score += 0.5
     total_indicators += 1
     
-    # 计算综合评级
     if total_indicators > 0:
         rating_ratio = score / total_indicators
         if rating_ratio >= 0.8:
@@ -371,10 +320,8 @@ def display_market_overview():
     st.header("📊 大盘整体分析")
     st.caption("基于上证指数的全市场分析")
     
-    # AI分析选项
     use_ai_analysis = st.checkbox("🤖 AI大盘分析", value=False, help="选中后将使用AI对大盘进行深入分析")
     
-    # 用户观点输入框（仅在选择AI分析时显示）
     user_opinion = ""
     if use_ai_analysis:
         user_opinion = st.text_area(
@@ -384,8 +331,7 @@ def display_market_overview():
             height=100
         )
     
-    # 分析按钮
-    col1, col2, col3 = st.columns([1, 1, 4])
+    col1, col2, _ = st.columns([1, 1, 4])
     with col1:
         analyze_btn = st.button("🔍 开始分析", type="primary")
     with col2:
@@ -393,33 +339,28 @@ def display_market_overview():
     
     market_tools = get_market_tools()
     
-    # 处理刷新按钮
     if refresh_btn:
         market_tools.refresh_all_cache()
         st.rerun()
     
-    # 显示分析结果的区域
     result_container = st.container()
     
-    # 处理分析逻辑
     if analyze_btn:
         with result_container:
             with st.spinner("正在分析大盘数据..."):
                 try:
-                    # 如果选择了AI分析，设置session_state参数
                     if use_ai_analysis:
                         if "ai_index_report" not in st.session_state:
                             st.session_state.ai_index_report = {}
                         st.session_state['run_ai_index'] = True
-                        # 保存用户观点到session_state
                         st.session_state['market_user_opinion'] = user_opinion
+                    else:
+                        st.session_state.ai_index_report = {}
                                             
-                    # 显示报告基本信息
                     report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     st.success(f"📊 **大盘整体分析报告** (基于上证指数)")
                     st.caption(f"报告时间: {report_time}")
                     
-                    # 创建标签页
                     tab1, tab2, tab3, tab4 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📋 综合摘要"])
                     
                     with tab1:
@@ -435,7 +376,6 @@ def display_market_overview():
                     with tab4:
                         display_market_summary()
                         
-                    # 额外的展示选项
                     with st.expander("📊 详细信息", expanded=False):
                         st.write(f"**分析时间:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                         st.write(f"**分析对象:** 上证指数 (大盘整体)")
@@ -445,14 +385,12 @@ def display_market_overview():
                     st.error(f"分析失败: {str(e)}")
                     st.write("请稍后重试或检查网络连接。")
                     
-                    # 显示错误详情（调试用）
                     with st.expander("🔍 错误详情", expanded=False):
                         st.code(str(e), language="text")
     else:
         with result_container:
             st.info("点击'开始分析'按钮获取大盘整体分析报告")
             
-            # 显示功能说明
             with st.expander("ℹ️ 功能说明", expanded=True):
                 st.markdown("""
                 **大盘整体分析功能包括：**

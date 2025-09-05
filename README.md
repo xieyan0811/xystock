@@ -25,30 +25,59 @@
 
 ## 安装和使用
 
-克隆仓库并构建Docker镜像
+拉取最新代码
 
-   ```bash
-   git clone git@github.com:xieyan0811/xystock.git
-   cd xystock
-   docker build . -t xystock:latest
-   ```
+```bash
+git clone https://github.com/xieyan0811/xystock.git
+cd xystock
+```
 
-启动Docker Compose容器
+### 方式一：使用预构建镜像（推荐）
 
-生产模式：
+**适用场景：** 快速部署、生产环境使用
+
+直接使用 Docker Hub 上的稳定版镜像，无需本地编译：
+
+```bash
+docker pull xieyan800811/xystock:latest
+```
+
+> 💡 **提示：** 此步骤可选，`docker-compose up` 会自动拉取镜像。后续版本更新时，重新执行 `docker pull` 即可获取最新版本。
+
+### 方式二：本地构建镜像（开发版）
+
+**适用场景：** 二次开发、功能定制、体验最新特性
+
+从源码本地构建 Docker 镜像：
+
+```bash
+docker build . -t xieyan800811/xystock:latest
+```
+
+### 启动应用
+
+**生产模式（推荐）：**
    
 ```bash
- docker compose up -d
- ```
+docker compose up -d
+```
    
- 开发模式：
- ```bash
- docker compose -f docker-compose.dev.yml up -d
- docker exec -it xystock-web bash
- python -m streamlit run ui/app.py --server.address=0.0.0.0 --server.port=8811
- ```
+**开发模式：**
 
-打开本机的 8811 端口，先配置大模型相关参数。随后可以依次尝试以下功能：token统计、大盘分析、股票分析。
+```bash
+docker compose -f docker-compose.dev.yml up -d
+docker exec -it xystock-web bash
+python -m streamlit run ui/app.py --server.address=0.0.0.0 --server.port=8811
+```
+
+### 使用指南
+
+1. 打开浏览器访问 `http://localhost:8811`
+2. 首次使用需先配置大模型相关参数
+3. 建议按以下顺序体验功能：
+   - **Token 统计** - 了解模型调用成本
+   - **大盘分析** - 获取市场整体趋势
+   - **个股分析** - 深入分析具体股票
 
 ## 支持的模型
 
@@ -120,4 +149,14 @@
 
 
 *如果你觉得项目对你有帮助或能解决你的实际问题，请帮我点亮小星星～*
+
+## 更新日志
+
+查看详细的版本更新历史和功能变化，请参考 [CHANGELOG.md](./CHANGELOG.md)。
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](./LICENSE) 文件。
+
+MIT 许可证允许您自由地使用、修改、分发本软件，包括商业用途，只需保留原始的版权声明和许可证声明。
 

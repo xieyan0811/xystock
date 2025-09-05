@@ -3,10 +3,8 @@ version: '3.8'
 services:
   # XY Stock Web 应用服务 - 开发模式
   xystock-web:
-    build: 
-      context: .
-      dockerfile: Dockerfile  # 使用相同的 Dockerfile
-    image: xystock:latest
+    #build: .
+    image: xieyan800811/xystock:latest
     container_name: xystock-web
     ports:
       - "8811:8811"
@@ -36,9 +34,3 @@ networks:
   xystock-network:
     driver: bridge
 
-volumes:
-  # 数据持久化卷
-  xystock-data:
-    driver: local
-  xystock-logs:
-    driver: local

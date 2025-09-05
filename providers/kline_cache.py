@@ -1,9 +1,5 @@
-"""
-基于CSV的K线数据缓存管理器
-支持智能缓存策略：历史数据永久保存，近期数据智能过期
-"""
+"""基于CSV的K线数据缓存管理器，支持智能缓存策略：历史数据永久保存，近期数据智能过期"""
 
-import csv
 import os
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,37 +9,34 @@ from enum import Enum
 
 
 class KLineType(Enum):
-    """K线类型枚举"""
-    MIN_1 = "1m"      # 1分钟
-    MIN_5 = "5m"      # 5分钟
-    MIN_15 = "15m"    # 15分钟
-    MIN_30 = "30m"    # 30分钟
-    MIN_60 = "60m"    # 60分钟
-    HOUR_1 = "1h"     # 1小时
-    DAY = "1d"        # 日K
-    WEEK = "1w"       # 周K
-    MONTH = "1M"      # 月K
+    MIN_1 = "1m"
+    MIN_5 = "5m"
+    MIN_15 = "15m"
+    MIN_30 = "30m"
+    MIN_60 = "60m"
+    HOUR_1 = "1h"
+    DAY = "1d"
+    WEEK = "1w"
+    MONTH = "1M"
 
 
 @dataclass
 class KLineData:
     """K线数据结构"""
-    symbol: str             # 股票代码
-    datetime: str           # 股票数据时间
-    open: float            # 开盘价
-    high: float            # 最高价
-    low: float             # 最低价
-    close: float           # 收盘价
-    volume: int            # 成交量
-    amount: Optional[float] = None  # 成交额
-    fetch_time: Optional[str] = None  # 数据拉取时间
+    symbol: str
+    datetime: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    amount: Optional[float] = None
+    fetch_time: Optional[str] = None
     
     def __post_init__(self):
-        """数据验证和默认值设置"""
         if self.high < max(self.open, self.close) or self.low > min(self.open, self.close):
             raise ValueError("K线数据不合理：最高价应大于等于开盘价和收盘价，最低价应小于等于开盘价和收盘价")
         
-        # 如果没有设置fetch_time，使用当前时间
         if self.fetch_time is None:
             self.fetch_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -52,67 +45,43 @@ class KLineCacheManager:
     """基于CSV的K线数据缓存管理器"""
     
     def __init__(self, cache_dir: str = None):
-        """
-        初始化缓存管理器
-        
-        Args:
-            cache_dir: CSV文件存储目录，默认为项目data/cache目录
-        """
         if cache_dir is None:
-            # 获取当前文件所在目录，然后构建cache路径
             project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.cache_dir = os.path.join(project_dir, "data", "cache")
         else:
             self.cache_dir = cache_dir
         
-        # 确保目录存在
         os.makedirs(self.cache_dir, exist_ok=True)
         print(f"✅ CSV缓存目录: {self.cache_dir}")
     
     def _get_csv_path(self, kline_type: KLineType) -> str:
-        """获取CSV文件路径（按时间周期存储）"""
         filename = f"kline_{kline_type.value}.csv"
         return os.path.join(self.cache_dir, filename)
     
     def _is_data_fresh(self, stock_data_time: str, fetch_time: str, kline_type: KLineType) -> bool:
-        """
-        判断数据是否需要更新
-        
-        Args:
-            stock_data_time: 股票数据的时间（如"2024-01-15 09:30:00"）
-            fetch_time: 拉取时间（如"2024-01-15 14:30:00"）
-            kline_type: K线类型
-        
-        Returns:
-            bool: True表示数据仍然有效，False表示需要更新
-        """
+        """判断数据是否需要更新"""
         try:
-            # 解析时间
             if kline_type == KLineType.DAY:
-                # 日线只比较日期部分
                 data_date = datetime.strptime(stock_data_time.split()[0], '%Y-%m-%d').date()
                 fetch_datetime = datetime.strptime(fetch_time, '%Y-%m-%d %H:%M:%S')
             else:
-                # 分钟线比较完整时间
                 data_datetime = datetime.strptime(stock_data_time, '%Y-%m-%d %H:%M:%S')
                 fetch_datetime = datetime.strptime(fetch_time, '%Y-%m-%d %H:%M:%S')
             
             now = datetime.now()
             
-            # 历史数据判断：如果数据时间是T-2之前，认为是历史数据，永久有效
+            # 历史数据判断：T-2之前的数据永久有效
             if kline_type == KLineType.DAY:
                 if data_date < (now - timedelta(days=2)).date():
-                    return True  # 历史数据，永久有效
+                    return True
                 
-                # 近期数据判断：只有当拉取时间在数据时间范围内时，才考虑过期
                 if data_date != fetch_datetime.date():
                     return True  # 不在同一天拉取的，认为有效
             else:
-                # 分钟线：如果数据时间是1小时之前，认为是历史数据
+                # 分钟线：1小时之前的数据永久有效
                 if data_datetime < now - timedelta(hours=1):
                     return True
                 
-                # 近期数据：只有当拉取时间接近数据时间时，才考虑过期
                 time_diff = abs((data_datetime - fetch_datetime).total_seconds())
                 if time_diff > 3600:  # 如果拉取时间和数据时间差距超过1小时，认为有效
                     return True
@@ -121,7 +90,6 @@ class KLineCacheManager:
             time_since_fetch = now - fetch_datetime
             
             if kline_type == KLineType.DAY:
-                # 当日日线：4小时后过期
                 return time_since_fetch < timedelta(hours=4)
             elif kline_type == KLineType.MIN_1:
                 return time_since_fetch < timedelta(minutes=1)
@@ -145,14 +113,12 @@ class KLineCacheManager:
             return False
     
     def _load_all_data(self, kline_type: KLineType) -> pd.DataFrame:
-        """加载指定类型的所有数据"""
         csv_path = self._get_csv_path(kline_type)
         
         if not os.path.exists(csv_path):
             return pd.DataFrame()
         
         try:
-            # 指定symbol列为字符串类型，避免类型转换问题
             df = pd.read_csv(csv_path, dtype={'symbol': str})
             return df
         except Exception as e:
@@ -160,7 +126,6 @@ class KLineCacheManager:
             return pd.DataFrame()
     
     def _save_all_data(self, kline_type: KLineType, df: pd.DataFrame):
-        """保存所有数据到CSV文件"""
         csv_path = self._get_csv_path(kline_type)
         
         try:
@@ -169,31 +134,18 @@ class KLineCacheManager:
             print(f"保存数据失败 {csv_path}: {e}")
     
     def get_cached_kline(self, symbol: str, kline_type: KLineType, count: int) -> Optional[List[KLineData]]:
-        """
-        获取缓存的K线数据
-        
-        Args:
-            symbol: 股票代码
-            kline_type: K线类型
-            count: 数据条数
-            
-        Returns:
-            Optional[List[KLineData]]: 缓存的K线数据，如果不存在或已过期则返回None
-        """
+        """获取缓存的K线数据"""
         try:
-            # 加载所有数据
             df = self._load_all_data(kline_type)
             
             if df.empty:
                 return None
             
-            # 筛选指定股票的数据
             symbol_df = df[df['symbol'] == symbol].copy()
             
             if symbol_df.empty:
                 return None
             
-            # 按时间排序
             symbol_df = symbol_df.sort_values('datetime')
             
             # 检查数据新鲜度，过滤掉过期的数据
@@ -203,16 +155,13 @@ class KLineCacheManager:
                     if self._is_data_fresh(row['datetime'], row['fetch_time'], kline_type):
                         fresh_data.append(row)
                 else:
-                    # 如果没有fetch_time，认为是历史数据，保留
                     fresh_data.append(row)
             
             if not fresh_data:
                 return None
             
-            # 取最后count条数据
             fresh_df = pd.DataFrame(fresh_data).tail(count)
             
-            # 转换为KLineData对象
             kline_data = []
             for _, row in fresh_df.iterrows():
                 kline_data.append(KLineData(
@@ -234,29 +183,18 @@ class KLineCacheManager:
             return None
     
     def cache_kline(self, symbol: str, kline_type: KLineType, count: int, kline_data: List[KLineData]):
-        """
-        缓存K线数据（替换指定股票的所有数据）
-        
-        Args:
-            symbol: 股票代码
-            kline_type: K线类型
-            count: 数据条数（为了保持接口兼容性，实际不使用）
-            kline_data: K线数据
-        """
+        """缓存K线数据（替换指定股票的所有数据）"""
         if not kline_data:
             return
         
         try:
-            # 加载现有数据
             df = self._load_all_data(kline_type)
             
-            # 移除指定股票的旧数据
             if not df.empty:
                 df = df[df['symbol'] != symbol]
             else:
                 df = pd.DataFrame()
             
-            # 准备新数据
             new_data_list = []
             for kdata in kline_data:
                 new_data_list.append({
@@ -273,16 +211,13 @@ class KLineCacheManager:
             
             new_df = pd.DataFrame(new_data_list)
             
-            # 合并数据
             if not df.empty:
                 df = pd.concat([df, new_df], ignore_index=True)
             else:
                 df = new_df
             
-            # 按股票代码和时间排序
             df = df.sort_values(['symbol', 'datetime'])
             
-            # 保存数据
             self._save_all_data(kline_type, df)
             
             print(f"✅ 缓存K线数据: {symbol} {kline_type.value} {len(kline_data)}条")
@@ -293,32 +228,21 @@ class KLineCacheManager:
             traceback.print_exc()
     
     def update_kline_data(self, symbol: str, kline_type: KLineType, new_data: List[KLineData]):
-        """
-        智能更新K线数据（增量更新，合并新旧数据）
-        
-        Args:
-            symbol: 股票代码
-            kline_type: K线类型
-            new_data: 新的K线数据
-        """
+        """智能更新K线数据（增量更新，合并新旧数据）"""
         if not new_data:
             return
         
         try:
-            # 加载现有数据
             df = self._load_all_data(kline_type)
             
-            # 获取指定股票的现有数据
             existing_symbol_df = df[df['symbol'] == symbol].copy() if not df.empty else pd.DataFrame()
             other_symbols_df = df[df['symbol'] != symbol].copy() if not df.empty else pd.DataFrame()
             
-            # 转换现有数据为字典，便于查找和更新
             existing_data = {}
             if not existing_symbol_df.empty:
                 for _, row in existing_symbol_df.iterrows():
                     existing_data[row['datetime']] = row.to_dict()
             
-            # 处理新数据
             for new_item in new_data:
                 existing_data[new_item.datetime] = {
                     'symbol': new_item.symbol,
@@ -332,19 +256,15 @@ class KLineCacheManager:
                     'fetch_time': new_item.fetch_time
                 }
             
-            # 重建该股票的DataFrame
             updated_symbol_df = pd.DataFrame(list(existing_data.values()))
             
-            # 合并所有数据
             if not other_symbols_df.empty:
                 df = pd.concat([other_symbols_df, updated_symbol_df], ignore_index=True)
             else:
                 df = updated_symbol_df
             
-            # 按股票代码和时间排序
             df = df.sort_values(['symbol', 'datetime'])
             
-            # 保存数据
             self._save_all_data(kline_type, df)
             
             print(f"✅ 更新K线数据: {symbol} {kline_type.value} 新增/更新 {len(new_data)}条")
@@ -353,29 +273,16 @@ class KLineCacheManager:
             print(f"更新K线数据失败: {e}")
     
     def analyze_missing_ranges(self, symbol: str, kline_type: KLineType, count: int) -> List[Tuple[str, str]]:
-        """
-        分析缺失的时间范围
-        
-        Args:
-            symbol: 股票代码
-            kline_type: K线类型
-            count: 需要的数据条数
-            
-        Returns:
-            List[Tuple[str, str]]: 缺失的时间范围列表 [(start_time, end_time), ...]
-        """
+        """分析缺失的时间范围"""
         try:
-            # 获取现有数据
-            cached_data = self.get_cached_kline(symbol, kline_type, count * 2)  # 多获取一些用于分析
+            cached_data = self.get_cached_kline(symbol, kline_type, count * 2)
             
             if not cached_data:
-                # 没有缓存数据，需要全部拉取
                 end_time = datetime.now()
                 if kline_type == KLineType.DAY:
-                    start_time = end_time - timedelta(days=count + 10)  # 多拉取一些天数，考虑周末
+                    start_time = end_time - timedelta(days=count + 10)
                     return [(start_time.strftime('%Y-%m-%d'), end_time.strftime('%Y-%m-%d'))]
                 else:
-                    # 分钟线数据
                     if kline_type == KLineType.MIN_1:
                         start_time = end_time - timedelta(minutes=count)
                     elif kline_type == KLineType.MIN_5:
@@ -390,7 +297,6 @@ class KLineCacheManager:
                     return [(start_time.strftime('%Y-%m-%d %H:%M:%S'), 
                             end_time.strftime('%Y-%m-%d %H:%M:%S'))]
             
-            # 如果有足够的数据，返回空列表
             if len(cached_data) >= count:
                 return []
             
@@ -418,33 +324,22 @@ class KLineCacheManager:
             return []
     
     def clear_cache(self, symbol: Optional[str] = None, kline_type: Optional[KLineType] = None):
-        """
-        清理缓存
-        
-        Args:
-            symbol: 指定股票代码，不指定则清理所有股票
-            kline_type: 指定K线类型，不指定则清理所有类型
-        """
+        """清理缓存"""
         try:
             if kline_type:
-                # 清理指定类型的缓存
                 if symbol:
-                    # 清理指定股票的指定类型数据
                     df = self._load_all_data(kline_type)
                     if not df.empty:
                         df = df[df['symbol'] != symbol]
                         self._save_all_data(kline_type, df)
                     print(f"✅ 清理股票 {symbol} 的 {kline_type.value} 缓存数据")
                 else:
-                    # 清理指定类型的所有数据
                     csv_path = self._get_csv_path(kline_type)
                     if os.path.exists(csv_path):
                         os.remove(csv_path)
                     print(f"✅ 清理所有 {kline_type.value} 缓存文件")
             else:
-                # 清理所有缓存
                 if symbol:
-                    # 清理指定股票的所有数据
                     for ktype in KLineType:
                         df = self._load_all_data(ktype)
                         if not df.empty:
@@ -452,7 +347,6 @@ class KLineCacheManager:
                             self._save_all_data(ktype, df)
                     print(f"✅ 清理股票 {symbol} 的所有缓存数据")
                 else:
-                    # 清理所有数据
                     for file in os.listdir(self.cache_dir):
                         if file.startswith('kline_') and file.endswith('.csv'):
                             os.remove(os.path.join(self.cache_dir, file))
@@ -483,12 +377,10 @@ class KLineCacheManager:
                         fresh_data.append(row)
                 
                 if len(fresh_data) != len(df):
-                    # 保存清理后的数据
                     if fresh_data:
                         fresh_df = pd.DataFrame(fresh_data)
                         self._save_all_data(kline_type, fresh_df)
                     else:
-                        # 如果没有数据了，删除文件
                         csv_path = self._get_csv_path(kline_type)
                         if os.path.exists(csv_path):
                             os.remove(csv_path)
@@ -500,12 +392,7 @@ class KLineCacheManager:
             print(f"清理过期缓存失败: {e}")
     
     def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        获取缓存统计信息
-        
-        Returns:
-            Dict[str, Any]: 缓存统计信息
-        """
+        """获取缓存统计信息"""
         try:
             csv_files = [f for f in os.listdir(self.cache_dir) if f.startswith('kline_') and f.endswith('.csv')]
             
@@ -524,10 +411,8 @@ class KLineCacheManager:
                 file_size = os.path.getsize(file_path)
                 total_size += file_size
                 
-                # 解析文件名获取K线类型
                 kline_type = file.replace('kline_', '').replace('.csv', '')
                 
-                # 统计记录数和股票数
                 df = pd.read_csv(file_path)
                 record_count = len(df)
                 total_records += record_count

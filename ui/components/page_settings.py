@@ -5,14 +5,10 @@ XY Stock 股票分析系统 - 设置界面
 import streamlit as st
 import os
 import sys
-import json
-from pathlib import Path
 
-# 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
-# 导入配置管理器
 from config_manager import config
 
 def save_config(section, key, value):
@@ -104,18 +100,15 @@ def main():
         # 保存按钮
         if st.button("💾 保存设置", type="primary"):
             try:
-                # 保存基本设置
                 save_config('LLM_OPENAI', 'API_KEY', api_key)
                 save_config('LLM_OPENAI', 'BASE_URL', base_url)
                 save_config('LLM_OPENAI', 'DEFAULT_MODEL', analysis_model)
                 save_config('LLM_OPENAI', 'INFERENCE_MODEL', inference_model)
                 
-                # 保存高级设置
                 save_config('LLM_OPENAI', 'TIMEOUT', timeout)
                 save_config('LLM_OPENAI', 'MAX_RETRIES', max_retries)
                 save_config('LLM_OPENAI', 'DEFAULT_TEMPERATURE', temperature)
                 
-                # 保存缓存设置
                 save_config('LLM_CACHE', 'ENABLE_CACHE', enable_cache)
                 save_config('LLM_CACHE', 'CACHE_TTL', cache_ttl)
                 
@@ -124,14 +117,12 @@ def main():
                 st.error(f"保存失败: {str(e)}")
     
     
-    # 测试连接区域
     st.subheader("测试连接")
     if st.button("🔄 测试API连接"):
         with st.spinner("正在测试连接..."):
             try:
                 from llm.openai_client import OpenAIClient
                 
-                # 使用临时客户端测试连接
                 client = OpenAIClient(api_key=api_key)
                 response = client.ask("这是一个API连接测试，请回复'连接成功'", model_type="inference")
                 
@@ -143,7 +134,6 @@ def main():
                 st.error(f"API连接测试失败：{str(e)}")
 
 
-    # 新增用户画像设置区域（简化版）
     with st.container():
         st.subheader("用户画像")
         user_profile = st.text_area(
@@ -153,7 +143,6 @@ def main():
             help="请简要描述您的擅长领域、交易习惯等，有助于系统更好地理解您的需求"
         )
         
-        # 常犯错误多选项
         common_mistakes_options = [
             "踏空", "套牢", "卖飞", "追高杀跌", "频繁操作", "重仓单一标的", "止损不坚决", "盲目跟风", "情绪化交易", "行情不好时回避关注"
         ]
@@ -173,7 +162,6 @@ def main():
                 st.error(f"保存失败: {str(e)}")
 
 
-    # 页面底部信息
     st.markdown("---")
     st.markdown(
         """

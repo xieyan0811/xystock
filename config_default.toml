@@ -20,3 +20,30 @@ LOG_LEVEL = "INFO"
 # 缓存配置（可选）
 ENABLE_CACHE = false
 CACHE_TTL = 3600  # 缓存时间（秒）
+
+[AI_ANALYSIS]
+# AI分析配置
+[AI_ANALYSIS.TECHNICAL]
+TEMPERATURE = 0.5
+MODEL_TYPE = "inference"
+CACHE_FILENAME = "req_tech.txt"
+
+[AI_ANALYSIS.NEWS]
+TEMPERATURE = 0.7
+MODEL_TYPE = "default"
+CACHE_FILENAME = "req_news.txt"
+
+[AI_ANALYSIS.CHIP]
+TEMPERATURE = 0.5
+MODEL_TYPE = "default"
+CACHE_FILENAME = "req_chip.txt"
+
+[AI_ANALYSIS.FUNDAMENTAL]
+TEMPERATURE = 0.6
+MODEL_TYPE = "default"
+CACHE_FILENAME = "req_basic_info.txt"
+
+[AI_ANALYSIS.COMPREHENSIVE]
+TEMPERATURE = 0.4
+MODEL_TYPE = "default"
+CACHE_FILENAME = "req.txt"
