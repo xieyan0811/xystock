@@ -81,11 +81,11 @@ class StockDataFormatter:
         indicators = kline_info.get('indicators')
         risk_metrics = kline_info.get('risk_metrics')
         if indicators:
-            indicators_text = format_indicators_dict(indicators, "技术指标")
+            indicators_text = format_indicators_dict(indicators, "技术指标", "（注意：使用的 K线数据截至上一交易日）")
             text_parts.append(indicators_text)
         
         if risk_metrics:
-            risk_text = format_indicators_dict(risk_metrics, "风险指标")
+            risk_text = format_indicators_dict(risk_metrics, "风险指标", "（注意：使用的 K线数据截至上一交易日）")
             text_parts.append(risk_text)
 
         if 'data_length' in kline_info:

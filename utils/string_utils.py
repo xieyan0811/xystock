@@ -129,7 +129,7 @@ def normalize_whitespace(text: str) -> str:
     return text
 
 
-def format_indicators_dict(data_dict: Dict[str, Any], title: str) -> str:
+def format_indicators_dict(data_dict: Dict[str, Any], title: str, desc = None) -> str:
     """
     将指标字典格式化为字符串
     
@@ -144,6 +144,8 @@ def format_indicators_dict(data_dict: Dict[str, Any], title: str) -> str:
         return f"{title}：无数据\n"
     
     result_text = f"{title}：\n"
+    if desc:
+        result_text += f"{desc}\n"
     for key, value in data_dict.items():
         if isinstance(value, (int, float)):
             # 数值型数据保留2位小数

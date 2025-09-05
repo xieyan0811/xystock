@@ -49,7 +49,9 @@ def generate_index_analysis_report(
         
         if tech_indicators:
             tech_text = f"## 主要技术指标（{stock_name}）：\n"
-            
+
+            tech_text += "（注意：使用的 K线数据截至上一交易日）\n"
+
             for key, value in tech_indicators.items():
                 if isinstance(value, (int, float)):
                     formatted_value = round(float(value), 2)
