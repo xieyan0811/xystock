@@ -22,6 +22,7 @@ import akshare as ak
 import pandas as pd
 import efinance as ef
 from providers.stock_utils import get_indicators
+from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 
 def fetch_market_sentiment() -> Dict:
     """获取市场情绪数据"""
@@ -130,11 +131,9 @@ def fetch_current_indices() -> Dict:
         
         if not df_indices.empty:
             indices_list = []
-            target_indices = ["上证指数", "深证成指", "北证50", "创业板指", "科创综指",
-                              "沪深300", "中证500", "科创50"]
 
             for _, row in df_indices.iterrows():
-                if str(row.get('名称', '')) not in target_indices:
+                if str(row.get('名称', '')) not in FOCUS_INDICES:
                     continue
                 index_info = {
                     'code': str(row.get('代码', '')),
@@ -166,8 +165,7 @@ def fetch_current_indices() -> Dict:
             
             print(f"      成功获取 {len(indices_dict)} 个指数数据")
             
-            main_indices = ['上证指数', '深证成指', '创业板指', '沪深300', '中证500', '科创50']
-            for name in main_indices:
+            for name in FOCUS_INDICES:
                 if name in indices_dict:
                     idx = indices_dict[name]
                     change_sign = '+' if idx['change_percent'] >= 0 else ''
@@ -272,32 +270,13 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
 def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> Dict:
     """获取指数技术指标（实时数据，不缓存）"""
     print(f"📊 获取{index_name}技术指标...")
-    
-    indices = {
-        '上证指数': '000001',
-        '深证成指': '399001', 
-        '创业板指': '399006',
-        '沪深300': '000300',
-        '中证500': '000905',
-        '科创50': '000688'
-    }
         
     try:
-        if index_name not in indices:
+        if index_name not in INDEX_SYMBOL_MAPPING:
             raise ValueError(f"不支持的指数名称: {index_name}")
         
-        if index_name == '上证指数':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000001")
-        elif index_name == '深证成指':
-            df_raw = ak.stock_zh_index_daily(symbol="sz399001")
-        elif index_name == '创业板指':
-            df_raw = ak.stock_zh_index_daily(symbol="sz399006")
-        elif index_name == '沪深300':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000300")
-        elif index_name == '中证500':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000905")
-        elif index_name == '科创50':
-            df_raw = ak.stock_zh_index_daily(symbol="sh000688")
+        symbol = INDEX_SYMBOL_MAPPING[index_name]
+        df_raw = ak.stock_zh_index_daily(symbol=symbol)
         
         if df_raw.empty:
             raise ValueError(f"无法获取{index_name}数据")

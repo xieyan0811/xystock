@@ -8,8 +8,9 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from providers.market_data_tools import get_market_tools
-from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_large_number
+from utils.format_utils import format_volume, format_large_number
 from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
+from ui.config import FOCUS_INDICES
 
 
 def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
@@ -142,10 +143,8 @@ def generate_markdown_market_report(index_name, report_data):
 
 """
             
-            # 定义要显示的主要指数顺序
-            main_indices = ['上证指数', '深证成指', '创业板指', '科创50', '沪深300', '中证500']
-            
-            for idx_name in main_indices:
+
+            for idx_name in FOCUS_INDICES:
                 if idx_name in indices_dict:
                     idx_data = indices_dict[idx_name]
                     current = idx_data.get('current_price', 0)
@@ -424,4 +423,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"   ❌ 报告生成失败: {e}")
     
+    print("\n✅ 测试完成!")
     print("\n✅ 测试完成!")

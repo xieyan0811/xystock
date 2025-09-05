@@ -4,27 +4,21 @@ import json
 from pathlib import Path
 import time
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import sys
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from ui.config import INDEX_CODE_MAPPING
+
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
 _STOCK_NAME_CODE_MAP = {}
 _HK_STOCK_CODE_NAME_MAP = {}
 _HK_STOCK_NAME_CODE_MAP = {}
-_INDEX_CODE_NAME_MAP = {
-    '000001': '上证指数',
-    '399001': '深证成指', 
-    '399006': '创业板指',
-    '000300': '沪深300',
-    '000905': '中证500',
-    '000688': '科创50'
-}
-_INDEX_NAME_CODE_MAP = {
-    '上证指数': '000001',
-    '深证成指': '399001', 
-    '创业板指': '399006',
-    '沪深300': '000300',
-    '中证500': '000905',
-    '科创50': '000688'
-}
+
+_INDEX_CODE_NAME_MAP = {code: name for name, code in INDEX_CODE_MAPPING.items()}
+_INDEX_NAME_CODE_MAP = INDEX_CODE_MAPPING.copy()
 
 _LAST_UPDATE_TIME = 0
 _HK_LAST_UPDATE_TIME = 0

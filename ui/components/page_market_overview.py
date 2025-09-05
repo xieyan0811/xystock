@@ -16,6 +16,7 @@ from utils.format_utils import format_large_number
 from ui.components.page_common import display_technical_indicators
 from providers.market_data_tools import get_market_tools
 from providers.market_data_fetcher import fetch_index_technical_indicators
+from ui.config import FOCUS_INDICES
 
 def display_market_fundamentals():
     """显示市场基本面分析"""
@@ -166,10 +167,7 @@ def display_market_indices():
         
         indices_dict = indices_data['indices_dict']
         
-        main_indices = [
-            '上证指数', '深证成指', '创业板指', 
-            '沪深300', '中证500', '科创50'
-        ]
+        main_indices = FOCUS_INDICES
         
         col1, col2, col3 = st.columns(3)
         
@@ -214,7 +212,6 @@ def display_market_summary():
 
     market_tools = get_market_tools()    
     result_data = market_tools.get_comprehensive_market_report()
-
     summary_text = market_tools.generate_market_report(result_data, format_type='summary')
 
     if not summary_text:
@@ -334,7 +331,7 @@ def display_market_overview():
             height=100
         )
     
-    col1, col2, col3 = st.columns([1, 1, 4])
+    col1, col2, _ = st.columns([1, 1, 4])
     with col1:
         analyze_btn = st.button("🔍 开始分析", type="primary")
     with col2:
@@ -357,6 +354,8 @@ def display_market_overview():
                             st.session_state.ai_index_report = {}
                         st.session_state['run_ai_index'] = True
                         st.session_state['market_user_opinion'] = user_opinion
+                    else:
+                        st.session_state.ai_index_report = {}
                                             
                     report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     st.success(f"📊 **大盘整体分析报告** (基于上证指数)")
