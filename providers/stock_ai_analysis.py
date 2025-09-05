@@ -3,11 +3,13 @@
 提供基于LLM的股票市场分析功能、筹码分析功能、新闻分析功能和基本面分析功能
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
+from dataclasses import dataclass
 from llm.openai_client import OpenAIClient
 import datetime
 import sys
 import os
+import traceback
 
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_dir not in sys.path:
@@ -15,6 +17,323 @@ if project_dir not in sys.path:
 
 from utils.string_utils import remove_markdown_format
 from providers.data_formatters import get_stock_formatter
+
+
+@dataclass
+class AnalysisResult:
+    """AI分析结果的统一格式"""
+    success: bool
+    report: str
+    timestamp: str
+    error_message: Optional[str] = None
+    analysis_type: str = ""
+    stock_code: str = ""
+    data_sources: Optional[List[Dict]] = None
+
+
+class AnalysisConfig:
+    """AI分析配置管理器"""
+    
+    def __init__(self):
+        try:
+            from config_manager import config
+            self.config = config
+        except Exception as e:
+            print(f"加载配置失败，使用默认配置: {e}")
+            self.config = None
+    
+    def get_analysis_config(self, analysis_type: str) -> Dict[str, Any]:
+        """获取指定分析类型的配置"""
+        if not self.config:
+            return self._get_default_config(analysis_type)
+        
+        try:
+            config_key = f"AI_ANALYSIS.{analysis_type.upper()}"
+            return {
+                'temperature': self.config.get(f'{config_key}.TEMPERATURE', 0.5),
+                'model_type': self.config.get(f'{config_key}.MODEL_TYPE', 'default'),
+                'max_length': self.config.get(f'{config_key}.MAX_LENGTH', 500),
+                'cache_filename': self.config.get(f'{config_key}.CACHE_FILENAME', f'req_{analysis_type}.txt')
+            }
+        except Exception as e:
+            print(f"获取{analysis_type}配置失败，使用默认配置: {e}")
+            return self._get_default_config(analysis_type)
+    
+    def _get_default_config(self, analysis_type: str) -> Dict[str, Any]:
+        """获取默认配置"""
+        defaults = {
+            'technical': {'temperature': 0.5, 'model_type': 'inference', 'max_length': 500, 'cache_filename': 'req_tech.txt'},
+            'news': {'temperature': 0.7, 'model_type': 'default', 'max_length': 800, 'cache_filename': 'req_news.txt'},
+            'chip': {'temperature': 0.5, 'model_type': 'default', 'max_length': 500, 'cache_filename': 'req_chip.txt'},
+            'fundamental': {'temperature': 0.6, 'model_type': 'default', 'max_length': 500, 'cache_filename': 'req_basic_info.txt'},
+            'comprehensive': {'temperature': 0.4, 'model_type': 'default', 'max_length': 800, 'cache_filename': 'req.txt'}
+        }
+        return defaults.get(analysis_type, defaults['comprehensive'])
+
+
+class DataCollector:
+    """数据收集器 - 负责收集各种分析所需的数据"""
+    
+    def __init__(self):
+        self.formatter = get_stock_formatter()
+    
+    def collect_stock_basic_info(self, stock_identity: Dict[str, Any]) -> Tuple[str, Optional[Dict]]:
+        """收集股票基本信息"""
+        try:
+            from providers.stock_data_tools import get_stock_tools
+            stock_tools = get_stock_tools()
+            basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True)
+            
+            if basic_info and 'error' not in basic_info:
+                formatted_info = self.formatter.format_basic_info(basic_info, stock_identity)
+                data_source = {
+                    'type': '股票基本信息',
+                    'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
+                    'timestamp': basic_info.get('update_time', '未知时间')
+                }
+                return formatted_info, data_source
+        except Exception as e:
+            print(f"获取股票基本信息失败: {e}")
+        
+        return "", None
+    
+    def collect_historical_analyses(self, stock_code: str, stock_tools=None) -> Tuple[Dict[str, str], List[Dict]]:
+        """收集历史分析数据"""
+        historical_analyses = {}
+        data_sources = []
+        
+        if not stock_tools:
+            return historical_analyses, data_sources
+        
+        analysis_types = {
+            'technical': '技术分析',
+            'fundamental': '基本面分析',
+            'news': '新闻分析',
+            'chip': '筹码分析'
+        }
+        
+        for analysis_type, description in analysis_types.items():
+            try:
+                cached_analysis = stock_tools.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
+                if cached_analysis and 'report' in cached_analysis:
+                    historical_analyses[analysis_type] = cached_analysis['report']
+                    data_sources.append({
+                        'type': description,
+                        'description': f'缓存的{description}报告',
+                        'timestamp': cached_analysis.get('timestamp', '未知时间')
+                    })
+            except Exception as e:
+                print(f"获取{description}失败: {e}")
+        
+        return historical_analyses, data_sources
+    
+    def collect_market_data(self, market_tools=None) -> Tuple[str, str, List[Dict]]:
+        """收集市场数据"""
+        market_report_text = ""
+        market_ai_analysis = ""
+        data_sources = []
+        
+        if not market_tools:
+            try:
+                from providers.market_data_tools import get_market_tools
+                market_tools = get_market_tools()
+            except Exception as e:
+                print(f"导入market_tools失败: {e}")
+                return market_report_text, market_ai_analysis, data_sources
+        
+        # 收集市场综合报告
+        try:
+            market_report = market_tools.get_comprehensive_market_report(use_cache=True)
+            if market_report:
+                data_sources.append({
+                    'type': '市场综合报告',
+                    'description': '包含技术指标、情绪、估值、资金流向等市场数据',
+                    'timestamp': market_report.get('report_time', '未知时间')
+                })
+                market_report_text = market_tools.generate_market_report(market_report, format_type='summary')
+        except Exception as e:
+            print(f"获取市场综合报告失败: {e}")
+        
+        # 收集AI大盘分析
+        try:
+            market_ai_data = market_tools.get_ai_analysis(use_cache=True)
+            if market_ai_data:
+                if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
+                    market_ai_analysis = market_ai_data['report']
+                data_sources.append({
+                    'type': 'AI大盘分析',
+                    'description': '基于AI模型的市场分析报告',
+                    'timestamp': market_ai_data.get('analysis_time', '未知时间')
+                })
+        except Exception as e:
+            print(f"获取大盘分析失败: {e}")
+        
+        return market_report_text, market_ai_analysis, data_sources
+    
+    def collect_user_profile(self) -> Tuple[str, str, List[Dict]]:
+        """收集用户画像数据"""
+        user_profile_section = ""
+        user_mistakes_section = ""
+        data_sources = []
+        
+        try:
+            from config_manager import config
+            
+            # 用户画像
+            user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
+            if user_profile_raw:
+                user_profile_section = f"\n# 用户画像\n{user_profile_raw}\n"
+                data_sources.append({
+                    'type': '用户画像',
+                    'description': '用户的投资偏好、风险承受能力等信息',
+                    'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+            
+            # 用户常犯错误
+            user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
+            if user_mistakes:
+                user_mistakes_section = f"\n# 用户常犯错误\n{user_mistakes}\n"
+                data_sources.append({
+                    'type': '用户常犯错误',
+                    'description': '用户在投资过程中常犯的错误和误区',
+                    'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+        except Exception as e:
+            print(f"获取用户配置失败: {e}")
+        
+        return user_profile_section, user_mistakes_section, data_sources
+
+
+class ReportFormatter:
+    """报告格式化器 - 负责格式化各种数据为报告格式"""
+    
+    @staticmethod
+    def format_historical_summary(historical_analyses: Dict[str, str], truncate_data: bool = False) -> str:
+        """格式化历史分析摘要"""
+        if not historical_analyses:
+            return "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
+        
+        analysis_types = {
+            'technical': '技术分析',
+            'fundamental': '基本面分析',
+            'news': '新闻分析',
+            'chip': '筹码分析'
+        }
+        
+        historical_summary = "\n\n# 📊 历史分析摘要\n"
+        for analysis_type, report in historical_analyses.items():
+            if truncate_data:
+                summary = report[:300] + "..." if len(report) > 300 else report
+            else:
+                summary = report
+            summary = remove_markdown_format(summary)
+            historical_summary += f"\n## {analysis_types.get(analysis_type, analysis_type)}:\n\n{summary}\n"
+        
+        return historical_summary
+    
+    @staticmethod
+    def format_market_summary(market_report_text: str, market_ai_analysis: str, truncate_data: bool = False) -> str:
+        """格式化市场环境分析"""
+        if not market_report_text and not market_ai_analysis:
+            return "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
+        
+        market_summary = "\n\n# 🌐 市场环境分析\n"
+        
+        if market_report_text:
+            market_text_summary = market_report_text[:500] + "..." if truncate_data and len(market_report_text) > 500 else market_report_text
+            market_summary += f"\n## 市场综合报告:\n\n{market_text_summary}\n\n"
+        
+        if market_ai_analysis:
+            ai_summary = market_ai_analysis[:300] + "..." if truncate_data and len(market_ai_analysis) > 300 else market_ai_analysis
+            market_summary += f"\n### AI大盘分析:\n\n{ai_summary}\n\n"
+        
+        return market_summary
+    
+    @staticmethod
+    def format_user_opinion_section(user_opinion: str, user_position: str) -> Tuple[str, List[Dict]]:
+        """格式化用户观点部分"""
+        user_opinion_section = ""
+        data_sources = []
+        
+        if user_opinion.strip():
+            user_opinion_section = f"\n# 用户观点\n{user_opinion.strip()}\n"
+            data_sources.append({
+                'type': '用户观点',
+                'description': '用户提供的投资观点和看法',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        if user_position and user_position.strip() and user_position.strip() != "不确定":
+            user_opinion_section += f"\n# 用户当前持仓状态\n{user_position.strip()}\n"
+            data_sources.append({
+                'type': '用户持仓',
+                'description': f'用户当前持仓状态：{user_position.strip()}',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return user_opinion_section, data_sources
+
+
+def _save_request_to_cache(content: str, filename: str):
+    """保存请求内容到缓存文件"""
+    try:
+        cache_path = os.path.join(project_dir, "data", "cache", filename)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception as e:
+        print(f"保存请求文件{filename}失败: {e}")
+
+
+def _handle_analysis_error(error: Exception, analysis_type: str = "分析") -> Tuple[str, str]:
+    """统一的错误处理"""
+    error_msg = f"生成{analysis_type}报告失败: {str(error)}"
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return error_msg, timestamp
+
+
+class BaseAnalysisGenerator:
+    """基础分析生成器 - 提供通用的分析生成功能"""
+    
+    def __init__(self):
+        self.client = OpenAIClient()
+        self.config_manager = AnalysisConfig()
+    
+    def generate_analysis(self, analysis_type: str, messages: List[Dict], stock_code: str = "") -> AnalysisResult:
+        """通用的分析生成方法"""
+        config = self.config_manager.get_analysis_config(analysis_type)
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        if len(messages) > 1:
+            _save_request_to_cache(messages[1]['content'], config['cache_filename'])
+        
+        try:
+            response = self.client.chat(
+                messages=messages,
+                temperature=config['temperature'],
+                model_type=config['model_type']
+            )
+            
+            return AnalysisResult(
+                success=True,
+                report=response,
+                timestamp=timestamp,
+                analysis_type=analysis_type,
+                stock_code=stock_code
+            )
+            
+        except Exception as e:
+            error_msg = f"生成{analysis_type}分析报告失败: {str(e)}"
+            print(error_msg)
+            traceback.print_exc()
+            
+            return AnalysisResult(
+                success=False,
+                report=error_msg,
+                timestamp=timestamp,
+                error_message=str(e),
+                analysis_type=analysis_type,
+                stock_code=stock_code
+            )
 
 def get_stock_info(stock_identity):
     from providers.stock_data_tools import get_stock_tools
@@ -24,13 +343,12 @@ def get_stock_info(stock_identity):
 def generate_stock_analysis_report(
     stock_identity: Dict[str, Any],
     kline_info: Dict[str, Any] = None,
-) -> str:
+) -> AnalysisResult:
     """生成股票技术分析报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
 
-    client = OpenAIClient()
-    
+    generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
     basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
     kline_text = formatter.format_kline_data(kline_info)
@@ -72,31 +390,18 @@ def generate_stock_analysis_report(
         }
     ]
 
-    with open(os.path.join(project_dir, "data", "cache", "req_tech.txt"), "w", encoding="utf-8") as f:
-        f.write(messages[1]['content'])
-    #print(f'req length {len(messages[1]['content'])}')
-
-    try:
-        response = client.chat(
-            messages=messages,
-            temperature=0.5,
-            model_type="inference"
-        )
-        return response
-    except Exception as e:
-        return f"生成分析报告失败: {str(e)}"
+    return generator.generate_analysis("technical", messages, stock_code)
 
 
 def generate_news_analysis_report(
     stock_identity: Dict[str, Any],
     news_data: List[Dict]
-) -> Tuple[str, str]:
-    """生成股票新闻分析报告，返回(分析报告, 时间戳)"""
+) -> AnalysisResult:
+    """生成股票新闻分析报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
 
-    client = OpenAIClient()
-    
+    generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
     basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
     news_text = formatter.format_news_data(news_data, has_content=True)
@@ -161,32 +466,18 @@ def generate_news_analysis_report(
         }
     ]
     
-    with open(os.path.join(project_dir, "data", "cache", "req_news.txt"), "w", encoding="utf-8") as f:
-        f.write(messages[1]['content'])
-
-    try:
-        response = client.chat(
-            messages=messages,
-            temperature=0.7,
-            model_type="default"
-        )
-        now = datetime.datetime.now()
-        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-        return response, timestamp
-    except Exception as e:
-        return f"生成新闻分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return generator.generate_analysis("news", messages, stock_code)
         
         
 def generate_chip_analysis_report(
     stock_identity: Dict[str, Any],
     chip_data: Dict[str, Any]
-) -> Tuple[str, str]:
-    """生成筹码分析报告，返回(分析报告, 时间戳)"""
+) -> AnalysisResult:
+    """生成筹码分析报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
 
-    client = OpenAIClient()
-    
+    generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
     basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
     chip_text = formatter.format_chip_data(chip_data)
@@ -227,33 +518,19 @@ def generate_chip_analysis_report(
         }
     ]
     
-    with open(os.path.join(project_dir, "data", "cache", "req_chip.txt"), "w", encoding="utf-8") as f:
-        f.write(messages[1]['content'])
-
-    try:
-        response = client.chat(
-            messages=messages,
-            temperature=0.5,
-            model_type="default"
-        )
-        now = datetime.datetime.now()
-        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-        return response, timestamp
-    except Exception as e:
-        return f"生成筹码分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return generator.generate_analysis("chip", messages, stock_code)
 
 
 def generate_fundamental_analysis_report(
     stock_identity: Dict[str, Any],
     fundamental_data: Dict[str, Any]
-) -> Tuple[str, str]:
-    """生成股票基本面分析报告，返回(分析报告, 时间戳)"""
+) -> AnalysisResult:
+    """生成股票基本面分析报告"""
     
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
 
-    client = OpenAIClient()
-    
+    generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
     basic_info_section = formatter.format_basic_info(fundamental_data, stock_identity)
     currency_name = stock_identity.get('currency_name', '人民币')
@@ -303,197 +580,63 @@ def generate_fundamental_analysis_report(
         }
     ]
 
-    with open(os.path.join(project_dir, "data", "cache", "req_basic_info.txt"), "w", encoding="utf-8") as f:
-        f.write(messages[1]['content'])
-        
-    try:
-        response = client.chat(
-            messages=messages,
-            temperature=0.6,
-            model_type="default"
-        )
-        now = datetime.datetime.now()
-        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-        return response, timestamp
-    except Exception as e:
-        return f"生成基本面分析报告失败: {str(e)}", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return generator.generate_analysis("fundamental", messages, stock_code)
 
 
 
 def generate_comprehensive_analysis_report(
     stock_identity: Dict[str, Any],
     user_opinion: str = "",
-    user_position: str="不确定",
+    user_position: str = "不确定",
     stock_tools=None,
     market_tools=None,
     truncate_data: bool = False
-) -> Tuple[str, List[Dict]]:
-    """生成综合分析报告，返回(分析报告, 数据来源列表)"""
+) -> AnalysisResult:
+    """生成综合分析报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
-
-    client = OpenAIClient()
-    historical_analyses = {}
-    data_sources = []
-    market_report_text = ""
-    market_ai_analysis = ""
-    if market_tools is None:
-        try:
-            from providers.market_data_tools import get_market_tools
-            market_tools = get_market_tools()
-        except Exception as e:
-            print(f"导入market_tools失败: {e}")
-    if market_tools:
-        try:
-            market_report = market_tools.get_comprehensive_market_report(use_cache=True)
-            if market_report:
-                data_sources.append({
-                    'type': '市场综合报告',
-                    'description': '包含技术指标、情绪、估值、资金流向等市场数据',
-                    'timestamp': market_report.get('report_time', '未知时间')
-                })
-                market_report_text = market_tools.generate_market_report(market_report, format_type='summary')
-        except Exception as e:
-            print(f"获取市场综合报告失败: {e}")
-        try:
-            market_ai_data = market_tools.get_ai_analysis(use_cache=True)
-            if market_ai_data:
-                if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
-                    market_ai_analysis = market_ai_data['report']
-                data_sources.append({
-                    'type': 'AI大盘分析',
-                    'description': '基于AI模型的市场分析报告',
-                    'timestamp': market_ai_data.get('analysis_time', '未知时间')
-                })
-        except Exception as e:
-            print(f"获取大盘分析失败: {e}")
-            import traceback
-            traceback.print_exc()
+    
+    # 初始化数据收集器和格式化器
+    collector = DataCollector()
+    formatter = ReportFormatter()
+    all_data_sources = []
+    
     try:
-        if stock_tools:
-            analysis_types = {
-                'technical': '技术分析',
-                'fundamental': '基本面分析',
-                'news': '新闻分析',
-                'chip': '筹码分析'
-            }
-            for analysis_type, description in analysis_types.items():
-                try:
-                    cached_analysis = stock_tools.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
-                    if cached_analysis and 'report' in cached_analysis:
-                        historical_analyses[analysis_type] = cached_analysis['report']
-                        data_sources.append({
-                            'type': description,
-                            'description': f'缓存的{description}报告',
-                            'timestamp': cached_analysis.get('timestamp', '未知时间')
-                        })
-                except Exception as e:
-                    print(f"获取{description}失败: {e}")
-                    continue
+        # 1. 收集股票基本信息
+        basic_info_section, basic_info_source = collector.collect_stock_basic_info(stock_identity)
+        if basic_info_source:
+            all_data_sources.append(basic_info_source)
+        
+        # 2. 收集历史分析数据
+        historical_analyses, historical_sources = collector.collect_historical_analyses(stock_code, stock_tools)
+        all_data_sources.extend(historical_sources)
+        
+        # 如果没有历史分析数据，添加提示信息
         if not historical_analyses:
-            data_sources.append({
+            all_data_sources.append({
                 'type': '提示信息',
                 'description': '未找到历史分析数据，将基于基本信息进行分析',
                 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             })
-    except Exception as e:
-        print(f"收集历史分析数据时出错: {e}")
-        data_sources.append({
-            'type': '错误信息',
-            'description': f'收集历史数据时出错: {str(e)}',
-            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-    historical_summary = ""
-    if historical_analyses:
-        historical_summary = "\n\n# 📊 历史分析摘要\n"
-        for analysis_type, report in historical_analyses.items():
-            if truncate_data:
-                summary = report[:300] + "..." if len(report) > 300 else report
-            else:
-                summary = report
-            summary = remove_markdown_format(summary)
-            historical_summary += f"\n## {analysis_types.get(analysis_type, analysis_type)}:\n\n{summary}\n"
-    else:
-        historical_summary = "\n\n## 📊 历史分析摘要\n未找到相关历史分析数据，将基于股票基本信息进行分析。\n"
-    market_summary = ""
-    if market_report_text or market_ai_analysis:
-        market_summary = "\n\n# 🌐 市场环境分析\n"
-        if market_report_text:
-            if truncate_data:
-                market_text_summary = market_report_text[:500] + "..." if len(market_report_text) > 500 else market_report_text
-            else:
-                market_text_summary = market_report_text
-            market_summary += f"\n## 市场综合报告:\n\n{market_text_summary}\n\n"
-        if market_ai_analysis:
-            if truncate_data:
-                ai_summary = market_ai_analysis[:300] + "..." if len(market_ai_analysis) > 300 else market_ai_analysis
-            else:
-                ai_summary = market_ai_analysis
-            market_summary += f"\n### AI大盘分析:\n\n{ai_summary}\n\n"
-    else:
-        market_summary = "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
-
-    formatter = get_stock_formatter()    
-    basic_info_section = ""
-    try:
-        from providers.stock_data_tools import get_stock_tools
-        stock_tools = get_stock_tools()
-        basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True)
-        if basic_info and 'error' not in basic_info:
-            basic_info_section = formatter.format_basic_info(basic_info, stock_identity)
-            info = {
-                'type': '股票基本信息',
-                'description': '包含当前价格、涨跌额、涨跌幅等实时数据',
-                'timestamp': basic_info.get('update_time', '未知时间')
-            }
-            data_sources.append(info)
-    except Exception as e:
-        print(f"获取股票基本信息失败: {e}")
-    user_profile_section = ""
-    try:
-        from config_manager import config
-        user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
-        if user_profile_raw:
-            user_profile_section = f"\n# 用户画像\n{user_profile_raw}\n"
-            data_sources.append({
-                'type': '用户画像',
-                'description': '用户的投资偏好、风险承受能力等信息',
-                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            })
-    except Exception as e:
-        user_profile_section = ""
-    user_mistakes_section = ""
-    try:
-        from config_manager import config
-        user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
-        if user_mistakes:
-            user_mistakes_section = f"\n# 用户常犯错误\n{user_mistakes}\n"
-            data_sources.append({
-                'type': '用户常犯错误',
-                'description': '用户在投资过程中常犯的错误和误区',
-                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            })
-    except Exception as e:
-        user_mistakes_section = ""
-        print("error", e)
-    user_opinion_section = ""
-    if user_opinion.strip():
-        user_opinion_section = f"\n# 用户观点\n{user_opinion.strip()}\n"
-        data_sources.append({
-            'type': '用户观点',
-            'description': '用户提供的投资观点和看法',
-            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
         
-    if user_position and user_position.strip() and user_position.strip() != "不确定":
-        user_opinion_section += f"\n# 用户当前持仓状态\n{user_position.strip()}\n"
-        data_sources.append({
-            'type': '用户持仓',
-            'description': f'用户当前持仓状态：{user_position.strip()}',
-            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-
-    system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户情况，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
+        # 3. 收集市场数据
+        market_report_text, market_ai_analysis, market_sources = collector.collect_market_data(market_tools)
+        all_data_sources.extend(market_sources)
+        
+        # 4. 收集用户画像数据
+        user_profile_section, user_mistakes_section, user_sources = collector.collect_user_profile()
+        all_data_sources.extend(user_sources)
+        
+        # 5. 格式化用户观点和持仓信息
+        user_opinion_section, user_opinion_sources = formatter.format_user_opinion_section(user_opinion, user_position)
+        all_data_sources.extend(user_opinion_sources)
+        
+        # 6. 格式化各部分内容
+        historical_summary = formatter.format_historical_summary(historical_analyses, truncate_data)
+        market_summary = formatter.format_market_summary(market_report_text, market_ai_analysis, truncate_data)
+        
+        # 7. 构建系统消息（保持原有内容）
+        system_message = f"""你是一位资深的投资顾问和股票分析师。请基于AI已生成的各类分析（技术面、基本面、消息面、资金面、大盘分析）、股票实时价格信息和用户情况，对{stock_name}（{stock_code}）当前的投资价值进行高度凝练的综合判断。
 
 特别关注：
 - 当前股价的涨跌情况及其反映的市场情绪
@@ -530,8 +673,9 @@ def generate_comprehensive_analysis_report(
 - 必须考虑当前价格变动情况对投资决策的影响。
 - 请根据用户常犯的错误，根据当前行情，给出有针对性的提醒。
 """
-
-    user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
+        
+        # 8. 构建用户消息
+        user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
 
 {basic_info_section}
 {historical_summary}
@@ -541,27 +685,24 @@ def generate_comprehensive_analysis_report(
 {user_opinion_section}
 
 请基于以上信息，结合您的专业知识，给出一个综合的投资分析和建议。特别要关注当前市场环境对该股票的潜在影响。当前股价的涨跌情况也是重要的分析因素。"""
-
-    with open(os.path.join(project_dir, "data", "cache", "req.txt"), "w", encoding="utf-8") as f:
-        f.write(user_message)
-    print(f'req length {len(user_message)}')
-    #return user_message, data_sources # for test
-
-    try:
+        
+        # 9. 构建消息并生成分析
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ]
         
-        response = client.chat(
-            messages=messages,
-            temperature=0.4,  # 适中的创造性，保持客观性
-            model_type="default"
-        )
+        print(f'req length {len(user_message)}')
         
-        return response, data_sources
+        # 使用统一的分析生成器
+        generator = BaseAnalysisGenerator()
+        result = generator.generate_analysis("comprehensive", messages, stock_code)
+        result.data_sources = all_data_sources
+        
+        return result
         
     except Exception as e:
+        # 统一的错误处理
         error_report = f"""# ❌ 综合分析生成失败
 
 **错误信息:** {str(e)}
@@ -574,6 +715,18 @@ def generate_comprehensive_analysis_report(
 3. 稍后重试
 
 ## 数据来源：
-{len(data_sources)}个数据源已收集，但AI分析失败。"""
+{len(all_data_sources)}个数据源已收集，但AI分析失败。"""
         
-        return error_report, data_sources
+        # 记录详细错误信息
+        print(f"生成综合分析报告失败: {e}")
+        traceback.print_exc()
+        
+        return AnalysisResult(
+            success=False,
+            report=error_report,
+            timestamp=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            error_message=str(e),
+            analysis_type="comprehensive",
+            stock_code=stock_code,
+            data_sources=all_data_sources
+        )

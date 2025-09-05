@@ -180,7 +180,7 @@ class StockDataFormatter:
         parts = []       
         currency_symbol = stock_identity.get('currency_symbol', '元')
         
-        parts.append(f"## 股票概览:")
+        parts.append(f"股票概览:")
         parts.append(f"- 股票代码: {stock_identity['code']}")
         parts.append(f"- 股票名称: {stock_identity.get('name', '')}")
         parts.append(f"- 所属市场: {stock_identity.get('market_name', '未知市场')}")

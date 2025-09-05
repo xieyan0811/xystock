@@ -315,18 +315,20 @@ class StockTools:
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         try:
-            report, timestamp = generate_fundamental_analysis_report(
+            result = generate_fundamental_analysis_report(
                 stock_identity=stock_identity,
                 fundamental_data=fundamental_data or {}
             )
             
-            self.set_ai_analysis(stock_code, analysis_type, {
-                'report': report,
-                'timestamp': timestamp,
-                'stock_name': stock_name
-            })
-            
-            return report, timestamp
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
             
         except Exception as e:
             import traceback
@@ -352,19 +354,20 @@ class StockTools:
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         try:            
-            report = generate_stock_analysis_report(
+            result = generate_stock_analysis_report(
                 stock_identity=stock_identity,
                 kline_info=kline_info,
             )
             
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            self.set_ai_analysis(stock_code, analysis_type, {
-                'report': report,
-                'timestamp': timestamp,
-                'stock_name': stock_name
-            })
-            return report, timestamp
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
             
         except Exception as e:
             error_msg = f"技术分析失败: {str(e)}"
@@ -395,18 +398,20 @@ class StockTools:
                 else:
                     news_data = []
             
-            report, timestamp = generate_news_analysis_report(
+            result = generate_news_analysis_report(
                 stock_identity=stock_identity,
                 news_data=news_data
             )
             
-            self.set_ai_analysis(stock_code, analysis_type, {
-                'report': report,
-                'timestamp': timestamp,
-                'stock_name': stock_name
-            })
-            
-            return report, timestamp
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
             
         except Exception as e:
             error_msg = f"新闻分析失败: {str(e)}"
@@ -434,18 +439,20 @@ class StockTools:
             if chip_data is None:
                 raise ValueError("无法获取筹码数据")
             
-            report, timestamp = generate_chip_analysis_report(
+            result = generate_chip_analysis_report(
                 stock_identity=stock_identity,
                 chip_data=chip_data
             )
             
-            self.set_ai_analysis(stock_code, analysis_type, {
-                'report': report,
-                'timestamp': timestamp,
-                'stock_name': stock_name
-            })
-            
-            return report, timestamp
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
             
         except Exception as e:
             error_msg = f"筹码分析失败: {str(e)}"
@@ -491,13 +498,20 @@ class StockTools:
             
             market_tools = get_market_tools()
             
-            report, data_sources = generate_comprehensive_analysis_report(
+            result = generate_comprehensive_analysis_report(
                 stock_identity=stock_identity,
                 user_opinion=user_opinion,
                 user_position=user_position,
                 stock_tools=self,
                 market_tools=market_tools
             )
+            
+            if result.success:
+                report = result.report
+                data_sources = result.data_sources or []
+            else:
+                report = result.report
+                data_sources = result.data_sources or []
             
             analysis_data = {
                 'report': report,
