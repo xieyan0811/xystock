@@ -142,3 +142,16 @@ def format_change(change, change_percent, decimal_places=2):
         return f"{change:.{decimal_places}f} ({change_percent:.{decimal_places}f}%)"
     except (ValueError, TypeError):
         return f"{change} ({change_percent}%)"
+
+def format_number(number, decimal_places=2):
+    """
+    四舍五入格式化数字到指定小数位数
+    """
+    if number is None:
+        return f"0.{''.join(['0' for _ in range(decimal_places)])}"
+    
+    try:
+        number = float(number)
+        return f"{number:.{decimal_places}f}"
+    except (ValueError, TypeError):
+        return str(number)

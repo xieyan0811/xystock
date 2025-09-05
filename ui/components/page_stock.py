@@ -7,7 +7,6 @@ import os
 import datetime
 import pandas as pd
 import streamlit as st
-import akshare as ak
 import plotly.graph_objects as go
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,7 +14,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from ui.components.page_common import display_technical_indicators
-from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
+from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_number, format_large_number
 from providers.stock_data_tools import get_stock_tools
 from providers.stock_report import generate_stock_report
 from providers.report_utils import PDF_SUPPORT_AVAILABLE
@@ -239,18 +238,18 @@ def display_basic_info(stock_identity):
                 if basic_info_data.get('roe'):
                     st.write(f"**ROE:** {basic_info_data['roe']}")
             
-            with st.expander("更多财务指标", expanded=False):
+            with st.expander("更多财务指标", expanded=True):
                 if basic_info_data.get('gross_profit_margin'):
-                    st.write(f"**毛利率:** {basic_info_data['gross_profit_margin']}")
+                    st.write(f"**毛利率:** {format_number(basic_info_data['gross_profit_margin'])}")
                 
                 if basic_info_data.get('net_profit_margin'):
-                    st.write(f"**净利润率:** {basic_info_data['net_profit_margin']}")
+                    st.write(f"**净利润率:** {format_number(basic_info_data['net_profit_margin'])}")
                 
                 if basic_info_data.get('net_profit'):
-                    st.write(f"**净利润:** {basic_info_data['net_profit']}")
+                    st.write(f"**净利润:** {format_large_number(basic_info_data['net_profit'])}")
 
                 if basic_info_data.get('debt_to_asset_ratio'):
-                    st.write(f"**资产负债率:** {basic_info_data['debt_to_asset_ratio']}")
+                    st.write(f"**资产负债率:** {format_number(basic_info_data['debt_to_asset_ratio'])}")
 
             st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:

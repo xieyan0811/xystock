@@ -3,8 +3,10 @@
 """
 
 import akshare as ak
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import Counter
+import json
+from llm import openai_client
 
 
 def get_stock_news_by_akshare(stock_code, day = 7, debug=False):
@@ -14,7 +16,7 @@ def get_stock_news_by_akshare(stock_code, day = 7, debug=False):
     print(f"📊 获取股票 {stock_code} 的详细信息...")
     result = {
         'company_news': [],
-        'announcements': [],
+        'announcements': [], # 暂时取不到
         'research_reports': [],
         'news_summary': {}
     }
@@ -28,10 +30,15 @@ def get_stock_news_by_akshare(stock_code, day = 7, debug=False):
                            reverse=True)
             # 时间过滤，保留最近day天的数据，最多20条
             if day > 0:
-                from datetime import timedelta
                 cutoff_date = datetime.now() - timedelta(days=day)
                 company_news = [news for news in company_news if datetime.strptime(news.get('发布时间', '1900-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S') >= cutoff_date]
             company_news = company_news[:20]
+            if debug: # 内容有时取的很短，查看获取情况
+                for news in company_news:
+                    if '新闻内容' not in news or not news['新闻内容']:
+                        news['新闻内容'] = "无内容"
+                    else:
+                        print(f"   ✓ 成功获取新闻内容: {news['新闻内容']}, len={len(news['新闻内容'])}")
             result['company_news'] = company_news
         print(f"   ✓ 成功获取 {len(result['company_news'])} 条公司新闻")
         if debug:
@@ -102,8 +109,6 @@ def show_stock_by_ak_summary(stock_info):
         else:
             print("   暂无评级信息")
 
-import json
-from llm import openai_client
 
 SENTIMENT_ANALYSIS_PROMPT_TEMPLATE = """请分析以下新闻对股票"{stock_name}"的投资情绪影响：
 
