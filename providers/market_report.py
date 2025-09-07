@@ -123,16 +123,40 @@ def generate_markdown_market_report(index_name, report_data):
 **关注指数**: {index_name}  
 **报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
----
+"""
+
+    # AI分析部分
+    ai_analysis = report_data.get('ai_analysis', {})
+    if 'error' not in ai_analysis and ai_analysis and 'report' in ai_analysis:
+        md_content += """---
+
+# 🤖 AI市场分析
 
 """
+        
+        report_text = ai_analysis['report']
+        report_time = ai_analysis.get('timestamp', '')
+        user_opinion = ai_analysis.get('user_opinion', '')
+        
+        if user_opinion:
+            md_content += f"**用户观点**: {user_opinion}\n\n"
+        
+        md_content += f"""{report_text}
+
+*AI分析生成时间: {report_time}*
+
+*依据以下数据生成: 当前指数数据, 技术指标, 市场情绪, 估值水平, 资金流向, 融资融券*
+
+""" 
     
     # 指数概览部分
     current_indices = report_data.get('current_indices', {})
     focus_index_data = report_data.get('focus_index_data', {})
     
     if 'error' not in current_indices and current_indices:
-        md_content += """# 📊 市场指数概览
+        md_content += """---
+
+# 📊 市场指数概览
 
 """
         
@@ -270,7 +294,7 @@ def generate_markdown_market_report(index_name, report_data):
     valuation_data = report_data.get('valuation_data', {})
     if 'error' not in valuation_data and valuation_data:
         md_content += """---
-'''
+
 # 💰 估值水平分析
 
 """
@@ -353,30 +377,8 @@ def generate_markdown_market_report(index_name, report_data):
         else:
             trend = "大幅下降"
         
-        md_content += f"## 融资融券趋势\n\n融资融券余额较前日 **{trend}** ({change_ratio:.2f}%)\n\n"
-    
-    # AI分析部分
-    ai_analysis = report_data.get('ai_analysis', {})
-    if 'error' not in ai_analysis and ai_analysis and 'report' in ai_analysis:
-        md_content += """---
-
-# 🤖 AI市场分析
-
-"""
+        md_content += f"## 融资融券趋势\n\n融资融券余额较上周 **{trend}** ({change_ratio:.2f}%)\n\n"
         
-        report_text = ai_analysis['report']
-        report_time = ai_analysis.get('timestamp', '')
-        user_opinion = ai_analysis.get('user_opinion', '')
-        
-        if user_opinion:
-            md_content += f"**用户观点**: {user_opinion}\n\n"
-        
-        md_content += f"""{report_text}
-
-*AI分析生成时间: {report_time}*
-
-"""
-    
     md_content += """---
 
 *本报告由XYStock市场分析系统自动生成，仅供参考，不构成任何投资建议*
@@ -423,5 +425,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"   ❌ 报告生成失败: {e}")
     
-    print("\n✅ 测试完成!")
     print("\n✅ 测试完成!")

@@ -189,13 +189,9 @@ class MarketTools:
         }
         
         report['technical_indicators'] = fetch_index_technical_indicators(index_name)
-        #report['sentiment_indicators'] = self.get_market_sentiment(use_cache)
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
-        #report['ai_analysis'] = self.get_ai_analysis(use_cache)
-        
-        #report['market_summary'] = self.generate_market_report(report, format_type='summary')
         
         print("=" * 60)
         print("✅ 综合市场报告生成完成!")
