@@ -145,7 +145,7 @@ def generate_markdown_market_report(index_name, report_data):
 
 *AI分析生成时间: {report_time}*
 
-*依据以下数据生成: 当前指数数据, 技术指标, 市场情绪, 估值水平, 资金流向, 融资融券*
+*以下为参考数据: 当前指数数据, 技术指标, 市场情绪, 估值水平, 资金流向, 融资融券*
 
 """ 
     

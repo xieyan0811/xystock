@@ -343,8 +343,8 @@ def display_market_summary():
         else:
             format_type = st.selectbox(
                 "选择导出格式",
-                ["docx", "markdown"],
-                format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
+                ["docx", "markdown", "html"],
+                format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown", "html": "🌐 HTML"}[x],
                 key=f"market_format_select_{index_name}"
             )
 
@@ -358,7 +358,8 @@ def display_market_summary():
         else:
             format_descriptions = {
                 "docx": "Word文档，可编辑修改",
-                "markdown": "Markdown格式，适合程序员和技术人员"
+                "markdown": "Markdown格式，适合程序员和技术人员",
+                "html": "HTML格式，适合网页浏览"
             }
         st.caption(format_descriptions[format_type])
     
@@ -371,7 +372,8 @@ def display_market_summary():
         spinner_text = {
             "pdf": "正在收集数据并生成PDF报告...",
             "docx": "正在收集数据并生成Word文档...",
-            "markdown": "正在收集数据并生成Markdown文件..."
+            "markdown": "正在收集数据并生成Markdown文件...",
+            "html": "正在收集数据并生成HTML文件..."
         }
         
         with st.spinner(spinner_text[generating_format]):
@@ -391,7 +393,8 @@ def display_market_summary():
                 format_info = {
                     "pdf": {"ext": "pdf", "mime": "application/pdf"},
                     "docx": {"ext": "docx", "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-                    "markdown": {"ext": "md", "mime": "text/markdown"}
+                    "markdown": {"ext": "md", "mime": "text/markdown"},
+                    "html": {"ext": "html", "mime": "text/html"}
                 }
                 
                 ext = format_info[generating_format]["ext"]
@@ -405,8 +408,8 @@ def display_market_summary():
                 st.session_state[f"market_report_timestamp_{index_name}"] = timestamp
                 
                 st.session_state[f"generating_market_report_{index_name}"] = None
-                
-                format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown"}
+
+                format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown", "html": "HTML"}
                 st.success(f"✅ {format_names[generating_format]}市场报告生成成功！")
                 
             except Exception as e:
@@ -414,7 +417,7 @@ def display_market_summary():
                 st.session_state[f"generating_market_report_{index_name}"] = None
     
     if st.session_state.get(f"market_report_content_{index_name}"):
-        format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝"}
+        format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝", "html": "🌐"}
         current_format = st.session_state.get(f"market_report_format_{index_name}", "pdf")
         
         st.download_button(
