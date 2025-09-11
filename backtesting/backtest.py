@@ -5,8 +5,7 @@
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Callable
-from datetime import datetime, timedelta
+from typing import Dict, Callable
 
 
 class SimpleBacktest:
@@ -101,24 +100,36 @@ class SimpleBacktest:
         
         Args:
             data: 包含日期、价格等信息的DataFrame
-            strategy: 策略函数，接收(index, row, backtest)参数，返回交易信号
+            strategy: 策略函数，接收(index, row, backtest, data)参数，返回交易信号
+                     信号可以是字符串('buy', 'sell', 'hold')或字典({'action': 'buy', 'ratio': 0.3})
         """
         print("开始回测...")
         
         for i, row in data.iterrows():
-            # 执行策略
-            signal = strategy(i, row, self)
+            # 执行策略，传递当前回测数据
+            signal = strategy(i, row, self, data)
             
             # 处理交易信号
-            if signal == 'buy' and self.cash > 0:
-                # 全仓买入
-                max_shares = int(self.cash / row['close'])
+            if isinstance(signal, dict):
+                # 字典格式信号，包含仓位比例
+                action = signal.get('action', 'hold')
+                ratio = signal.get('ratio', 1.0)  # 默认全仓
+            else:
+                # 字符串格式信号，默认全仓
+                action = signal
+                ratio = 1.0
+            
+            if action == 'buy' and self.cash > 0:
+                # 按比例买入
+                max_shares = int(self.cash * ratio / row['close'])
                 if max_shares > 0:
                     self.buy(row['close'], max_shares, str(row['date']))
             
-            elif signal == 'sell' and self.position > 0:
-                # 全部卖出
-                self.sell(row['close'], self.position, str(row['date']))
+            elif action == 'sell' and self.position > 0:
+                # 按比例卖出
+                sell_shares = int(self.position * ratio)
+                if sell_shares > 0:
+                    self.sell(row['close'], sell_shares, str(row['date']))
             
             # 更新资产价值
             self.update_value(row['close'], str(row['date']))
@@ -193,61 +204,3 @@ class SimpleBacktest:
         print("="*50)
 
 
-# 示例策略函数
-def simple_ma_strategy(index: int, row: pd.Series, backtest: SimpleBacktest) -> str:
-    """
-    简单移动平均策略示例
-    当价格上穿5日均线时买入，下穿时卖出
-    """
-    # 需要足够的历史数据计算均线
-    if index < 5:
-        return 'hold'
-    
-    # 假设数据包含ma5字段，或者在这里计算
-    # 这里简化处理，实际使用时需要传入包含技术指标的数据
-    if hasattr(row, 'ma5'):
-        if row['close'] > row['ma5'] and backtest.position == 0:
-            return 'buy'
-        elif row['close'] < row['ma5'] and backtest.position > 0:
-            return 'sell'
-    
-    return 'hold'
-
-
-def momentum_strategy(index: int, row: pd.Series, backtest: SimpleBacktest) -> str:
-    """
-    动量策略示例
-    当日涨幅超过2%时买入，跌幅超过1%时卖出
-    """
-    if hasattr(row, 'pct_change'):
-        if row['pct_change'] > 0.02 and backtest.position == 0:
-            return 'buy'
-        elif row['pct_change'] < -0.01 and backtest.position > 0:
-            return 'sell'
-    
-    return 'hold'
-
-
-# 示例用法
-if __name__ == "__main__":
-    # 创建示例数据
-    dates = pd.date_range('2023-01-01', '2023-12-31', freq='D')
-    np.random.seed(42)
-    prices = 100 + np.cumsum(np.random.randn(len(dates)) * 0.5)
-    
-    data = pd.DataFrame({
-        'date': dates,
-        'close': prices,
-        'pct_change': np.random.randn(len(dates)) * 0.02  # 模拟涨跌幅
-    })
-    
-    # 运行回测
-    bt = SimpleBacktest(initial_cash=100000)
-    results = bt.run_backtest(data, momentum_strategy)
-    
-    # 展示结果
-    bt.print_summary(results)
-    
-    # 使用可视化模块绘制图表
-    # from backtesting.visualizer import plot_single_strategy_analysis
-    # plot_single_strategy_analysis(results, "动量策略", data)
