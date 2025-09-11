@@ -1,9 +1,10 @@
 chroma_cache
 .pytest_cache
 config.toml
-*.ipynb
+#*.ipynb
 *.csv
 *.log
 *.pyc
 data/
 reports/
+notebook/
