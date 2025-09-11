@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import warnings
+import subprocess
+import os
 from typing import Dict, List, Optional
 
 
@@ -17,6 +19,7 @@ class BacktestVisualizer:
     def __init__(self):
         """初始化可视化工具，配置字体"""
         self._setup_fonts()
+        self._font_initialized = True
     
     def _setup_fonts(self):
         """设置中文字体配置"""
@@ -34,7 +37,8 @@ class BacktestVisualizer:
             'SimHei',               # 黑体
             'Microsoft YaHei',      # 微软雅黑
             'Noto Sans CJK SC',     # Google Noto字体
-            'Source Han Sans CN'    # 思源黑体
+            'Source Han Sans CN',   # 思源黑体
+            'DejaVu Sans'           # 备用英文字体
         ]
         
         # 找到第一个可用的中文字体
@@ -45,14 +49,225 @@ class BacktestVisualizer:
                 break
         
         # 设置字体配置
-        if found_font:
+        if found_font and found_font != 'DejaVu Sans':
             plt.rcParams['font.sans-serif'] = [found_font, 'DejaVu Sans']
             self.font_available = True
+            self.current_font = found_font
         else:
             plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
             self.font_available = False
+            self.current_font = 'DejaVu Sans'
         
         plt.rcParams['axes.unicode_minus'] = False
+        
+        # 刷新字体缓存
+        fm._load_fontmanager(try_read_cache=False)
+    
+    def _ensure_font_setup(self):
+        """确保字体已正确设置（内部使用）"""
+        if not hasattr(self, '_font_initialized'):
+            self._setup_fonts()
+            self._font_initialized = True
+    
+    def install_chinese_fonts(self):
+        """自动安装中文字体（仅Linux系统）"""
+        print("=== 检测系统并安装中文字体 ===")
+        
+        try:
+            # 检测操作系统
+            import platform
+            system = platform.system()
+            
+            if system == "Linux":
+                print("检测到Linux系统，尝试安装中文字体...")
+                
+                # 检查是否有 apt 包管理器
+                result = subprocess.run(['which', 'apt-get'], capture_output=True)
+                if result.returncode == 0:
+                    print("正在安装文泉驿微米黑字体...")
+                    try:
+                        # 安装字体包
+                        subprocess.run(['apt-get', 'update'], check=True, capture_output=True)
+                        subprocess.run(['apt-get', 'install', '-y', 'fonts-wqy-microhei'], 
+                                     check=True, capture_output=True)
+                        
+                        # 刷新字体缓存
+                        subprocess.run(['fc-cache', '-fv'], check=True, capture_output=True)
+                        
+                        print("✅ 中文字体安装成功！")
+                        
+                        # 重新初始化字体设置
+                        self._setup_fonts()
+                        return True
+                        
+                    except subprocess.CalledProcessError as e:
+                        print(f"❌ 字体安装失败: {e}")
+                        print("请手动执行: sudo apt-get install fonts-wqy-microhei")
+                        return False
+                else:
+                    print("❌ 未找到apt包管理器，请手动安装中文字体")
+                    return False
+            else:
+                print(f"检测到{system}系统，请手动安装中文字体")
+                if system == "Darwin":  # macOS
+                    print("macOS建议: brew install font-wqy-microhei")
+                elif system == "Windows":
+                    print("Windows系统通常已包含中文字体")
+                return False
+                
+        except Exception as e:
+            print(f"字体安装过程出错: {e}")
+            return False
+    
+    def test_font_display(self):
+        """测试字体显示效果并生成测试图表"""
+        print("=== 字体显示测试 ===")
+        
+        # 获取系统所有字体名称
+        available_fonts = set([f.name for f in fm.fontManager.ttflist])
+        
+        # 常见中文字体列表
+        test_fonts = [
+            'WenQuanYi Micro Hei',
+            'SimHei',
+            'Microsoft YaHei',
+            'Noto Sans CJK SC',
+            'Source Han Sans CN',
+            'DejaVu Sans'
+        ]
+        
+        # 创建测试图表
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        fig.suptitle('Font Display Test / 字体显示测试', fontsize=16)
+        
+        for i, font_name in enumerate(test_fonts):
+            row = i // 3
+            col = i % 3
+            ax = axes[row, col]
+            
+            # 测试字体是否可用
+            if font_name in available_fonts:
+                status = "✅ 可用"
+                test_text = f"字体测试: {font_name}\nFont Test: {font_name}\n数字: 123456\nNumbers: 123456"
+                color = 'green'
+                
+                # 临时设置字体
+                original_font = plt.rcParams['font.sans-serif']
+                plt.rcParams['font.sans-serif'] = [font_name, 'DejaVu Sans']
+                
+                ax.text(0.5, 0.5, test_text, ha='center', va='center', 
+                       fontsize=10, transform=ax.transAxes, color=color)
+                
+                # 恢复原字体设置
+                plt.rcParams['font.sans-serif'] = original_font
+            else:
+                status = "❌ 不可用"
+                test_text = f"Font not available: {font_name}"
+                color = 'red'
+                
+                ax.text(0.5, 0.5, test_text, ha='center', va='center',
+                       fontsize=10, transform=ax.transAxes, color=color)
+            
+            ax.set_title(f"{font_name}\n{status}", fontsize=8)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # 输出当前字体配置信息
+        print(f"\n当前字体配置:")
+        print(f"  主字体: {self.current_font}")
+        print(f"  中文支持: {'是' if self.font_available else '否'}")
+        print(f"  matplotlib字体设置: {plt.rcParams['font.sans-serif']}")
+        
+        return available_fonts
+    
+    def get_system_fonts_info(self):
+        """获取系统字体详细信息"""
+        print("=== 系统字体信息 ===")
+        
+        # 获取所有字体
+        all_fonts = fm.fontManager.ttflist
+        
+        # 按字体名称分组
+        font_families = {}
+        for font in all_fonts:
+            family = font.name
+            if family not in font_families:
+                font_families[family] = []
+            font_families[family].append({
+                'file': font.fname,
+                'style': font.style,
+                'weight': font.weight
+            })
+        
+        # 查找中文字体
+        chinese_keywords = ['Chinese', 'CJK', 'Han', 'Hei', 'Micro', 'YaHei', 'SimHei', 'WenQuanYi']
+        chinese_fonts = []
+        
+        for family_name, fonts in font_families.items():
+            for keyword in chinese_keywords:
+                if keyword.lower() in family_name.lower():
+                    chinese_fonts.append(family_name)
+                    break
+        
+        print(f"总共找到 {len(font_families)} 个字体族")
+        print(f"疑似中文字体 {len(chinese_fonts)} 个:")
+        
+        for font in sorted(chinese_fonts):
+            print(f"  - {font}")
+        
+        # 推荐的中文字体
+        recommended_fonts = [
+            'WenQuanYi Micro Hei',
+            'SimHei', 
+            'Microsoft YaHei',
+            'Noto Sans CJK SC',
+            'Source Han Sans CN'
+        ]
+        
+        print(f"\n推荐中文字体安装状态:")
+        for font in recommended_fonts:
+            status = "✅" if font in font_families else "❌"
+            print(f"  {status} {font}")
+        
+        return font_families, chinese_fonts
+    
+    def set_custom_font(self, font_name: str):
+        """设置自定义字体"""
+        print(f"=== 设置自定义字体: {font_name} ===")
+        
+        # 检查字体是否可用
+        available_fonts = set([f.name for f in fm.fontManager.ttflist])
+        
+        if font_name in available_fonts:
+            plt.rcParams['font.sans-serif'] = [font_name, 'DejaVu Sans']
+            self.current_font = font_name
+            self.font_available = True
+            print(f"✅ 成功设置字体: {font_name}")
+            
+            # 测试显示效果
+            plt.figure(figsize=(8, 4))
+            plt.text(0.5, 0.7, f'当前字体: {font_name}', ha='center', va='center', fontsize=16)
+            plt.text(0.5, 0.5, '中文显示测试: 回测分析图表', ha='center', va='center', fontsize=14)
+            plt.text(0.5, 0.3, 'English Display Test: Backtest Analysis', ha='center', va='center', fontsize=12)
+            plt.title(f'Custom Font Test - {font_name}')
+            plt.xlim(0, 1)
+            plt.ylim(0, 1)
+            plt.axis('off')
+            plt.tight_layout()
+            plt.show()
+            
+            return True
+        else:
+            print(f"❌ 字体不可用: {font_name}")
+            print("可用的字体列表:")
+            for font in sorted(available_fonts):
+                if any(keyword in font.lower() for keyword in ['chinese', 'cjk', 'han', 'hei', 'micro']):
+                    print(f"  - {font}")
+            return False
     
     def plot_single_strategy(self, results: Dict, strategy_name: str = "策略", 
                            benchmark_data: Optional[pd.DataFrame] = None):
@@ -64,6 +279,8 @@ class BacktestVisualizer:
             strategy_name: 策略名称
             benchmark_data: 基准数据（用于对比）
         """
+        self._ensure_font_setup()
+        
         if results['history'].empty:
             print("没有历史数据可绘制")
             return
@@ -136,6 +353,8 @@ class BacktestVisualizer:
             all_results: 所有策略的回测结果字典
             benchmark_data: 基准数据
         """
+        self._ensure_font_setup()
+        
         if not all_results:
             print("没有策略结果可绘制")
             return
@@ -228,6 +447,8 @@ class BacktestVisualizer:
             results: 回测结果字典
             strategy_name: 策略名称
         """
+        self._ensure_font_setup()
+        
         if results['trades'].empty:
             print("没有交易记录可分析")
             return
@@ -330,6 +551,8 @@ class BacktestVisualizer:
             results: 回测结果字典
             strategy_name: 策略名称
         """
+        self._ensure_font_setup()
+        
         if results['history'].empty:
             print("没有历史数据可分析")
             return
@@ -489,5 +712,14 @@ def plot_monthly_performance(results: Dict, strategy_name: str = "策略"):
 
 
 def check_font_setup():
-    """便捷函数：检查字体配置"""
+    """便捷函数：检查字体配置（可选使用）"""
     return visualizer.check_font_display()
+
+
+def get_font_info():
+    """便捷函数：获取当前字体信息"""
+    return {
+        'current_font': visualizer.current_font,
+        'chinese_support': visualizer.font_available,
+        'matplotlib_fonts': plt.rcParams['font.sans-serif']
+    }
