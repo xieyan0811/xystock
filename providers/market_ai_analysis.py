@@ -41,8 +41,7 @@ def generate_index_analysis_report(
         indices_text = f"## 当前市场指数情况：\n获取指数数据失败: {str(e)}\n"
     
     try:
-        from providers.market_data_fetcher import fetch_index_technical_indicators
-        tech_indicators = fetch_index_technical_indicators(stock_name)
+        tech_indicators = market_tools.get_index_technical_indicators(stock_name)
         
         if tech_indicators:
             tech_text = f"## 主要技术指标（{stock_name}）：\n"

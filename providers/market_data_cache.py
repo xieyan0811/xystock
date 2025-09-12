@@ -35,6 +35,7 @@ class MarketDataCache:
             'margin_data': {'expire_minutes': 60, 'description': '融资融券数据'},
             'current_indices': {'expire_minutes': 5, 'description': '当前指数实时数据'},
             'ai_analysis': {'expire_minutes': 180, 'description': 'AI大盘分析'},
+            'technical_indicators': {'expire_minutes': 60, 'description': '技术指标数据'}
         }
     
     def load_cache(self) -> Dict:

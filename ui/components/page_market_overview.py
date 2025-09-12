@@ -15,7 +15,6 @@ if project_root not in sys.path:
 from utils.format_utils import format_large_number
 from ui.components.page_common import display_technical_indicators
 from providers.market_data_tools import get_market_tools
-from providers.market_data_fetcher import fetch_index_technical_indicators
 from providers.market_report import generate_market_report
 from providers.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
@@ -223,31 +222,30 @@ def display_market_summary():
         st.info("综合摘要数据准备中...")
         return
     
-    if st.session_state.get('run_ai_index', False):        
+    if st.session_state.get('run_ai_index', False):
         # 检查是否已经生成过AI报告
         stock_code_for_ai = '上证指数'
-        if stock_code_for_ai not in st.session_state.get('ai_index_report', {}):
-            with st.spinner("🤖 AI正在分析指数数据..."):
-                try:
-                    user_opinion = st.session_state.get('market_user_opinion', '')
-                    
-                    ai_data = market_tools.get_ai_analysis(
-                        use_cache=use_cache, 
-                        index_name=stock_code_for_ai, 
-                        force_regenerate=not use_cache,
-                        user_opinion=user_opinion
-                    )
-                    
-                    if "ai_index_report" not in st.session_state:
-                        st.session_state.ai_index_report = {}
-                    st.session_state.ai_index_report[stock_code_for_ai] = ai_data
-                    
-                    if 'run_ai_index' in st.session_state:
-                        del st.session_state['run_ai_index']
-                except Exception as e:
-                    st.error(f"AI分析失败: {str(e)}")
-                    if 'run_ai_index' in st.session_state:
-                        del st.session_state['run_ai_index']
+        with st.spinner("🤖 AI正在分析指数数据..."):
+            try:
+                user_opinion = st.session_state.get('market_user_opinion', '')
+                
+                ai_data = market_tools.get_ai_analysis(
+                    use_cache=use_cache, 
+                    index_name=stock_code_for_ai, 
+                    force_regenerate=not use_cache,
+                    user_opinion=user_opinion
+                )
+                
+                if "ai_index_report" not in st.session_state:
+                    st.session_state.ai_index_report = {}
+                st.session_state.ai_index_report[stock_code_for_ai] = ai_data
+                
+                if 'run_ai_index' in st.session_state:
+                    del st.session_state['run_ai_index']
+            except Exception as e:
+                st.error(f"AI分析失败: {str(e)}")
+                if 'run_ai_index' in st.session_state:
+                    del st.session_state['run_ai_index']
         
     current_stock_code = result_data.get('focus_index', '')
     if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
@@ -463,7 +461,10 @@ def display_market_overview():
     
     if analyze_btn:
         st.session_state['show_analysis_results'] = True
-        st.session_state['market_use_cache'] = use_cache
+        st.session_state['market_use_cache'] = True
+        if not use_cache:
+            market_tools.clear_cache()
+            st.success("💾 已清除缓存，强制获取最新数据")
     
     if st.session_state.get('show_analysis_results', False):
         with result_container:
@@ -489,7 +490,7 @@ def display_market_overview():
                         display_market_indices()
                     
                     with tab2:
-                        tech_data = fetch_index_technical_indicators('上证指数')
+                        tech_data = get_market_tools().get_index_technical_indicators('上证指数')
                         display_technical_indicators(tech_data)
 
                     with tab3:

@@ -132,6 +132,47 @@ class MarketTools:
             print(f"❌ 未找到指数: {index_name}")
             return {}
         
+    def get_index_technical_indicators(self, index_name: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取指数技术指标，优先查缓存，没有再fetch"""
+        data_type = f'technical_indicators'
+        
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
+            print(f"📋 使用缓存的技术指标: {index_name}")
+            return self.cache_manager.get_cached_data(data_type)
+        
+        print(f"📡 获取技术指标: {index_name}...")
+        try:
+            data = fetch_index_technical_indicators(index_name)
+            print(f"📊 技术指标数据:")
+            # 转换numpy类型为Python原生类型以便JSON序列化
+            if data:
+                data = self._convert_numpy_types(data)
+            if use_cache:
+                self.cache_manager.save_cached_data(data_type, data)
+            return data
+        except Exception as e:
+            print(f"❌ 获取技术指标失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return self.cache_manager.get_cached_data(data_type) if use_cache else {}
+
+    def _convert_numpy_types(self, data):
+        """递归转换numpy类型为Python原生类型"""
+        import numpy as np
+        
+        if isinstance(data, dict):
+            return {key: self._convert_numpy_types(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self._convert_numpy_types(item) for item in data]
+        elif isinstance(data, np.integer):
+            return int(data)
+        elif isinstance(data, np.floating):
+            return float(data)
+        elif isinstance(data, np.ndarray):
+            return data.tolist()
+        else:
+            return data
+
     def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False, user_opinion: str = '') -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
@@ -180,7 +221,7 @@ class MarketTools:
             'market_summary': {}
         }
         
-        report['technical_indicators'] = fetch_index_technical_indicators(index_name)
+        report['technical_indicators'] = self.get_index_technical_indicators(index_name, use_cache=use_cache)
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)

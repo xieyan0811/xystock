@@ -33,8 +33,7 @@ def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_
         
         # 收集技术指标数据
         try:
-            from providers.market_data_fetcher import fetch_index_technical_indicators
-            tech_indicators = fetch_index_technical_indicators(index_name)
+            tech_indicators = get_market_tools().get_index_technical_indicators(index_name)
             if tech_indicators:
                 report_data['technical_indicators'] = tech_indicators
         except Exception as e:
