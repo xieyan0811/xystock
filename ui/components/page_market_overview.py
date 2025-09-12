@@ -189,22 +189,18 @@ def display_market_indices():
                     change_percent = index_info['change_percent']
                     change_amount = index_info['change_amount']
                     
-                    # 确定涨跌状态和颜色
                     if change_percent > 0:
-                        delta_color = "normal"
-                        delta_text = f"+{change_amount:.2f} (+{change_percent:.2f}%)"
+                        metric_delta_text = f"+{change_amount:.2f} (+{change_percent:.2f}%)"
                     elif change_percent < 0:
-                        delta_color = "inverse"
-                        delta_text = f"{change_amount:.2f} ({change_percent:.2f}%)"
+                        metric_delta_text = f"{change_amount:.2f} ({change_percent:.2f}%)"
                     else:
-                        delta_color = "off"
-                        delta_text = "0.00 (0.00%)"
-                    
+                        metric_delta_text = "➖ 0.00 (0.00%)"
+                                        
                     st.metric(
                         label=index_name,
                         value=f"{current_price:.2f}",
-                        delta=delta_text,
-                        delta_color=delta_color
+                        delta=metric_delta_text,
+                        delta_color="inverse" if change_percent != 0 else "off"
                     )
         
         if 'update_time' in indices_data:

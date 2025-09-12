@@ -216,7 +216,9 @@ def display_basic_info(stock_identity):
                 st.metric(
                     label="当前价格", 
                     value=f"{format_price(basic_info_data.get('current_price', 0))}",
-                    delta=format_change(basic_info_data.get('change', 0), basic_info_data.get('change_percent', 0))
+                    delta=format_change(basic_info_data.get('change', 0), 
+                                        basic_info_data.get('change_percent', 0)),
+                    delta_color="inverse"
                 )
                 
                 st.metric("成交量", format_volume(basic_info_data.get('volume', 0)))

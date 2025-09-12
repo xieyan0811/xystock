@@ -630,8 +630,3 @@ def clear_stock_cache(stock_code: str = None, data_type: str = None):
     tools = get_stock_tools()
     tools.clear_cache(stock_code, data_type)
 
-def set_stock_ai_analysis(stock_code: str, analysis_type: str, analysis_data: Dict):
-    """设置股票AI分析数据"""
-    tools = get_stock_tools()
-    tools.set_ai_analysis(stock_code, analysis_type, analysis_data)
-

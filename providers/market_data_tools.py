@@ -135,21 +135,13 @@ class MarketTools:
     def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False, user_opinion: str = '') -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
-        
-        # 如果指定了index_name并且需要重新生成AI分析
-        if index_name and force_regenerate:
-            return self._generate_ai_analysis(index_name, user_opinion)
-        
-        if use_cache and self.cache_manager.is_cache_valid(data_type):
+                
+        if use_cache and self.cache_manager.is_cache_valid(data_type) and not force_regenerate:
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
             return self.cache_manager.get_cached_data(data_type)
+        
         return self._generate_ai_analysis(index_name, user_opinion)
-    
-    def set_ai_analysis(self, analysis_data: Dict):
-        """设置AI分析数据"""
-        analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.cache_manager.save_cached_data('ai_analysis', analysis_data)
-    
+        
     def clear_cache(self, data_type: Optional[str] = None):
         self.cache_manager.clear_cache(data_type)
     
@@ -227,7 +219,7 @@ class MarketTools:
         tech = report['technical_indicators']
         if tech:
             summary['technical_trend'] = f"{tech.get('ma_trend', '未知')} | MACD {tech.get('macd_trend', '未知')}"
-            summary['current_price'] = tech.get('latest_close', 0)
+            #summary['current_price'] = tech.get('latest_close', 0)
             summary['rsi_level'] = self._judge_rsi_level(tech.get('rsi_14', 50))
         
         margin = report['margin_detail']
@@ -253,7 +245,7 @@ class MarketTools:
             'liquidity_condition': ('💸', '资金面'),
             'money_flow_indicators': ('💵', '资金流向'),
             'rsi_level': ('📊', 'RSI'),
-            'current_price': ('💹', '当前价格')
+            #'current_price': ('💹', '当前价格')
         }
         
         for key, (icon, label) in dimension_map.items():
