@@ -4,13 +4,11 @@ A股市场工具 - 统一的数据获取和缓存管理
 所有数据都支持智能缓存，避免重复请求
 """
 
-import json
 import os
 import sys
 import warnings
-import traceback
-from datetime import datetime, timedelta
-from typing import Dict, Optional, Any
+from datetime import datetime
+from typing import Dict
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -298,6 +296,7 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
         indicators = get_indicators(df)
+        indicators['kline'] = df.to_dict(orient='records')
         
         print(f"   ✓ 成功获取{index_name}技术指标")
         return indicators

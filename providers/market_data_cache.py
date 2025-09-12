@@ -12,8 +12,56 @@
 
 import json
 import os
-from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta, date, time
 from typing import Dict, Optional, Any
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理numpy、pandas和datetime数据类型"""
+    
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif hasattr(obj, 'item'):  # numpy scalar types
+            return obj.item()
+        
+        # 处理pandas数据类型
+        elif isinstance(obj, (pd.Timestamp, pd.DatetimeIndex)):
+            return obj.isoformat() if hasattr(obj, 'isoformat') else str(obj)
+        elif pd.isna(obj):
+            return None
+        
+        # 处理Python原生datetime类型
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, date):
+            return obj.isoformat()
+        elif isinstance(obj, time):
+            return obj.isoformat()
+        
+        # 处理pandas日期相关类型
+        elif hasattr(obj, 'to_pydatetime'):  # pandas datetime-like objects
+            try:
+                return obj.to_pydatetime().isoformat()
+            except:
+                return str(obj)
+        elif hasattr(obj, 'date'):  # objects with date method
+            try:
+                return obj.date().isoformat()
+            except:
+                return str(obj)
+        
+        return super().default(obj)
 
 
 class MarketDataCache:
@@ -43,16 +91,30 @@ class MarketDataCache:
         try:
             if os.path.exists(self.cache_file):
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    return self._clean_loaded_data(data)
             return {}
         except Exception:
             return {}
+    
+    def _clean_loaded_data(self, data):
+        """清理从JSON加载的数据，处理特殊值"""
+        if isinstance(data, dict):
+            return {k: self._clean_loaded_data(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_loaded_data(item) for item in data]
+        elif isinstance(data, float):
+            if np.isnan(data) or np.isinf(data):
+                return None
+            return data
+        else:
+            return data
     
     def save_cache(self, cache_data: Dict):
         """保存缓存文件"""
         try:
             with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                json.dump(cache_data, f, ensure_ascii=False, indent=2, cls=NumpyJSONEncoder)
         except Exception as e:
             print(f"❌ 保存缓存失败: {e}")
     
