@@ -39,17 +39,17 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    hide_streamlit_style = """
+    minimal_hide_style = """
     <style>
+    /* 只隐藏主菜单，保留所有其他功能 */
     #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
+    /* 隐藏底部的 Made with Streamlit */
     footer {visibility: hidden;}
-    /* 隐藏Streamlit默认的导航 */
-    [data-testid="collapsedControl"] {display: none}
-    section[data-testid="stSidebar"] > div.css-1d391kg {padding-top: 1rem;}
+    /* 减少侧边栏顶部间距 */
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 1rem;}
     </style>
     """
-    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+    st.markdown(minimal_hide_style, unsafe_allow_html=True)
     
     st.title("📈 XY Stock 股票分析系统")
     

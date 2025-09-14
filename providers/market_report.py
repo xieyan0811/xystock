@@ -117,18 +117,12 @@ def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_
 def generate_markdown_market_report(index_name, report_data):
     """生成Markdown格式的市场报告"""
     
-    md_content = f"""# {index_name} 市场综合分析报告
-
-**关注指数**: {index_name}  
-**报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-"""
+    md_content = ""
 
     # AI分析部分
     ai_analysis = report_data.get('ai_analysis', {})
     if 'error' not in ai_analysis and ai_analysis and 'report' in ai_analysis:
-        md_content += """---
-
+        md_content += """
 # 🤖 AI市场分析
 
 """
@@ -377,8 +371,11 @@ def generate_markdown_market_report(index_name, report_data):
             trend = "大幅下降"
         
         md_content += f"## 融资融券趋势\n\n融资融券余额较上周 **{trend}** ({change_ratio:.2f}%)\n\n"
-        
-    md_content += """---
+
+    md_content += f"""---
+
+**关注指数**: {index_name}  
+**报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 *本报告由XYStock市场分析系统自动生成，仅供参考，不构成任何投资建议*
 """
