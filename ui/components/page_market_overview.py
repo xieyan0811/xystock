@@ -95,7 +95,7 @@ def display_market_fundamentals():
             st.metric("M2余额", f"{m2_amount/10000:.2f}万亿" if m2_amount else "N/A")
         with money_col2:
             m2_growth = money_data.get('m2_growth')
-            st.metric("M2增速", f"{m2_growth:.2f}%" if m2_growth else "N/A")
+            st.metric("M2同比增长", f"{m2_growth:.2f}%" if m2_growth else "N/A")
         
         m1_col1, m1_col2 = st.columns(2)
         with m1_col1:
@@ -103,7 +103,7 @@ def display_market_fundamentals():
             st.metric("M1余额", f"{m1_amount/10000:.2f}万亿" if m1_amount else "N/A")
         with m1_col2:
             m1_growth = money_data.get('m1_growth')
-            st.metric("M1增速", f"{m1_growth:.2f}%" if m1_growth else "N/A")
+            st.metric("M1同比增长", f"{m1_growth:.2f}%" if m1_growth else "N/A")
         
         with st.expander("💧 流动性分析", expanded=True):
             if money_data.get('m2_growth') and money_data.get('m1_growth'):

@@ -21,7 +21,8 @@ from providers.market_data_fetcher import (
     fetch_valuation_data,
     fetch_index_technical_indicators
 )
-from providers.market_data_cache import get_cache_manager            
+from providers.market_data_cache import get_cache_manager
+from utils.format_utils import judge_rsi_level            
 
 class MarketTools:
     """统一的市场数据工具类"""
@@ -261,7 +262,7 @@ class MarketTools:
         if tech:
             summary['technical_trend'] = f"{tech.get('ma_trend', '未知')} | MACD {tech.get('macd_trend', '未知')}"
             #summary['current_price'] = tech.get('latest_close', 0)
-            summary['rsi_level'] = self._judge_rsi_level(tech.get('rsi_14', 50))
+            summary['rsi_level'] = judge_rsi_level(tech.get('rsi_14', 50))
         
         margin = report['margin_detail']
         if margin:
@@ -382,9 +383,9 @@ class MarketTools:
                     lines.append(f"- **M2余额:** {m2_amount}")
                 m2_growth = money.get('m2_growth', 'N/A')
                 if isinstance(m2_growth, (int, float)):
-                    lines.append(f"- **M2增速:** {m2_growth:.2f}%")
+                    lines.append(f"- **M2同比增长:** {m2_growth:.2f}%")
                 else:
-                    lines.append(f"- **M2增速:** {m2_growth}%")
+                    lines.append(f"- **M2同比增长:** {m2_growth}%")
             else:
                 lines.append(f"\n💸 资金流向:")
                 m2_amount = money.get('m2_amount', 'N/A')
@@ -394,9 +395,9 @@ class MarketTools:
                     lines.append(f"   M2余额: {m2_amount}")
                 m2_growth = money.get('m2_growth', 'N/A')
                 if isinstance(m2_growth, (int, float)):
-                    lines.append(f"   M2增速: {m2_growth:.2f}%")
+                    lines.append(f"   M2同比增长: {m2_growth:.2f}%")
                 else:
-                    lines.append(f"   M2增速: {m2_growth}%")
+                    lines.append(f"   M2同比增长: {m2_growth}%")
         
         margin_data = report['margin_detail']
         if margin_data:
@@ -446,19 +447,6 @@ class MarketTools:
         
         return '\n'.join(lines)
     
-    def _judge_rsi_level(self, rsi: float) -> str:
-        """判断RSI水平"""
-        if rsi >= 80:
-            return "超买"
-        elif rsi >= 70:
-            return "强势"
-        elif rsi >= 30:
-            return "正常"
-        elif rsi >= 20:
-            return "弱势"
-        else:
-            return "超卖"
-    
     def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:
         """生成AI分析数据"""
         try:
@@ -468,13 +456,13 @@ class MarketTools:
             
             print(f"🤖 OOOOOO 正在生成{index_name}的AI分析报告...")
             
-            ai_report, timestamp = generate_index_analysis_report(
+            ret, ai_report, timestamp = generate_index_analysis_report(
                 index_name,
                 index_name, 
                 market_report_data,
                 user_opinion
             )
-            
+                        
             ai_data = {
                 'report': ai_report,
                 'timestamp': timestamp,
@@ -482,8 +470,9 @@ class MarketTools:
                 'user_opinion': user_opinion,
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
-            
-            self.cache_manager.save_cached_data('ai_analysis', ai_data)
+
+            if ret:    
+                self.cache_manager.save_cached_data('ai_analysis', ai_data)
             
             print(f"✅ AI分析报告生成完成")
             return ai_data
