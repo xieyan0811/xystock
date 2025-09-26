@@ -16,7 +16,7 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from utils.string_utils import remove_markdown_format
-from providers.data_formatters import get_stock_formatter
+from utils.data_formatters import get_stock_formatter
 
 
 @dataclass
@@ -79,7 +79,7 @@ class DataCollector:
     def collect_stock_basic_info(self, stock_identity: Dict[str, Any]) -> Tuple[str, Optional[Dict]]:
         """收集股票基本信息"""
         try:
-            from providers.stock_data_tools import get_stock_tools
+            from stock.stock_data_tools import get_stock_tools
             stock_tools = get_stock_tools()
             basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True)
             
@@ -134,7 +134,7 @@ class DataCollector:
         
         if not market_tools:
             try:
-                from providers.market_data_tools import get_market_tools
+                from market.market_data_tools import get_market_tools
                 market_tools = get_market_tools()
             except Exception as e:
                 print(f"导入market_tools失败: {e}")
@@ -328,7 +328,7 @@ class BaseAnalysisGenerator:
             )
 
 def get_stock_info(stock_identity):
-    from providers.stock_data_tools import get_stock_tools
+    from stock.stock_data_tools import get_stock_tools
     stock_tools = get_stock_tools()
     return stock_tools.get_basic_info(stock_identity, use_cache=True)
 

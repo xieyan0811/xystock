@@ -13,7 +13,7 @@ if PROJECT_ROOT not in sys.path:
 
 warnings.filterwarnings('ignore')
 
-from providers.market_data_fetcher import (
+from market.market_data_fetcher import (
     fetch_current_indices,
     fetch_margin_data_unified,
     fetch_market_sentiment,
@@ -21,7 +21,7 @@ from providers.market_data_fetcher import (
     fetch_valuation_data,
     fetch_index_technical_indicators
 )
-from providers.market_data_cache import get_cache_manager
+from market.market_data_cache import get_cache_manager
 from utils.format_utils import judge_rsi_level            
 
 class MarketTools:
@@ -450,7 +450,7 @@ class MarketTools:
     def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:
         """生成AI分析数据"""
         try:
-            from providers.market_ai_analysis import generate_index_analysis_report
+            from market.market_ai_analysis import generate_index_analysis_report
             
             market_report_data = self.get_comprehensive_market_report(use_cache=True, index_name=index_name)
             

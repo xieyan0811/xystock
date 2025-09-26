@@ -1,17 +1,15 @@
 import sys
 import os
 import datetime
-import pandas as pd
 from typing import Dict, Any
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.stock_data_tools import get_stock_tools
-from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change
-from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
-from providers.data_formatters import get_stock_formatter
+from stock.stock_data_tools import get_stock_tools
+from utils.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
+from utils.data_formatters import get_stock_formatter
 
 
 def generate_stock_report(stock_identity: Dict[str, Any], 

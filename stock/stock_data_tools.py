@@ -17,17 +17,17 @@ if project_root not in sys.path:
 warnings.filterwarnings('ignore')
 
 # 导入必要的模块
-from providers.stock_utils import (
+from stock.stock_utils import (
     fetch_stock_basic_info, fetch_stock_technical_indicators,
     fetch_stock_news_data, fetch_stock_chip_data
 )
-from providers.stock_data_fetcher import data_manager, KLineType
-from providers.stock_data_cache import get_cache_manager
+from stock.stock_data_fetcher import data_manager, KLineType
+from stock.stock_data_cache import get_cache_manager
 from utils.format_utils import judge_rsi_level
 
 # 导入AI分析模块
 try:
-    from providers.stock_ai_analysis import (
+    from stock.stock_ai_analysis import (
         generate_fundamental_analysis_report, generate_stock_analysis_report, 
         generate_news_analysis_report, generate_chip_analysis_report
     )
@@ -494,8 +494,8 @@ class StockTools:
             
             print(f"🤖 生成 {stock_code} 综合AI分析...")
             
-            from providers.stock_ai_analysis import generate_comprehensive_analysis_report
-            from providers.market_data_tools import get_market_tools
+            from stock.stock_ai_analysis import generate_comprehensive_analysis_report
+            from market.market_data_tools import get_market_tools
             
             market_tools = get_market_tools()
             

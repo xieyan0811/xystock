@@ -8,8 +8,8 @@ project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_dir not in sys.path:
     sys.path.append(project_dir)
 
-from providers.market_data_tools import get_market_tools
-from providers.market_data_utils import (
+from market.market_data_tools import get_market_tools
+from market.market_data_utils import (
     format_indices_for_analysis, 
     format_technical_indicators,
 )

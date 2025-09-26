@@ -26,7 +26,7 @@ def main():
                     use_container_width=True,
                     help="清理所有股票相关的数据缓存"):
             try:
-                from providers.stock_data_tools import clear_stock_cache
+                from stock.stock_data_tools import clear_stock_cache
                 clear_stock_cache()
                 st.success("✅ 股票数据缓存已清理完成！")
             except Exception as e:
@@ -41,7 +41,7 @@ def main():
                     use_container_width=True,
                     help="清理所有大盘相关的数据缓存"):
             try:
-                from providers.market_data_tools import get_market_tools
+                from market.market_data_tools import get_market_tools
                 market_tools = get_market_tools()
                 market_tools.clear_cache()
                 st.success("✅ 大盘数据缓存已清理完成！")
@@ -70,17 +70,17 @@ def main():
             if st.button("确认清理", key="confirm_clear_all_cache"):
                 try:
                     # 清理所有相关缓存
-                    from providers.stock_data_tools import clear_stock_cache
+                    from stock.stock_data_tools import clear_stock_cache
                     clear_stock_cache()
                     
-                    from providers.market_data_tools import get_market_tools
+                    from market.market_data_tools import get_market_tools
                     market_tools = get_market_tools()
                     market_tools.clear_cache()
 
-                    from providers.kline_cache import cache_manager
+                    from utils.kline_cache import cache_manager
                     cache_manager.clear_cache()
 
-                    from providers.stock_code_map import clear_stock_map_cache, clear_hk_stock_map_cache
+                    from stock.stock_code_map import clear_stock_map_cache, clear_hk_stock_map_cache
                     clear_stock_map_cache()
                     clear_hk_stock_map_cache()
 

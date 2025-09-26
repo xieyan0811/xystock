@@ -10,7 +10,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.market_report import generate_market_report
+from market.market_report import generate_market_report
 
 
 def test_market_report(index_name="上证指数", format_type="markdown", has_ai_analysis=True, user_opinion=None):

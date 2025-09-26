@@ -16,7 +16,7 @@ from ui.components.page_token_stats import main as display_token_stats
 from ui.components.page_stock import display_stock_info
 from ui.components.page_market_overview import display_market_overview
 from ui.components.page_cache_management import main as display_cache_management
-from providers.stock_code_map import get_stock_identity
+from stock.stock_code_map import get_stock_identity
 
 def set_requests_timeout(timeout=30):
     """全局设置 requests 默认超时时间（monkey patch）"""

@@ -131,7 +131,7 @@ def get_indicators(df):
 
 def fetch_stock_basic_info(stock_code: str) -> Dict:
     """获取股票基本信息的具体实现"""
-    from providers.stock_data_fetcher import data_manager
+    from stock.stock_data_fetcher import data_manager
     
     basic_info = {}
     
@@ -167,8 +167,8 @@ def fetch_stock_basic_info(stock_code: str) -> Dict:
 
 def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict:
     """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）"""
-    from providers.stock_data_fetcher import data_manager, KLineType
-    from providers.risk_metrics import calculate_portfolio_risk_summary
+    from stock.stock_data_fetcher import data_manager, KLineType
+    from utils.risk_metrics import calculate_portfolio_risk_summary
     
     indicators_info = {}
     
@@ -221,7 +221,7 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
 
 def fetch_stock_news_data(stock_code: str, day=7) -> Dict:
     """获取股票新闻数据的具体实现"""
-    from providers.news_tools import get_stock_news_by_akshare
+    from utils.news_tools import get_stock_news_by_akshare
     
     news_info = {}
     

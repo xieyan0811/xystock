@@ -25,8 +25,8 @@ xystock 数据获取模块
     quote = fetcher.get_realtime_quote("ETF")
 """
 
-from .kline_cache import KLineData, KLineType
-from .stock_data_fetcher import (
+from utils.kline_cache import KLineData, KLineType
+from stock.stock_data_fetcher import (
     StockDataFetcher,
     RealTimeQuote, 
     DataFetcherError,

@@ -7,9 +7,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
+from utils.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 from ui.config import FOCUS_INDICES
-from providers.market_data_utils import collect_market_data_for_report, format_technical_indicators, format_index_detail
+from market.market_data_utils import collect_market_data_for_report, format_technical_indicators, format_index_detail
 
 
 def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):

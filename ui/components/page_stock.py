@@ -15,9 +15,9 @@ if project_root not in sys.path:
 
 from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_number, format_large_number
-from providers.stock_data_tools import get_stock_tools
-from providers.stock_report import generate_stock_report
-from providers.report_utils import PDF_SUPPORT_AVAILABLE
+from stock.stock_data_tools import get_stock_tools
+from stock.stock_report import generate_stock_report
+from utils.report_utils import PDF_SUPPORT_AVAILABLE
 
 stock_tools = get_stock_tools()
 

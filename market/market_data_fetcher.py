@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 import akshare as ak
 import pandas as pd
 import efinance as ef
-from providers.stock_utils import get_indicators
+from stock.stock_utils import get_indicators
 from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 
 def fetch_market_sentiment() -> Dict:

@@ -14,9 +14,9 @@ if project_root not in sys.path:
 
 from utils.format_utils import format_large_number
 from ui.components.page_common import display_technical_indicators
-from providers.market_data_tools import get_market_tools
-from providers.market_report import generate_market_report
-from providers.report_utils import PDF_SUPPORT_AVAILABLE
+from market.market_data_tools import get_market_tools
+from market.market_report import generate_market_report
+from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
 
 def display_market_fundamentals():
