@@ -7,85 +7,16 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.market_data_tools import get_market_tools
-from utils.format_utils import format_volume, format_large_number
 from providers.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 from ui.config import FOCUS_INDICES
+from providers.market_data_utils import collect_market_data_for_report, format_technical_indicators, format_index_detail
 
 
 def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
     """生成完整的市场分析报告（安全版本，完全独立于UI）"""
     try:
-        market_tools = get_market_tools()
-        
-        report_data = {}
-        
-        # 收集当前指数数据
-        try:
-            current_indices = market_tools.get_current_indices(use_cache=True)
-            if 'error' not in current_indices and current_indices:
-                report_data['current_indices'] = current_indices
-                # 获取特定指数信息
-                if index_name in current_indices.get('indices_dict', {}):
-                    report_data['focus_index_data'] = current_indices['indices_dict'][index_name]
-        except Exception as e:
-            report_data['current_indices'] = {'error': str(e)}
-        
-        # 收集技术指标数据
-        try:
-            tech_indicators = get_market_tools().get_index_technical_indicators(index_name)
-            if tech_indicators:
-                report_data['technical_indicators'] = tech_indicators
-        except Exception as e:
-            report_data['technical_indicators'] = {'error': str(e)}
-        
-        # 收集市场情绪数据
-        """
-        try:
-            sentiment_data = market_tools.get_market_sentiment(use_cache=True)
-            if 'error' not in sentiment_data and sentiment_data:
-                report_data['sentiment_data'] = sentiment_data
-        except Exception as e:
-            report_data['sentiment_data'] = {'error': str(e)}
-        """
-        
-        # 收集估值数据
-        try:
-            valuation_data = market_tools.get_valuation_data(use_cache=True)
-            if 'error' not in valuation_data and valuation_data:
-                report_data['valuation_data'] = valuation_data
-        except Exception as e:
-            report_data['valuation_data'] = {'error': str(e)}
-        
-        # 收集资金流向数据
-        try:
-            money_flow_data = market_tools.get_money_flow_data(use_cache=True)
-            if 'error' not in money_flow_data and money_flow_data:
-                report_data['money_flow_data'] = money_flow_data
-        except Exception as e:
-            report_data['money_flow_data'] = {'error': str(e)}
-        
-        # 收集融资融券数据
-        try:
-            margin_data = market_tools.get_margin_data(use_cache=True)
-            if 'error' not in margin_data and margin_data:
-                report_data['margin_data'] = margin_data
-        except Exception as e:
-            report_data['margin_data'] = {'error': str(e)}
-        
-        # 收集AI分析数据
-        if has_ai_analysis:
-            try:
-                ai_analysis = market_tools.get_ai_analysis(
-                    use_cache=True, 
-                    index_name=index_name,
-                    force_regenerate=bool(user_opinion.strip()),
-                    user_opinion=user_opinion
-                )
-                if 'error' not in ai_analysis:
-                    report_data['ai_analysis'] = ai_analysis
-            except Exception as e:
-                report_data['ai_analysis'] = {'error': str(e)}
+        # 使用统一的数据收集工具
+        report_data = collect_market_data_for_report(index_name, has_ai_analysis, user_opinion)
         
         md_content = generate_markdown_market_report(index_name, report_data)
         
@@ -188,61 +119,11 @@ def generate_markdown_market_report(index_name, report_data):
         
         # 焦点指数详细信息
         if focus_index_data:
-            md_content += f"""## {index_name} 详细信息
-
-"""
-            
-            focus_metrics = [
-                ('当前点位', f"{focus_index_data.get('current_price', 0):.2f}"),
-                ('今日开盘', f"{focus_index_data.get('open', 0):.2f}"),
-                ('今日最高', f"{focus_index_data.get('high', 0):.2f}"),
-                ('今日最低', f"{focus_index_data.get('low', 0):.2f}"),
-                ('昨日收盘', f"{focus_index_data.get('prev_close', 0):.2f}"),
-                ('涨跌点数', f"{focus_index_data.get('change_amount', 0):.2f}"),
-                ('涨跌幅', f"{focus_index_data.get('change_percent', 0):.2f}%"),
-                ('成交量', format_volume(focus_index_data.get('volume', 0))),
-                ('成交额', format_large_number(focus_index_data.get('turnover', 0)))
-            ]
-            
-            for label, value in focus_metrics:
-                if value and value != "0.00":
-                    md_content += f"- **{label}**: {value}\n"
-            
-            md_content += "\n"
+            md_content += format_index_detail(focus_index_data, index_name)
     
     # 技术指标分析部分
     technical_indicators = report_data.get('technical_indicators', {})
-    if 'error' not in technical_indicators and technical_indicators:
-        md_content += """---
-
-# 📈 技术指标分析
-
-"""
-        
-        tech_metrics = [
-            ('MA5', f"{technical_indicators.get('ma5', 0):.2f}"),
-            ('MA10', f"{technical_indicators.get('ma10', 0):.2f}"),
-            ('MA20', f"{technical_indicators.get('ma20', 0):.2f}"),
-            ('MA60', f"{technical_indicators.get('ma60', 0):.2f}"),
-            ('RSI(14)', f"{technical_indicators.get('rsi_14', 0):.2f}"),
-            ('MACD', f"{technical_indicators.get('macd', 0):.4f}"),
-            ('MACD信号线', f"{technical_indicators.get('macd_signal', 0):.4f}"),
-            ('MACD柱状图', f"{technical_indicators.get('macd_histogram', 0):.4f}"),
-            ('MA趋势', technical_indicators.get('ma_trend', '')),
-            ('MACD趋势', technical_indicators.get('macd_trend', ''))
-        ]
-        
-        for label, value in tech_metrics:
-            if value and str(value) != "0.00":
-                md_content += f"- **{label}**: {value}\n"
-        
-        md_content += "\n"
-        
-        # RSI水平判断
-        rsi_14 = technical_indicators.get('rsi_14', 50)
-        if rsi_14:
-            rsi_level = _judge_rsi_level(rsi_14)
-            md_content += f"## RSI水平分析\n\n当前RSI值为 **{rsi_14:.2f}**，处于 **{rsi_level}** 状态。\n\n"
+    md_content += format_technical_indicators(technical_indicators)
     
     # 市场情绪部分
 
@@ -381,20 +262,6 @@ def generate_markdown_market_report(index_name, report_data):
 """
     
     return md_content
-
-
-def _judge_rsi_level(rsi: float) -> str:
-    """判断RSI水平"""
-    if rsi >= 80:
-        return "超买"
-    elif rsi >= 70:
-        return "强势"
-    elif rsi >= 30:
-        return "正常"
-    elif rsi >= 20:
-        return "弱势"
-    else:
-        return "超卖"
 
 
 if __name__ == "__main__":

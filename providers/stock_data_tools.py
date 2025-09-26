@@ -23,6 +23,7 @@ from providers.stock_utils import (
 )
 from providers.stock_data_fetcher import data_manager, KLineType
 from providers.stock_data_cache import get_cache_manager
+from utils.format_utils import judge_rsi_level
 
 # 导入AI分析模块
 try:
@@ -567,7 +568,7 @@ class StockTools:
         if kline and 'error' not in kline:
             indicators = kline.get('indicators', {})
             summary['technical_trend'] = f"{indicators.get('ma_trend', '未知')} | MACD {indicators.get('macd_trend', '未知')}"
-            summary['rsi_level'] = self._judge_rsi_level(indicators.get('rsi_14', 50))
+            summary['rsi_level'] = judge_rsi_level(indicators.get('rsi_14', 50))
         
         news = report['news_data']
         if news and 'error' not in news:
@@ -579,19 +580,6 @@ class StockTools:
             summary['avg_cost'] = chip.get('avg_cost', 0)
         
         return summary
-    
-    def _judge_rsi_level(self, rsi: float) -> str:
-        """判断RSI水平"""
-        if rsi >= 80:
-            return "超买"
-        elif rsi >= 70:
-            return "强势"
-        elif rsi >= 30:
-            return "正常"
-        elif rsi >= 20:
-            return "弱势"
-        else:
-            return "超卖"
     
     def clear_cache(self, stock_code: str = None, data_type: str = None):
         """清理缓存"""

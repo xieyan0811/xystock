@@ -121,34 +121,11 @@ def get_indicators(df):
         
         # CCI指标
         'cci_14': stock['cci_14'].iloc[-1] if stock_len > 14 else None,
-        
-        # 基础数据
-        'latest_close': stock['close'].iloc[-1],
-        'latest_high': stock['high'].iloc[-1],
-        'latest_low': stock['low'].iloc[-1],
-        'latest_open': stock['open'].iloc[-1],
-        'latest_volume': stock['volume'].iloc[-1],
-        'latest_date': df.iloc[-1].get('datetime', datetime.now().strftime('%Y-%m-%d')),
-        
+                
         # 趋势判断
         'ma_trend': _judge_ma_trend(stock),
         'macd_trend': _judge_macd_trend(stock),
     }
-    
-    # 价格变化计算
-    if stock_len > 1:
-        prev_close = stock['close'].iloc[-2]
-        indicators.update({
-            'prev_close': prev_close,
-            'change_amount': stock['close'].iloc[-1] - prev_close,
-            'change_percent': ((stock['close'].iloc[-1] - prev_close) / prev_close * 100) if prev_close != 0 else 0,
-        })
-    else:
-        indicators.update({
-            'prev_close': None,
-            'change_amount': 0,
-            'change_percent': 0,
-        })
     
     return indicators
 

@@ -9,6 +9,10 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from providers.market_data_tools import get_market_tools
+from providers.market_data_utils import (
+    format_indices_for_analysis, 
+    format_technical_indicators,
+)
 
 def generate_index_analysis_report(
     stock_code: str,
@@ -19,62 +23,30 @@ def generate_index_analysis_report(
     """生成指数AI分析报告（包含超短期预测）"""
     client = OpenAIClient()
     
+    # 生成市场报告文本    
     try:
         market_tools = get_market_tools()
-        market_report_text = market_tools.generate_market_report(market_report_data, 
-                                                                 format_type='detail', 
-                                                                 markdown=False)
+        market_report_text = market_tools.generate_market_report(
+            market_report_data, 
+            format_type='detail', 
+            markdown=False
+        )
     except Exception as e:
         market_report_text = f"市场报告数据格式化失败: {str(e)}"
-    
+        return False, market_report_text, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 获取当前指数数据并格式化
     try:
+        market_tools = get_market_tools()
         current_indices = market_tools.get_current_indices(use_cache=True, force_refresh=False)
-        indices_text = "## 当前市场指数情况：\n"
-        if 'indices_dict' in current_indices:
-            for index_name, index_data in current_indices['indices_dict'].items():
-                indices_text += f"- {index_name}: {index_data['current_price']:.2f} "
-                indices_text += f"({index_data['change_percent']:+.2f}%) "
-                indices_text += f"涨跌额: {index_data['change_amount']:+.2f}\n"
-        else:
-            indices_text += "无法获取指数数据\n"
+        indices_text = format_indices_for_analysis(current_indices, stock_name)
     except Exception as e:
         indices_text = f"## 当前市场指数情况：\n获取指数数据失败: {str(e)}\n"
     
+    # 获取技术指标数据并格式化
     try:
         tech_indicators = market_tools.get_index_technical_indicators(stock_name)
-        
-        if tech_indicators:
-            tech_text = f"## 主要技术指标（{stock_name}）：\n"
-
-            tech_text += "（注意：使用的 K线数据截至上一交易日）\n"
-
-            for key, value in tech_indicators.items():
-                if key == "kline":
-                    continue  # 跳过kline字段
-                if isinstance(value, (int, float)):
-                    formatted_value = round(float(value), 2)
-                    tech_text += f"- {key}: {formatted_value}\n"
-                elif isinstance(value, str):
-                    tech_text += f"- {key}: {value}\n"
-                elif isinstance(value, dict):
-                    tech_text += f"- {key}:\n"
-                    for sub_key, sub_value in value.items():
-                        if isinstance(sub_value, (int, float)):
-                            formatted_sub_value = round(float(sub_value), 2)
-                            tech_text += f"  • {sub_key}: {formatted_sub_value}\n"
-                        else:
-                            tech_text += f"  • {sub_key}: {sub_value}\n"
-                elif isinstance(value, list):
-                    if len(value) > 0 and isinstance(value[0], (int, float)):
-                        formatted_values = [round(float(v), 2) for v in value[:3]]
-                        tech_text += f"- {key}: {formatted_values}{'...' if len(value) > 3 else ''}\n"
-                    else:
-                        tech_text += f"- {key}: {value}\n"
-                else:
-                    tech_text += f"- {key}: {value}\n"
-        else:
-            tech_text = "## 主要技术指标：\n无法获取技术指标数据\n"
-            
+        tech_text = format_technical_indicators(tech_indicators)
     except Exception as e:
         tech_text = f"## 主要技术指标：\n获取技术指标失败: {str(e)}\n"
     
@@ -126,7 +98,7 @@ def generate_index_analysis_report(
         f.write(system_message + "\n\n")
         f.write(user_message)
     print(f'req length {len(user_message)}')
-    # return user_message, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 注释掉调试返回
+    # return False, user_message, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 注释掉调试返回 
 
     try:
         messages = [
@@ -143,9 +115,9 @@ def generate_index_analysis_report(
         now = datetime.datetime.now()
         timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
         
-        return response, timestamp
+        return True, response, timestamp
         
     except Exception as e:
         error_msg = f"生成{stock_name}AI分析报告失败: {str(e)}"
         print(f"❌ {error_msg}")
-        return error_msg, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return False, error_msg, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
