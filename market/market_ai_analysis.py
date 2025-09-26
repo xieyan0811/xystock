@@ -9,10 +9,8 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from market.market_data_tools import get_market_tools
-from market.market_data_utils import (
-    format_indices_for_analysis, 
-    format_technical_indicators,
-)
+from market.market_data_utils import format_indices_for_analysis
+from utils.data_formatters import format_technical_indicators, format_risk_metrics
 
 def generate_index_analysis_report(
     stock_code: str,
@@ -49,7 +47,6 @@ def generate_index_analysis_report(
         tech_text = format_technical_indicators(tech_indicators)
         if 'risk_metrics' in tech_indicators:
             risk_metrics = tech_indicators['risk_metrics']
-            from market.market_data_utils import format_risk_metrics
             tech_text += "\n" + format_risk_metrics(risk_metrics)
     except Exception as e:
         tech_text = f"## 主要技术指标：\n获取技术指标失败: {str(e)}\n"

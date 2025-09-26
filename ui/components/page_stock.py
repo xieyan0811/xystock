@@ -13,7 +13,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_number, format_large_number
 from stock.stock_data_tools import get_stock_tools
 from stock.stock_report import generate_stock_report
@@ -298,10 +297,116 @@ def display_basic_info(stock_identity):
         st.error(f"获取基本信息失败: {str(e)}")
 
 
+def display_kline_charts(df):
+    """显示K线图和成交量图表"""
+    # 转换日期格式
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    
+    # K线图与均线
+    fig_price = go.Figure()
+    
+    # 添加K线图
+    fig_price.add_trace(go.Candlestick(
+        x=df['datetime'],
+        open=df['open'], 
+        high=df['high'],
+        low=df['low'], 
+        close=df['close'],
+        name='K线',
+        increasing_line_color="#DA1A10",
+        decreasing_line_color="#14AA06",
+        increasing_fillcolor="#F51D12",
+        decreasing_fillcolor="#1BCC0B"
+    ))
+    
+    # 添加均线
+    fig_price.add_trace(go.Scatter(
+        x=df['datetime'], 
+        y=df['MA5'],
+        mode='lines',
+        name='MA5',
+        line=dict(color="#D2FF07", width=1.5)
+    ))
+    
+    fig_price.add_trace(go.Scatter(
+        x=df['datetime'], 
+        y=df['MA10'],
+        mode='lines',
+        name='MA10',
+        line=dict(color="#FF22DA", width=1.5)
+    ))
+    
+    fig_price.add_trace(go.Scatter(
+        x=df['datetime'], 
+        y=df['MA20'],
+        mode='lines',
+        name='MA20',
+        line=dict(color="#0593F1", width=1.5)
+    ))
+    
+    # 设置K线图布局
+    fig_price.update_layout(
+        title='K线图与均线',
+        xaxis_title='日期',
+        yaxis_title='价格',
+        height=500,
+        margin=dict(l=0, r=0, t=40, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(rangeslider=dict(visible=False)),
+        yaxis=dict(fixedrange=True)
+    )
+    
+    st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
+    
+    # 成交量图
+    fig_volume = go.Figure()
+    
+    fig_volume.add_trace(go.Bar(
+        x=df['datetime'], 
+        y=df['volume'],
+        name='成交量',
+        marker=dict(color='#90CAF9')
+    ))
+    
+    fig_volume.update_layout(
+        title='成交量',
+        xaxis_title='日期',
+        yaxis_title='成交量',
+        height=250,
+        margin=dict(l=0, r=0, t=40, b=0),
+        xaxis=dict(rangeslider=dict(visible=False)),
+        yaxis=dict(fixedrange=True)
+    )
+    
+    st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
+
+
+def display_ai_market_analysis(kline_info, stock_code):
+    """显示AI行情分析报告"""
+    if "ai_market_report" not in st.session_state:
+        st.session_state.ai_market_report = {}
+        
+    if 'ai_analysis' in kline_info:
+        if 'error' not in kline_info['ai_analysis']:
+            st.session_state.ai_market_report[stock_code] = {
+                "report": kline_info['ai_analysis']['report'],
+                "timestamp": kline_info['ai_analysis']['timestamp']
+            }
+        else:
+            st.error(f"AI行情分析失败: {kline_info['ai_analysis']['error']}")
+            st.info("请稍后再试或联系管理员")
+    
+    if stock_code in st.session_state.ai_market_report:
+        with st.expander("🤖 AI 行情分析报告", expanded=True):
+            st.markdown(st.session_state.ai_market_report[stock_code]["report"])
+            st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
+
+
 def display_market_trend(stock_identity):
     """显示股票行情走势"""
     st.subheader("行情走势")
     stock_code = stock_identity['code']
+    
     try:
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
@@ -309,11 +414,23 @@ def display_market_trend(stock_identity):
         include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
                              stock_code not in st.session_state.get('ai_market_report', {}))
         
+        # 获取K线数据
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
-                kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                kline_info = stock_tools.get_stock_kline_data(
+                    stock_identity, 
+                    period=160, 
+                    use_cache=use_cache, 
+                    force_refresh=force_refresh, 
+                    include_ai_analysis=True
+                )
         else:
-            kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh)
+            kline_info = stock_tools.get_stock_kline_data(
+                stock_identity, 
+                period=160, 
+                use_cache=use_cache, 
+                force_refresh=force_refresh
+            )
         
         if 'error' in kline_info:
             st.error(f"获取K线数据失败: {kline_info['error']}")
@@ -322,114 +439,22 @@ def display_market_trend(stock_identity):
         if kline_info and kline_info.get('kline_data'):
             df = pd.DataFrame(kline_info['kline_data'])
             
-            if "ai_market_report" not in st.session_state:
-                st.session_state.ai_market_report = {}
-                
-            if 'ai_analysis' in kline_info:
-                if 'error' not in kline_info['ai_analysis']:
-                    st.session_state.ai_market_report[stock_code] = {
-                        "report": kline_info['ai_analysis']['report'],
-                        "timestamp": kline_info['ai_analysis']['timestamp']
-                    }
-                else:
-                    st.error(f"AI行情分析失败: {kline_info['ai_analysis']['error']}")
-                    st.info("请稍后再试或联系管理员")
+            # 显示AI分析报告
+            display_ai_market_analysis(kline_info, stock_code)
             
-            if stock_code in st.session_state.ai_market_report:
-                with st.expander("🤖 AI 行情分析报告", expanded=True):
-                    st.markdown(st.session_state.ai_market_report[stock_code]["report"])
-                    st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
-            
+            # 显示风险分析
             risk_metrics = kline_info.get('risk_metrics', None)
-            if risk_metrics is None or 'error' in risk_metrics:
-                st.error(f"获取风险指标失败: {risk_metrics['error']}")
-            elif risk_metrics and 'summary_table' in risk_metrics:
-                with st.expander("风险分析", expanded=True):
-                    st.table(risk_metrics['summary_table'])
-            elif 'error' not in risk_metrics:
-                with st.expander("风险分析摘要", expanded=True):
-                    st.json(risk_metrics)
-
-            df['datetime'] = pd.to_datetime(df['datetime'])
-                        
-            fig_price = go.Figure()
+            from ui.components.page_common import display_risk_analysis
+            display_risk_analysis(risk_metrics)
             
-            fig_price.add_trace(go.Candlestick(
-                x=df['datetime'],
-                open=df['open'], 
-                high=df['high'],
-                low=df['low'], 
-                close=df['close'],
-                name='K线',
-                increasing_line_color="#DA1A10",
-                decreasing_line_color="#14AA06",
-                increasing_fillcolor="#F51D12",
-                decreasing_fillcolor="#1BCC0B"
-            ))
+            # 显示K线图和成交量图
+            display_kline_charts(df)
             
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA5'],
-                mode='lines',
-                name='MA5',
-                line=dict(color="#D2FF07", width=1.5)
-            ))
-            
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA10'],
-                mode='lines',
-                name='MA10',
-                line=dict(color="#FF22DA", width=1.5)
-            ))
-            
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA20'],
-                mode='lines',
-                name='MA20',
-                line=dict(color="#0593F1", width=1.5)
-            ))
-            
-            fig_price.update_layout(
-                title='K线图与均线',
-                xaxis_title='日期',
-                yaxis_title='价格',
-                height=500,
-                margin=dict(l=0, r=0, t=40, b=0),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                xaxis=dict(rangeslider=dict(visible=False)),
-                yaxis=dict(fixedrange=True)
-            )
-            
-            st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
-            
-            fig_volume = go.Figure()
-            
-            fig_volume.add_trace(go.Bar(
-                x=df['datetime'], 
-                y=df['volume'],
-                name='成交量',
-                marker=dict(color='#90CAF9')
-            ))
-            
-            fig_volume.update_layout(
-                title='成交量',
-                xaxis_title='日期',
-                yaxis_title='成交量',
-                height=250,
-                margin=dict(l=0, r=0, t=40, b=0),
-                xaxis=dict(rangeslider=dict(visible=False)),
-                yaxis=dict(fixedrange=True)
-            )
-            
-            st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
-            
-            indicators = kline_info.get('indicators', {})
-            if indicators:
-                display_technical_indicators(indicators)
-            else:
-                st.warning("未获取到技术指标数据")
+            # 显示技术指标分析
+            st.markdown("---")
+            st.subheader("技术指标分析")
+            from ui.components.page_common import display_technical_analysis_tab
+            display_technical_analysis_tab(stock_identity=stock_identity)
 
         else:
             st.warning(f"未获取到 {stock_code} 的K线数据")

@@ -13,7 +13,6 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from utils.format_utils import format_large_number
-from ui.components.page_common import display_technical_indicators
 from market.market_data_tools import get_market_tools
 from market.market_report import generate_market_report
 from utils.report_utils import PDF_SUPPORT_AVAILABLE
@@ -490,8 +489,29 @@ def display_market_overview():
                         display_market_indices()
                     
                     with tab2:
-                        tech_data = get_market_tools().get_index_technical_indicators('上证指数')
-                        display_technical_indicators(tech_data)
+                        # 使用统一的技术指标显示函数
+                        from ui.components.page_common import display_technical_analysis_tab, display_risk_analysis
+                        display_technical_analysis_tab(index_name='上证指数')
+                        
+                        # 显示大盘风险分析
+                        st.markdown("---")
+                        st.subheader("大盘风险分析")
+                        try:
+                            use_cache = st.session_state.get('market_use_cache', True)
+                            market_tools = get_market_tools()
+                            
+                            # 获取大盘技术指标数据（包含风险数据）
+                            tech_data = market_tools.get_index_technical_indicators('上证指数')
+                            
+                            if tech_data and not ('error' in tech_data):
+                                # 直接使用返回数据中的风险指标
+                                risk_metrics = tech_data.get('risk_metrics', None)
+                                display_risk_analysis(risk_metrics)
+                            else:
+                                st.warning("暂无大盘风险分析数据")
+                                
+                        except Exception as e:
+                            st.error(f"获取大盘风险分析失败: {str(e)}")
 
                     with tab3:
                         display_market_fundamentals()

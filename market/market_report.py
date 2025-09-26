@@ -9,7 +9,8 @@ if project_root not in sys.path:
 
 from utils.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 from ui.config import FOCUS_INDICES
-from market.market_data_utils import collect_market_data_for_report, format_technical_indicators, format_index_detail
+from market.market_data_utils import collect_market_data_for_report, format_index_detail
+from utils.data_formatters import format_technical_indicators, format_risk_metrics
 
 
 def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
@@ -124,8 +125,10 @@ def generate_markdown_market_report(index_name, report_data):
             md_content += format_index_detail(focus_index_data, index_name)
     
     # 技术指标分析部分
-    technical_indicators = report_data.get('technical_indicators', {})
-    md_content += format_technical_indicators(technical_indicators)
+    tech_indicators = report_data.get('technical_indicators', {})
+    md_content += format_technical_indicators(tech_indicators)
+    if tech_indicators.get('risk_metrics'):
+        md_content += "\n" + format_risk_metrics(tech_indicators.get('risk_metrics'))
     
     # 市场情绪部分
 

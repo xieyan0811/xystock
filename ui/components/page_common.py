@@ -98,3 +98,74 @@ def display_technical_indicators(tech_data):
             kdj_j = tech_data.get('kdj_j')
             st.metric("KDJ-J", format_price(kdj_j) if kdj_j else "N/A")
 
+
+def display_technical_analysis_tab(stock_identity=None, index_name=None):
+    """
+    显示技术指标分析Tab的完整内容
+    适用于股票和大盘指数的技术分析
+    
+    Args:
+        stock_identity: 股票标识信息 (用于股票分析)
+        index_name: 指数名称 (用于大盘分析，如'上证指数')
+    """
+    if stock_identity and index_name:
+        st.error("stock_identity 和 index_name 不能同时提供")
+        return
+        
+    if not stock_identity and not index_name:
+        st.error("必须提供 stock_identity 或 index_name 中的一个")
+        return
+    
+    try:
+        use_cache = st.session_state.get('use_cache', True) or st.session_state.get('market_use_cache', True)
+        force_refresh = not use_cache
+        
+        # 根据类型获取技术指标数据
+        if stock_identity:
+            # 股票技术分析
+            from stock.stock_data_tools import get_stock_tools
+            stock_tools = get_stock_tools()
+            
+            kline_info = stock_tools.get_stock_kline_data(
+                stock_identity, 
+                period=160, 
+                use_cache=use_cache, 
+                force_refresh=force_refresh
+            )
+            
+            if 'error' in kline_info:
+                st.error(f"获取K线数据失败: {kline_info['error']}")
+                return
+                
+            indicators = kline_info.get('indicators', {})
+            
+        elif index_name:
+            # 大盘指数技术分析
+            from market.market_data_tools import get_market_tools
+            market_tools = get_market_tools()
+            
+            indicators = market_tools.get_index_technical_indicators(index_name)
+        
+        # 显示技术指标
+        if indicators:
+            display_technical_indicators(indicators)
+        else:
+            st.warning("未获取到技术指标数据")
+            
+    except Exception as e:
+        st.error(f"加载技术分析数据失败: {str(e)}")
+        with st.expander("🔍 错误详情", expanded=False):
+            st.code(str(e), language="text")
+
+
+def display_risk_analysis(risk_metrics):
+    """显示风险分析"""
+    if risk_metrics is None or 'error' in risk_metrics:
+        st.error(f"获取风险指标失败: {risk_metrics.get('error', '未知错误')}")
+    elif risk_metrics and 'summary_table' in risk_metrics:
+        with st.expander("📊 风险分析", expanded=True):
+            st.table(risk_metrics['summary_table'])
+    elif 'error' not in risk_metrics:
+        with st.expander("📊 风险分析摘要", expanded=True):
+            st.json(risk_metrics)
+
