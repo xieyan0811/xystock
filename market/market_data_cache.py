@@ -21,8 +21,40 @@ from typing import Dict, Optional, Any
 class NumpyJSONEncoder(json.JSONEncoder):
     """自定义JSON编码器，处理numpy、pandas和datetime数据类型"""
     
+    @staticmethod
+    def clean_data(obj):
+        """递归清理数据中的NaN和无穷大值"""
+        if isinstance(obj, dict):
+            return {k: NumpyJSONEncoder.clean_data(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [NumpyJSONEncoder.clean_data(item) for item in obj]
+        elif isinstance(obj, float):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return obj
+        elif isinstance(obj, np.floating):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        elif hasattr(obj, '__module__') and 'numpy' in str(obj.__module__):
+            # 处理其他numpy类型
+            if hasattr(obj, 'item'):
+                try:
+                    item_val = obj.item()
+                    if isinstance(item_val, float) and (np.isnan(item_val) or np.isinf(item_val)):
+                        return None
+                    return item_val
+                except:
+                    return None
+        return obj
+    
     def default(self, obj):
-        if isinstance(obj, np.integer):
+        # 处理Python原生float中的特殊值
+        if isinstance(obj, float):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return obj
+        elif isinstance(obj, np.integer):
             return int(obj)
         elif isinstance(obj, np.floating):
             if np.isnan(obj) or np.isinf(obj):
@@ -32,14 +64,35 @@ class NumpyJSONEncoder(json.JSONEncoder):
             return obj.tolist()
         elif isinstance(obj, np.bool_):
             return bool(obj)
-        elif hasattr(obj, 'item'):  # numpy scalar types
+        elif isinstance(obj, np.generic):  # numpy scalar types
             return obj.item()
         
         # 处理pandas数据类型
         elif isinstance(obj, (pd.Timestamp, pd.DatetimeIndex)):
             return obj.isoformat() if hasattr(obj, 'isoformat') else str(obj)
-        elif pd.isna(obj):
+        elif isinstance(obj, pd.DataFrame):
+            # 将DataFrame转换为可序列化的格式，替换NaN和无穷大
+            df_clean = obj.replace([np.nan, np.inf, -np.inf], None)
+            return df_clean.to_dict('records')
+        elif isinstance(obj, pd.Series):
+            # 将Series转换为列表，替换NaN和无穷大
+            series_clean = obj.replace([np.nan, np.inf, -np.inf], None)
+            return series_clean.tolist()
+        elif isinstance(obj, (pd.Index, pd.RangeIndex)):
+            # 处理pandas索引对象
+            return obj.tolist()
+        # 对于标量pandas对象，安全地检查是否为NaN
+        elif hasattr(obj, '__module__') and obj.__module__ == 'pandas._libs.missing':
+            # 处理pandas的NA/NaT等特殊值
             return None
+        elif hasattr(obj, '__array__') and hasattr(obj, 'size') and obj.size == 1:
+            # 处理单元素的pandas对象
+            try:
+                if pd.isna(obj):
+                    return None
+                return obj.item() if hasattr(obj, 'item') else obj
+            except (ValueError, TypeError):
+                pass  # 如果pd.isna()失败，继续其他处理
         
         # 处理Python原生datetime类型
         elif isinstance(obj, datetime):
@@ -113,9 +166,13 @@ class MarketDataCache:
     def save_cache(self, cache_data: Dict):
         """保存缓存文件"""
         try:
+            # 预清理数据，确保所有NaN和无穷大值都被处理
+            cleaned_data = NumpyJSONEncoder.clean_data(cache_data)
             with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2, cls=NumpyJSONEncoder)
+                json.dump(cleaned_data, f, ensure_ascii=False, indent=2, cls=NumpyJSONEncoder, allow_nan=False)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"❌ 保存缓存失败: {e}")
     
     def is_cache_valid(self, data_type: str) -> bool:
@@ -155,7 +212,8 @@ class MarketDataCache:
                 'data': data
             }
             self.save_cache(cache_data)
-            print(f"💾 {self.cache_configs[data_type]['description']}已缓存")
+            description = self.cache_configs.get(data_type, {}).get('description', data_type)
+            print(f"💾 {description}已缓存")
         except Exception as e:
             print(f"❌ 缓存数据失败: {e}")
     

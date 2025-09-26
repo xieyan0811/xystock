@@ -80,7 +80,9 @@ def generate_markdown_market_report(index_name, report_data):
     if 'error' not in current_indices and current_indices:
         md_content += """---
 
-# 📊 市场指数概览
+# 参考数据
+
+## 📊 市场指数概览
 
 """
         
@@ -131,7 +133,7 @@ def generate_markdown_market_report(index_name, report_data):
     if 'error' not in sentiment_data and sentiment_data:
         md_content += """---
 
-# 😊 市场情绪指标
+## 😊 市场情绪指标
 
 """
         
@@ -169,7 +171,7 @@ def generate_markdown_market_report(index_name, report_data):
     if 'error' not in valuation_data and valuation_data:
         md_content += """---
 
-# 💰 估值水平分析
+## 💰 估值水平分析
 
 """
         
@@ -194,7 +196,7 @@ def generate_markdown_market_report(index_name, report_data):
     if 'error' not in money_flow_data and money_flow_data:
         md_content += """---
 
-# 💸 资金流向分析
+## 💸 资金流向分析
 
 """
         
@@ -217,7 +219,7 @@ def generate_markdown_market_report(index_name, report_data):
     if 'error' not in margin_data and margin_data:
         md_content += """---
 
-# 💳 融资融券分析
+## 💳 融资融券分析
 
 """
         

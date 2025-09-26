@@ -9,7 +9,6 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from utils.format_utils import format_large_number, format_market_value, format_price, format_percentage
-from utils.string_utils import format_indicators_dict
 
 
 class StockDataFormatter:
@@ -81,11 +80,13 @@ class StockDataFormatter:
         indicators = kline_info.get('indicators')
         risk_metrics = kline_info.get('risk_metrics')
         if indicators:
-            indicators_text = format_indicators_dict(indicators, "技术指标", "（注意：使用的 K线数据截至上一交易日）")
+            from market.market_data_utils import format_technical_indicators
+            indicators_text = format_technical_indicators(indicators)
             text_parts.append(indicators_text)
         
         if risk_metrics:
-            risk_text = format_indicators_dict(risk_metrics, "风险指标", "（注意：使用的 K线数据截至上一交易日）")
+            from market.market_data_utils import format_risk_metrics
+            risk_text = format_risk_metrics(risk_metrics)
             text_parts.append(risk_text)
 
         if 'data_length' in kline_info:

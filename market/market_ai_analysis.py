@@ -47,6 +47,10 @@ def generate_index_analysis_report(
     try:
         tech_indicators = market_tools.get_index_technical_indicators(stock_name)
         tech_text = format_technical_indicators(tech_indicators)
+        if 'risk_metrics' in tech_indicators:
+            risk_metrics = tech_indicators['risk_metrics']
+            from market.market_data_utils import format_risk_metrics
+            tech_text += "\n" + format_risk_metrics(risk_metrics)
     except Exception as e:
         tech_text = f"## 主要技术指标：\n获取技术指标失败: {str(e)}\n"
     
@@ -64,7 +68,7 @@ def generate_index_analysis_report(
 - 如有用户观点，简要评价其合理性与风险点
 
 3. **涨跌预测**
-- 下个交易日：涨、平、跌的概率分布，预测置信度
+- 下个交易日：上涨、平盘、下跌的概率分布，预测置信度（±1% 内的波动认为“平盘”）
 - 短期（1个月）和中期（3-6个月）趋势判断
 
 4. **操作建议**

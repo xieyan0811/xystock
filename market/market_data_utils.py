@@ -214,3 +214,97 @@ def format_technical_indicators(tech_indicators):
         md_content += f"## RSI水平分析\n\n当前RSI值为 **{rsi_14:.2f}**，处于 **{rsi_level}** 状态。\n\n"
     
     return md_content
+
+
+def format_risk_metrics(risk_metrics):
+    """
+    为市场报告格式化风险指标数据（中文化格式）
+    
+    Args:
+        risk_metrics: 风险指标数据字典
+    
+    Returns:
+        str: 格式化后的风险指标Markdown文本
+    """
+    if not risk_metrics or 'error' in risk_metrics:
+        return ""
+        
+    md_content = """---
+
+# ⚠️ 风险指标分析
+（注意：使用的 K线数据截至上一交易日）
+
+"""
+    
+    # 周期分析
+    if 'period_analysis' in risk_metrics:
+        period = risk_metrics['period_analysis']
+        md_content += "## 数据周期分析\n\n"
+        if 'data_length' in period:
+            md_content += f"- **数据天数**: {int(period['data_length'])}天\n"
+        if 'price_change_pct' in period:
+            md_content += f"- **期间涨跌幅**: {period['price_change_pct']:.2f}%\n"
+        if 'trend_direction' in period:
+            trend_cn = {'up': '上涨', 'down': '下跌', 'sideways': '横盘'}.get(period['trend_direction'], period['trend_direction'])
+            md_content += f"- **趋势方向**: {trend_cn}\n"
+        md_content += "\n"
+    
+    # 波动率分析
+    if 'volatility_analysis' in risk_metrics:
+        volatility = risk_metrics['volatility_analysis']
+        md_content += "## 波动率分析\n\n"
+        if 'annual_volatility' in volatility:
+            md_content += f"- **年化波动率**: {volatility['annual_volatility']:.2f} ({volatility['annual_volatility']*100:.2f}%)\n"
+        if 'recent_volatility' in volatility:
+            md_content += f"- **近期波动率**: {volatility['recent_volatility']:.2f} ({volatility['recent_volatility']*100:.2f}%)\n"
+        if 'volatility_trend' in volatility:
+            trend_cn = {'increasing': '递增', 'decreasing': '递减', 'stable': '稳定'}.get(volatility['volatility_trend'], volatility['volatility_trend'])
+            md_content += f"- **波动趋势**: {trend_cn}\n"
+        md_content += "\n"
+    
+    # 核心风险指标
+    if 'risk_metrics' in risk_metrics:
+        risk_core = risk_metrics['risk_metrics']
+        md_content += "## 核心风险指标\n\n"
+        if 'max_drawdown' in risk_core:
+            md_content += f"- **最大回撤**: {risk_core['max_drawdown']:.2f} ({risk_core['max_drawdown']*100:.2f}%)\n"
+        if 'sharpe_ratio' in risk_core:
+            md_content += f"- **夏普比率**: {risk_core['sharpe_ratio']:.3f}\n"
+        if 'var_5pct' in risk_core:
+            md_content += f"- **风险价值VaR(5%)**: {risk_core['var_5pct']:.3f} ({risk_core['var_5pct']*100:.2f}%)\n"
+        if 'cvar_5pct' in risk_core:
+            md_content += f"- **条件风险价值CVaR(5%)**: {risk_core['cvar_5pct']:.3f} ({risk_core['cvar_5pct']*100:.2f}%)\n"
+        md_content += "\n"
+    
+    # 收益统计
+    if 'return_statistics' in risk_metrics:
+        returns = risk_metrics['return_statistics']
+        md_content += "## 收益统计\n\n"
+        if 'daily_return_mean' in returns:
+            md_content += f"- **日均收益率**: {returns['daily_return_mean']:.4f} ({returns['daily_return_mean']*100:.2f}%)\n"
+        if 'daily_return_std' in returns:
+            md_content += f"- **日收益标准差**: {returns['daily_return_std']:.4f} ({returns['daily_return_std']*100:.2f}%)\n"
+        if 'positive_days_ratio' in returns:
+            md_content += f"- **上涨日占比**: {returns['positive_days_ratio']:.2f} ({returns['positive_days_ratio']*100:.1f}%)\n"
+        if 'max_single_day_gain' in returns:
+            md_content += f"- **单日最大涨幅**: {returns['max_single_day_gain']:.3f} ({returns['max_single_day_gain']*100:.2f}%)\n"
+        if 'max_single_day_loss' in returns:
+            md_content += f"- **单日最大跌幅**: {returns['max_single_day_loss']:.3f} ({returns['max_single_day_loss']*100:.2f}%)\n"
+        md_content += "\n"
+    
+    # 风险评估
+    if 'risk_assessment' in risk_metrics:
+        assessment = risk_metrics['risk_assessment']
+        md_content += "## 风险评估\n\n"
+        if 'risk_level' in assessment:
+            risk_level_cn = {'low': '低风险', 'medium': '中等风险', 'high': '高风险'}.get(assessment['risk_level'], assessment['risk_level'])
+            md_content += f"- **风险等级**: {risk_level_cn}\n"
+        if 'stability' in assessment:
+            stability_cn = {'stable': '稳定', 'unstable': '不稳定', 'volatile': '高波动'}.get(assessment['stability'], assessment['stability'])
+            md_content += f"- **稳定性**: {stability_cn}\n"
+        if 'trend_strength' in assessment:
+            strength_cn = {'weak': '弱', 'moderate': '中等', 'strong': '强'}.get(assessment['trend_strength'], assessment['trend_strength'])
+            md_content += f"- **趋势强度**: {strength_cn}\n"
+        md_content += "\n"
+    
+    return md_content

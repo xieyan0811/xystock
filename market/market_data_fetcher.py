@@ -281,15 +281,6 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
                     
         df = df_raw.tail(period).copy()
         
-        # stockstats要求的列名
-        df = df.rename(columns={
-            'open': 'open',
-            'close': 'close', 
-            'high': 'high',
-            'low': 'low',
-            'volume': 'volume'
-        })
-        
         numeric_columns = ['open', 'high', 'low', 'close', 'volume']
         for col in numeric_columns:
             if col in df.columns:
@@ -298,6 +289,15 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
         indicators = get_indicators(df)
         indicators['kline'] = df.to_dict(orient='records')
         
+        # 风险指标计算
+        risk_metrics = {}
+        if len(df) >= 5:
+            from utils.risk_metrics import calculate_portfolio_risk_summary
+            risk_metrics = calculate_portfolio_risk_summary(df, price_col='close')
+
+            if risk_metrics:
+                indicators['risk_metrics'] = risk_metrics
+
         print(f"   ✓ 成功获取{index_name}技术指标")
         return indicators
         
