@@ -1,5 +1,5 @@
 """
-大盘整体分析页面 - 市场全局分析和上证指数分析
+大盘整体分析页面 - 市场全局分析和指数分析
 """
 
 import streamlit as st
@@ -208,13 +208,13 @@ def display_market_indices():
         st.error(f"显示指数数据时出错: {str(e)}")
         
 
-def display_market_summary():
+def display_market_summary(index_name='上证指数'):
     """显示综合摘要卡片"""
 
     use_cache = st.session_state.get('market_use_cache', True)
     
     market_tools = get_market_tools()    
-    result_data = market_tools.get_comprehensive_market_report(use_cache=use_cache)
+    result_data = market_tools.get_comprehensive_market_report(use_cache=use_cache, index_name=index_name)
     summary_text = market_tools.generate_market_report(result_data, format_type='summary')
 
     if not summary_text:
@@ -223,8 +223,8 @@ def display_market_summary():
     
     if st.session_state.get('run_ai_index', False):
         # 检查是否已经生成过AI报告
-        stock_code_for_ai = '上证指数'
-        with st.spinner("🤖 AI正在分析指数数据..."):
+        stock_code_for_ai = index_name
+        with st.spinner(f"🤖 AI正在分析{stock_code_for_ai}数据..."):
             try:
                 user_opinion = st.session_state.get('market_user_opinion', '')
                 
@@ -246,14 +246,14 @@ def display_market_summary():
                 if 'run_ai_index' in st.session_state:
                     del st.session_state['run_ai_index']
         
-    current_stock_code = result_data.get('focus_index', '')
+    current_stock_code = result_data.get('focus_index', index_name)
     if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
         ai_data = st.session_state['ai_index_report'][current_stock_code]
         
         st.markdown("---")
         st.subheader("🤖 AI深度分析")
         
-        with st.expander("📊 AI指数分析报告", expanded=True):
+        with st.expander(f"📊 AI{current_stock_code}分析报告", expanded=True):
             st.markdown(ai_data['report'])
             
             col1, col2 = st.columns(2)
@@ -322,7 +322,7 @@ def display_market_summary():
     st.info("💡 可以导出当前市场分析的完整报告")
     
     support_pdf = PDF_SUPPORT_AVAILABLE
-    index_name = result_data.get('focus_index', '上证指数')
+    report_index_name = result_data.get('focus_index', index_name)
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -331,14 +331,14 @@ def display_market_summary():
                 "选择导出格式",
                 ["pdf", "docx", "markdown"],
                 format_func=lambda x: {"pdf": "📄 PDF格式", "docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                key=f"market_format_select_{index_name}"
+                key=f"market_format_select_{report_index_name}"
             )
         else:
             format_type = st.selectbox(
                 "选择导出格式",
                 ["docx", "markdown", "html"],
                 format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown", "html": "🌐 HTML"}[x],
-                key=f"market_format_select_{index_name}"
+                key=f"market_format_select_{report_index_name}"
             )
 
     with col2:
@@ -356,11 +356,11 @@ def display_market_summary():
             }
         st.caption(format_descriptions[format_type])
     
-    market_report_button_key = f"generate_market_report_{index_name}"
+    market_report_button_key = f"generate_market_report_{report_index_name}"
     if st.button("🔄 生成市场报告", key=market_report_button_key, use_container_width=True):
-        st.session_state[f"generating_market_report_{index_name}"] = format_type
+        st.session_state[f"generating_market_report_{report_index_name}"] = format_type
     
-    generating_format = st.session_state.get(f"generating_market_report_{index_name}", None)
+    generating_format = st.session_state.get(f"generating_market_report_{report_index_name}", None)
     if generating_format:
         spinner_text = {
             "pdf": "正在收集数据并生成PDF报告...",
@@ -372,11 +372,11 @@ def display_market_summary():
         with st.spinner(spinner_text[generating_format]):
             try:
                 # 检查是否有AI分析报告
-                has_ai_analysis = bool(st.session_state.get('ai_index_report', {}).get(index_name))
+                has_ai_analysis = bool(st.session_state.get('ai_index_report', {}).get(report_index_name))
                 user_opinion = st.session_state.get('market_user_opinion', '')
                 
                 report_content = generate_market_report(
-                    index_name=index_name,
+                    index_name=report_index_name,
                     format_type=generating_format,
                     has_ai_analysis=has_ai_analysis,
                     user_opinion=user_opinion
@@ -392,44 +392,53 @@ def display_market_summary():
                 
                 ext = format_info[generating_format]["ext"]
                 mime = format_info[generating_format]["mime"]
-                filename = f"市场分析报告_{index_name}_{timestamp}.{ext}"
+                filename = f"市场分析报告_{report_index_name}_{timestamp}.{ext}"
                 
-                st.session_state[f"market_report_content_{index_name}"] = report_content
-                st.session_state[f"market_report_filename_{index_name}"] = filename
-                st.session_state[f"market_report_mime_{index_name}"] = mime
-                st.session_state[f"market_report_format_{index_name}"] = generating_format
-                st.session_state[f"market_report_timestamp_{index_name}"] = timestamp
+                st.session_state[f"market_report_content_{report_index_name}"] = report_content
+                st.session_state[f"market_report_filename_{report_index_name}"] = filename
+                st.session_state[f"market_report_mime_{report_index_name}"] = mime
+                st.session_state[f"market_report_format_{report_index_name}"] = generating_format
+                st.session_state[f"market_report_timestamp_{report_index_name}"] = timestamp
                 
-                st.session_state[f"generating_market_report_{index_name}"] = None
+                st.session_state[f"generating_market_report_{report_index_name}"] = None
 
                 format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown", "html": "HTML"}
                 st.success(f"✅ {format_names[generating_format]}市场报告生成成功！")
                 
             except Exception as e:
                 st.error(f"❌ 生成{generating_format.upper()}市场报告失败: {str(e)}")
-                st.session_state[f"generating_market_report_{index_name}"] = None
+                st.session_state[f"generating_market_report_{report_index_name}"] = None
     
-    if st.session_state.get(f"market_report_content_{index_name}"):
+    if st.session_state.get(f"market_report_content_{report_index_name}"):
         format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝", "html": "🌐"}
-        current_format = st.session_state.get(f"market_report_format_{index_name}", "pdf")
+        current_format = st.session_state.get(f"market_report_format_{report_index_name}", "pdf")
         
         st.download_button(
             label=f"{format_icons[current_format]} 下载{current_format.upper()}文件",
-            data=st.session_state[f"market_report_content_{index_name}"],
-            file_name=st.session_state[f"market_report_filename_{index_name}"],
-            mime=st.session_state[f"market_report_mime_{index_name}"],
-            key=f"download_market_report_{index_name}",
+            data=st.session_state[f"market_report_content_{report_index_name}"],
+            file_name=st.session_state[f"market_report_filename_{report_index_name}"],
+            mime=st.session_state[f"market_report_mime_{report_index_name}"],
+            key=f"download_market_report_{report_index_name}",
             use_container_width=True,
             help=f"点击下载生成的{current_format.upper()}市场报告文件"
         )
-        st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'market_report_timestamp_{index_name}']}")
+        st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'market_report_timestamp_{report_index_name}']}")
 
             
 def display_market_overview():
     """显示大盘整体分析"""
     
     st.header("📊 大盘整体分析")
-    st.caption("基于上证指数的全市场分析")
+    
+    # 指数选择
+    selected_index = st.selectbox(
+        "选择分析指数",
+        options=FOCUS_INDICES,
+        index=0,  # 默认选择上证指数
+        help="选择要分析的指数"
+    )
+    
+    st.caption(f"基于{selected_index}的全市场分析")
     
     use_ai_analysis = st.checkbox("🤖 AI大盘分析", value=False, help="选中后将使用AI对大盘进行深入分析")
     use_cache = st.checkbox("💾 使用缓存数据", value=True, help="使用缓存数据可以加快查询速度，取消勾选将强制获取最新数据")
@@ -476,11 +485,18 @@ def display_market_overview():
                                 st.session_state.ai_index_report = {}
                             st.session_state['run_ai_index'] = True
                             st.session_state['market_user_opinion'] = user_opinion
+                            st.session_state['selected_index'] = selected_index
                         else:
                             st.session_state.ai_index_report = {}
+                        
+                        # 保存当前选择的指数
+                        st.session_state['current_analysis_index'] = selected_index
                                             
+                    # 从session_state获取当前分析的指数，如果没有则使用当前选择的指数
+                    current_index = st.session_state.get('current_analysis_index', selected_index)
+                    
                     report_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    st.success(f"📊 **大盘整体分析报告** (基于上证指数)")
+                    st.success(f"📊 **指数分析报告** (基于{current_index})")
                     st.caption(f"报告时间: {report_time}")
                     
                     tab1, tab2, tab3, tab4 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📋 综合摘要"])
@@ -491,37 +507,37 @@ def display_market_overview():
                     with tab2:
                         # 使用统一的技术指标显示函数
                         from ui.components.page_common import display_technical_analysis_tab, display_risk_analysis
-                        display_technical_analysis_tab(index_name='上证指数')
+                        display_technical_analysis_tab(index_name=current_index)
                         
                         # 显示大盘风险分析
                         st.markdown("---")
-                        st.subheader("大盘风险分析")
+                        st.subheader(f"风险分析")
                         try:
                             use_cache = st.session_state.get('market_use_cache', True)
                             market_tools = get_market_tools()
                             
-                            # 获取大盘技术指标数据（包含风险数据）
-                            tech_data = market_tools.get_index_technical_indicators('上证指数')
+                            # 获取指定指数的技术指标数据（包含风险数据）
+                            tech_data = market_tools.get_index_technical_indicators(current_index)
                             
                             if tech_data and not ('error' in tech_data):
                                 # 直接使用返回数据中的风险指标
                                 risk_metrics = tech_data.get('risk_metrics', None)
                                 display_risk_analysis(risk_metrics)
                             else:
-                                st.warning("暂无大盘风险分析数据")
+                                st.warning(f"暂无风险分析数据")
                                 
                         except Exception as e:
-                            st.error(f"获取大盘风险分析失败: {str(e)}")
+                            st.error(f"获取风险分析失败: {str(e)}")
 
                     with tab3:
                         display_market_fundamentals()
 
                     with tab4:
-                        display_market_summary()
+                        display_market_summary(current_index)
                         
                     with st.expander("📊 详细信息", expanded=False):
                         st.write(f"**分析时间:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                        st.write(f"**分析对象:** 上证指数 (大盘整体)")
+                        st.write(f"**分析对象:** {current_index}")
                         st.write(f"**数据源:** 实时市场数据")
                         
                 except Exception as e:
@@ -539,9 +555,11 @@ def display_market_overview():
                 **大盘整体分析功能包括：**
                 
                 - 📈 **大盘指数**: 显示主要指数的实时价格和涨跌幅，包括上证指数、深证成指、创业板指等
-                - 📊 **技术指标分析**: 基于上证指数的技术指标，反映大盘走势
-                - � **市场基本面**: 包含估值水平和资金流向分析，反映市场的基本面情况
-                - 📋 **综合摘要**: AI生成的大盘分析综合报告
+                - 📊 **技术指标分析**: 基于选择指数的技术指标，反映市场走势
+                - 💰 **市场基本面**: 包含估值水平和资金流向分析，反映市场的基本面情况
+                - 📋 **综合摘要**: AI生成的指数分析综合报告
                 
-                **AI分析功能：** 选中AI分析选项后，系统会对大盘数据进行深度分析，提供更详细的投资建议。
+                **指数选择：** 支持分析多个主要指数，包括上证指数、深证成指、沪深300、中证500、创业板指等。
+                
+                **AI分析功能：** 选中AI分析选项后，系统会对选择的指数数据进行深度分析，提供更详细的投资建议。
                 """)

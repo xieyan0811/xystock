@@ -130,13 +130,13 @@ class MarketDataCache:
         
         # 缓存配置
         self.cache_configs = {
-            'market_sentiment': {'expire_minutes': 15, 'description': '市场情绪指标'},
-            'valuation_data': {'expire_minutes': 1440, 'description': '估值指标'},
-            'money_flow_data': {'expire_minutes': 43200, 'description': '资金流向指标'},
-            'margin_data': {'expire_minutes': 60, 'description': '融资融券数据'},
-            'current_indices': {'expire_minutes': 5, 'description': '当前指数实时数据'},
-            'ai_analysis': {'expire_minutes': 180, 'description': 'AI大盘分析'},
-            'technical_indicators': {'expire_minutes': 60, 'description': '技术指标数据'}
+            'market_sentiment': {'expire_minutes': 15, 'description': '市场情绪指标', 'index_specific': False},
+            'valuation_data': {'expire_minutes': 1440, 'description': '估值指标', 'index_specific': False},
+            'money_flow_data': {'expire_minutes': 43200, 'description': '资金流向指标', 'index_specific': False},
+            'margin_data': {'expire_minutes': 60, 'description': '融资融券数据', 'index_specific': False},
+            'current_indices': {'expire_minutes': 5, 'description': '当前指数实时数据', 'index_specific': False},
+            'ai_analysis': {'expire_minutes': 180, 'description': 'AI大盘分析', 'index_specific': True},
+            'technical_indicators': {'expire_minutes': 60, 'description': '技术指标数据', 'index_specific': True}
         }
     
     def load_cache(self) -> Dict:
@@ -175,14 +175,27 @@ class MarketDataCache:
             traceback.print_exc()
             print(f"❌ 保存缓存失败: {e}")
     
-    def is_cache_valid(self, data_type: str) -> bool:
+    def _get_cache_key(self, data_type: str, index_name: str = None) -> str:
+        """生成缓存键名"""
+        if data_type not in self.cache_configs:
+            return data_type
+        
+        config = self.cache_configs[data_type]
+        if config.get('index_specific', False) and index_name:
+            # 对于指数相关的数据，添加指数名称后缀
+            return f"{data_type}_{index_name}"
+        else:
+            return data_type
+    
+    def is_cache_valid(self, data_type: str, index_name: str = None) -> bool:
         """检查缓存是否有效"""
         try:
+            cache_key = self._get_cache_key(data_type, index_name)
             cache_data = self.load_cache()
-            if data_type not in cache_data:
+            if cache_key not in cache_data:
                 return False
             
-            cache_meta = cache_data[data_type].get('cache_meta', {})
+            cache_meta = cache_data[cache_key].get('cache_meta', {})
             cache_time = datetime.fromisoformat(cache_meta['timestamp'])
             expire_minutes = self.cache_configs[data_type]['expire_minutes']
             expire_time = cache_time + timedelta(minutes=expire_minutes)
@@ -191,33 +204,45 @@ class MarketDataCache:
         except Exception:
             return False
     
-    def get_cached_data(self, data_type: str) -> Dict:
+    def get_cached_data(self, data_type: str, index_name: str = None) -> Dict:
         """获取缓存数据"""
         try:
+            cache_key = self._get_cache_key(data_type, index_name)
             cache_data = self.load_cache()
-            return cache_data.get(data_type, {}).get('data', {})
+            return cache_data.get(cache_key, {}).get('data', {})
         except Exception:
             return {}
     
-    def save_cached_data(self, data_type: str, data: Dict):
+    def save_cached_data(self, data_type: str, data: Dict, index_name: str = None):
         """保存数据到缓存"""
         try:
+            cache_key = self._get_cache_key(data_type, index_name)
             cache_data = self.load_cache()
-            cache_data[data_type] = {
-                'cache_meta': {
-                    'timestamp': datetime.now().isoformat(),
-                    'data_type': data_type,
-                    'expire_minutes': self.cache_configs[data_type]['expire_minutes']
-                },
+            
+            cache_meta = {
+                'timestamp': datetime.now().isoformat(),
+                'data_type': data_type,
+                'expire_minutes': self.cache_configs[data_type]['expire_minutes']
+            }
+            
+            # 如果是指数相关数据，记录指数名称
+            if index_name and self.cache_configs[data_type].get('index_specific', False):
+                cache_meta['index_name'] = index_name
+            
+            cache_data[cache_key] = {
+                'cache_meta': cache_meta,
                 'data': data
             }
             self.save_cache(cache_data)
             description = self.cache_configs.get(data_type, {}).get('description', data_type)
-            print(f"💾 {description}已缓存")
+            if index_name and self.cache_configs[data_type].get('index_specific', False):
+                print(f"💾 {description}({index_name})已缓存")
+            else:
+                print(f"💾 {description}已缓存")
         except Exception as e:
             print(f"❌ 缓存数据失败: {e}")
     
-    def clear_cache(self, data_type: Optional[str] = None):
+    def clear_cache(self, data_type: Optional[str] = None, index_name: str = None):
         """清理缓存"""
         if data_type:
             if data_type not in self.cache_configs:
@@ -226,12 +251,34 @@ class MarketDataCache:
             
             try:
                 cache_data = self.load_cache()
-                if data_type in cache_data:
-                    del cache_data[data_type]
-                    self.save_cache(cache_data)
-                    print(f"✅ 已清理{self.cache_configs[data_type]['description']}缓存")
+                config = self.cache_configs[data_type]
+                
+                if config.get('index_specific', False) and index_name:
+                    # 清理特定指数的缓存
+                    cache_key = self._get_cache_key(data_type, index_name)
+                    if cache_key in cache_data:
+                        del cache_data[cache_key]
+                        print(f"✅ 已清理{config['description']}({index_name})缓存")
+                    else:
+                        print(f"ℹ️ {config['description']}({index_name})缓存不存在")
+                elif config.get('index_specific', False):
+                    # 清理该数据类型所有指数的缓存
+                    keys_to_delete = [k for k in cache_data.keys() if k.startswith(f"{data_type}_")]
+                    for key in keys_to_delete:
+                        del cache_data[key]
+                    if keys_to_delete:
+                        print(f"✅ 已清理{len(keys_to_delete)}个{config['description']}缓存")
+                    else:
+                        print(f"ℹ️ 没有{config['description']}缓存需要清理")
                 else:
-                    print(f"ℹ️ {self.cache_configs[data_type]['description']}缓存不存在")
+                    # 非指数相关数据，直接清理
+                    if data_type in cache_data:
+                        del cache_data[data_type]
+                        print(f"✅ 已清理{config['description']}缓存")
+                    else:
+                        print(f"ℹ️ {config['description']}缓存不存在")
+                
+                self.save_cache(cache_data)
             except Exception as e:
                 print(f"❌ 清理缓存失败: {e}")
         else:
@@ -251,43 +298,91 @@ class MarketDataCache:
         cache_data = self.load_cache()
         
         for data_type, config in self.cache_configs.items():
-            if data_type in cache_data:
-                is_valid = self.is_cache_valid(data_type)
+            if config.get('index_specific', False):
+                # 指数相关数据，需要检查所有指数的缓存
+                index_caches = {}
+                found_any = False
                 
-                try:
-                    cache_meta = cache_data[data_type].get('cache_meta', {})
-                    cache_time_str = cache_meta.get('timestamp', '')
-                    cache_time = datetime.fromisoformat(cache_time_str)
-                    expire_time = cache_time + timedelta(minutes=config['expire_minutes'])
-                    
-                    if is_valid:
-                        remaining_minutes = int((expire_time - current_time).total_seconds() / 60)
-                        remaining_text = f"{remaining_minutes}分钟后过期"
-                    else:
-                        overdue_minutes = int((current_time - expire_time).total_seconds() / 60)
-                        remaining_text = f"已过期{overdue_minutes}分钟"
+                # 检查所有可能的指数缓存
+                from ui.config import FOCUS_INDICES
+                for index_name in FOCUS_INDICES:
+                    cache_key = self._get_cache_key(data_type, index_name)
+                    if cache_key in cache_data:
+                        found_any = True
+                        is_valid = self.is_cache_valid(data_type, index_name)
                         
-                except Exception:
-                    cache_time_str = "解析失败"
-                    remaining_text = "未知"
+                        try:
+                            cache_meta = cache_data[cache_key].get('cache_meta', {})
+                            cache_time_str = cache_meta.get('timestamp', '')
+                            cache_time = datetime.fromisoformat(cache_time_str)
+                            expire_time = cache_time + timedelta(minutes=config['expire_minutes'])
+                            
+                            if is_valid:
+                                remaining_minutes = int((expire_time - current_time).total_seconds() / 60)
+                                remaining_text = f"{remaining_minutes}分钟后过期"
+                            else:
+                                overdue_minutes = int((current_time - expire_time).total_seconds() / 60)
+                                remaining_text = f"已过期{overdue_minutes}分钟"
+                                
+                        except Exception:
+                            cache_time_str = "解析失败"
+                            remaining_text = "未知"
+                        
+                        index_caches[index_name] = {
+                            'valid': is_valid,
+                            'cache_time': cache_time_str,
+                            'remaining': remaining_text
+                        }
                 
                 status[data_type] = {
                     'description': config['description'],
-                    'exists': True,
-                    'valid': is_valid,
-                    'cache_time': cache_time_str,
+                    'exists': found_any,
+                    'valid': any(cache['valid'] for cache in index_caches.values()),
                     'expire_minutes': config['expire_minutes'],
-                    'remaining': remaining_text
+                    'index_specific': True,
+                    'index_caches': index_caches
                 }
             else:
-                status[data_type] = {
-                    'description': config['description'],
-                    'exists': False,
-                    'valid': False,
-                    'cache_time': None,
-                    'expire_minutes': config['expire_minutes'],
-                    'remaining': "无缓存"
-                }
+                # 非指数相关数据，按原逻辑处理
+                if data_type in cache_data:
+                    is_valid = self.is_cache_valid(data_type)
+                    
+                    try:
+                        cache_meta = cache_data[data_type].get('cache_meta', {})
+                        cache_time_str = cache_meta.get('timestamp', '')
+                        cache_time = datetime.fromisoformat(cache_time_str)
+                        expire_time = cache_time + timedelta(minutes=config['expire_minutes'])
+                        
+                        if is_valid:
+                            remaining_minutes = int((expire_time - current_time).total_seconds() / 60)
+                            remaining_text = f"{remaining_minutes}分钟后过期"
+                        else:
+                            overdue_minutes = int((current_time - expire_time).total_seconds() / 60)
+                            remaining_text = f"已过期{overdue_minutes}分钟"
+                            
+                    except Exception:
+                        cache_time_str = "解析失败"
+                        remaining_text = "未知"
+                    
+                    status[data_type] = {
+                        'description': config['description'],
+                        'exists': True,
+                        'valid': is_valid,
+                        'cache_time': cache_time_str,
+                        'expire_minutes': config['expire_minutes'],
+                        'remaining': remaining_text,
+                        'index_specific': False
+                    }
+                else:
+                    status[data_type] = {
+                        'description': config['description'],
+                        'exists': False,
+                        'valid': False,
+                        'cache_time': None,
+                        'expire_minutes': config['expire_minutes'],
+                        'remaining': "无缓存",
+                        'index_specific': False
+                    }
         
         return status
     
@@ -295,14 +390,28 @@ class MarketDataCache:
         """打印缓存状态"""
         status = self.get_cache_status()
         
-        print("=" * 70)
+        print("=" * 80)
         print("📊 市场数据缓存状态")
         print(f"📁 缓存文件: {self.cache_file}")
-        print("=" * 70)
+        print("=" * 80)
         
         for data_type, info in status.items():
-            status_icon = "✅" if info['valid'] else ("📋" if info['exists'] else "❌")
-            print(f"{status_icon} {info['description']:<12} | {info['remaining']:<15} | 过期时间: {info['expire_minutes']}分钟")
+            if info.get('index_specific', False):
+                status_icon = "✅" if info['valid'] else ("📋" if info['exists'] else "❌")
+                print(f"{status_icon} {info['description']:<15} | 过期时间: {info['expire_minutes']}分钟")
+                
+                # 显示各个指数的缓存状态
+                index_caches = info.get('index_caches', {})
+                if index_caches:
+                    for index_name, cache_info in index_caches.items():
+                        sub_icon = "  ✅" if cache_info['valid'] else "  ❌"
+                        print(f"{sub_icon} {index_name:<12} | {cache_info['remaining']:<15}")
+                else:
+                    print(f"  ❌ 无指数缓存")
+            else:
+                status_icon = "✅" if info['valid'] else ("📋" if info['exists'] else "❌")
+                remaining = info.get('remaining', '无缓存')
+                print(f"{status_icon} {info['description']:<15} | {remaining:<15} | 过期时间: {info['expire_minutes']}分钟")
         
         try:
             if os.path.exists(self.cache_file):
@@ -314,7 +423,7 @@ class MarketDataCache:
         except Exception:
             pass
         
-        print("=" * 70)
+        print("=" * 80)
 
 
 # 全局缓存管理器实例

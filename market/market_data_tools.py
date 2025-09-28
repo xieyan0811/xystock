@@ -137,9 +137,9 @@ class MarketTools:
         """获取指数技术指标，优先查缓存，没有再fetch"""
         data_type = f'technical_indicators'
         
-        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type, index_name):
             print(f"📋 使用缓存的技术指标: {index_name}")
-            return self.cache_manager.get_cached_data(data_type)
+            return self.cache_manager.get_cached_data(data_type, index_name)
         
         print(f"📡 获取技术指标: {index_name}...")
         try:
@@ -149,13 +149,13 @@ class MarketTools:
             if data:
                 data = self._convert_numpy_types(data)
             if use_cache:
-                self.cache_manager.save_cached_data(data_type, data)
+                self.cache_manager.save_cached_data(data_type, data, index_name)
             return data
         except Exception as e:
             print(f"❌ 获取技术指标失败: {e}")
             import traceback
             traceback.print_exc()
-            return self.cache_manager.get_cached_data(data_type) if use_cache else {}
+            return self.cache_manager.get_cached_data(data_type, index_name) if use_cache else {}
 
     def _convert_numpy_types(self, data):
         """递归转换numpy类型为Python原生类型"""
@@ -178,14 +178,14 @@ class MarketTools:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
                 
-        if use_cache and self.cache_manager.is_cache_valid(data_type) and not force_regenerate:
-            print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
-            return self.cache_manager.get_cached_data(data_type)
+        if use_cache and self.cache_manager.is_cache_valid(data_type, index_name) and not force_regenerate:
+            print(f"📋 使用缓存的AI分析: {index_name}")
+            return self.cache_manager.get_cached_data(data_type, index_name)
         
         return self._generate_ai_analysis(index_name, user_opinion)
         
-    def clear_cache(self, data_type: Optional[str] = None):
-        self.cache_manager.clear_cache(data_type)
+    def clear_cache(self, data_type: Optional[str] = None, index_name: str = None):
+        self.cache_manager.clear_cache(data_type, index_name)
     
     def get_cache_status(self) -> Dict:
         return self.cache_manager.get_cache_status()
@@ -472,7 +472,7 @@ class MarketTools:
             }
 
             if ret:    
-                self.cache_manager.save_cached_data('ai_analysis', ai_data)
+                self.cache_manager.save_cached_data('ai_analysis', ai_data, index_name)
             
             print(f"✅ AI分析报告生成完成")
             return ai_data

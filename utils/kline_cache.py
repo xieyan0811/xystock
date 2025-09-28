@@ -18,6 +18,7 @@ class KLineType(Enum):
     DAY = "1d"
     WEEK = "1w"
     MONTH = "1M"
+    INDEX_DAY = "index_1d"  # 指数日线数据
 
 
 @dataclass
@@ -32,6 +33,7 @@ class KLineData:
     volume: int
     amount: Optional[float] = None
     fetch_time: Optional[str] = None
+    data_type: str = "stock"  # "stock" 或 "index"
     
     def __post_init__(self):
         if self.high < max(self.open, self.close) or self.low > min(self.open, self.close):
@@ -61,7 +63,7 @@ class KLineCacheManager:
     def _is_data_fresh(self, stock_data_time: str, fetch_time: str, kline_type: KLineType) -> bool:
         """判断数据是否需要更新"""
         try:
-            if kline_type == KLineType.DAY:
+            if kline_type in [KLineType.DAY, KLineType.INDEX_DAY]:
                 data_date = datetime.strptime(stock_data_time.split()[0], '%Y-%m-%d').date()
                 fetch_datetime = datetime.strptime(fetch_time, '%Y-%m-%d %H:%M:%S')
             else:
@@ -71,7 +73,7 @@ class KLineCacheManager:
             now = datetime.now()
             
             # 历史数据判断：T-2之前的数据永久有效
-            if kline_type == KLineType.DAY:
+            if kline_type in [KLineType.DAY, KLineType.INDEX_DAY]:
                 if data_date < (now - timedelta(days=2)).date():
                     return True
                 
@@ -89,7 +91,7 @@ class KLineCacheManager:
             # 当日/当前数据过期判断
             time_since_fetch = now - fetch_datetime
             
-            if kline_type == KLineType.DAY:
+            if kline_type in [KLineType.DAY, KLineType.INDEX_DAY]:
                 return time_since_fetch < timedelta(hours=4)
             elif kline_type == KLineType.MIN_1:
                 return time_since_fetch < timedelta(minutes=1)
@@ -173,7 +175,8 @@ class KLineCacheManager:
                     close=float(row['close']),
                     volume=int(row['volume']),
                     amount=float(row['amount']) if pd.notna(row['amount']) else None,
-                    fetch_time=row.get('fetch_time')
+                    fetch_time=row.get('fetch_time'),
+                    data_type=row.get('data_type', 'stock')
                 ))
             
             return kline_data
@@ -206,7 +209,8 @@ class KLineCacheManager:
                     'close': kdata.close,
                     'volume': kdata.volume,
                     'amount': kdata.amount,
-                    'fetch_time': kdata.fetch_time
+                    'fetch_time': kdata.fetch_time,
+                    'data_type': kdata.data_type
                 })
             
             new_df = pd.DataFrame(new_data_list)
@@ -253,7 +257,8 @@ class KLineCacheManager:
                     'close': new_item.close,
                     'volume': new_item.volume,
                     'amount': new_item.amount,
-                    'fetch_time': new_item.fetch_time
+                    'fetch_time': new_item.fetch_time,
+                    'data_type': new_item.data_type
                 }
             
             updated_symbol_df = pd.DataFrame(list(existing_data.values()))
@@ -391,6 +396,26 @@ class KLineCacheManager:
         except Exception as e:
             print(f"清理过期缓存失败: {e}")
     
+    def cache_index_kline(self, index_name: str, kline_data: List[KLineData]):
+        """缓存指数K线数据的便捷方法"""
+        # 确保所有数据都标记为指数类型
+        for kdata in kline_data:
+            kdata.data_type = "index"
+        
+        self.cache_kline(index_name, KLineType.INDEX_DAY, len(kline_data), kline_data)
+    
+    def get_cached_index_kline(self, index_name: str, count: int = 30) -> Optional[List[KLineData]]:
+        """获取缓存的指数K线数据的便捷方法"""
+        return self.get_cached_kline(index_name, KLineType.INDEX_DAY, count)
+    
+    def update_index_kline(self, index_name: str, new_data: List[KLineData]):
+        """更新指数K线数据的便捷方法"""
+        # 确保所有数据都标记为指数类型
+        for kdata in new_data:
+            kdata.data_type = "index"
+        
+        self.update_kline_data(index_name, KLineType.INDEX_DAY, new_data)
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
         try:
