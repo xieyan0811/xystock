@@ -69,6 +69,117 @@ class MarketTools:
             print(f"❌ 获取估值数据失败: {e}")
             return self.cache_manager.get_cached_data(data_type) if use_cache else {}
     
+    def get_index_valuation_data(self, index_name: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """根据指数名称获取对应的估值数据"""
+        # 获取全部估值数据
+        all_valuation_data = self.get_valuation_data(use_cache, force_refresh)
+        
+        if not all_valuation_data:
+            return {}
+        
+        # 指数名称到数据key的映射 & 估值参考指数映射
+        index_mapping = {
+            # 直接支持估值数据的指数
+            '沪深300': {
+                'key_prefix': 'hs300',
+                'reference_index': '沪深300',
+                'description': '大盘蓝筹估值'
+            },
+            '中证500': {
+                'key_prefix': 'zz500',
+                'reference_index': '中证500', 
+                'description': '中盘成长估值'
+            },
+            '中证1000': {
+                'key_prefix': 'zz1000',
+                'reference_index': '中证1000',
+                'description': '小盘成长估值'
+            },
+            '中证2000': {
+                'key_prefix': 'zz2000',
+                'reference_index': '中证2000',
+                'description': '小微盘估值'
+            },
+            '上证50': {
+                'key_prefix': '上证50',
+                'reference_index': '上证50',
+                'description': '超大盘价值估值'
+            },
+            '科创50': {
+                'key_prefix': '科创50',
+                'reference_index': '科创50',
+                'description': '科创板龙头估值'
+            },
+            # 需要映射的指数
+            '创业板指': {
+                'key_prefix': '科创50',
+                'reference_index': '科创50',
+                'description': '参考科创50（高科技成长股）'
+            },
+            '上证指数': {
+                'key_prefix': 'hs300',
+                'reference_index': '沪深300',
+                'description': '参考沪深300（大盘蓝筹）'
+            },
+            '深证成指': {
+                'key_prefix': 'zz500',
+                'reference_index': '中证500',
+                'description': '参考中证500（中盘成长）'
+            },
+            '北证50': {
+                'key_prefix': 'zz1000',
+                'reference_index': '中证1000',
+                'description': '参考中证1000（小盘成长）'
+            },
+        }
+        
+        # 获取映射信息
+        mapping_info = index_mapping.get(index_name)
+        if not mapping_info:
+            # 默认使用沪深300作为参考
+            mapping_info = {
+                'key_prefix': 'hs300',
+                'reference_index': '沪深300',
+                'description': '参考沪深300（大盘基准）'
+            }
+            print(f"⚠️ {index_name}暂无专门估值数据，使用沪深300估值作为参考")
+        
+        key_prefix = mapping_info['key_prefix']
+        
+        # 提取对应指数的估值数据
+        index_valuation = {}
+        for key, value in all_valuation_data.items():
+            if key.startswith(key_prefix):
+                # 转换为通用格式
+                new_key = key.replace(key_prefix, 'index')
+                index_valuation[new_key] = value
+            elif key in ['update_time']:  # 保留时间信息
+                index_valuation[key] = value
+        
+        # 如果没有找到对应数据，返回沪深300数据作为参考
+        if not index_valuation and 'hs300_pe' in all_valuation_data:
+            index_valuation = {
+                'index_pe': all_valuation_data.get('hs300_pe'),
+                'index_dividend_yield': all_valuation_data.get('hs300_dividend_yield'),
+                'index_date': all_valuation_data.get('hs300_date'),
+                'update_time': all_valuation_data.get('update_time'),
+            }
+            mapping_info = {
+                'reference_index': '沪深300',
+                'description': '参考沪深300（默认基准）'
+            }
+        
+        # 添加映射信息
+        if index_valuation:
+            index_valuation['original_index'] = index_name
+            index_valuation['reference_index'] = mapping_info['reference_index']
+            index_valuation['valuation_description'] = mapping_info['description']
+            
+            # 标记是否为直接估值还是参考估值
+            index_valuation['is_direct_valuation'] = (index_name == mapping_info['reference_index'])
+        
+        return index_valuation
+    
     def get_money_flow_data(self, use_cache: bool = True, force_refresh: bool = False, debug: bool = False) -> Dict:
         """获取资金流向指标"""
         data_type = 'money_flow_data'

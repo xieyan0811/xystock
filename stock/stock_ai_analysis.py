@@ -155,7 +155,7 @@ class DataCollector:
         
         # 收集AI大盘分析
         try:
-            market_ai_data = market_tools.get_ai_analysis(use_cache=True)
+            market_ai_data = market_tools.get_ai_analysis(use_cache=True, index_name='上证指数')
             if market_ai_data:
                 if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
                     market_ai_analysis = market_ai_data['report']

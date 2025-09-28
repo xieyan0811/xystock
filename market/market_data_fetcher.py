@@ -57,31 +57,63 @@ def fetch_market_sentiment() -> Dict:
 
 
 def fetch_valuation_data(debug=False) -> Dict:
-    """获取估值指标"""
-    print("💰 获取估值指标...")
+    """获取多个指数的估值指标"""
+    print("💰 获取多指数估值指标...")
     
     valuation_data = {}
     
-    try:
-        print("   获取沪深300估值...")
-        df_hs300 = ak.stock_zh_index_value_csindex("000300")
-        if not df_hs300.empty:
-            if debug:
-                print(df_hs300)
-            latest_hs300 = df_hs300.iloc[-1]
-            valuation_data.update({
-                'hs300_pe': float(latest_hs300.get('市盈率1', 0)),
-                'hs300_dividend_yield': float(latest_hs300.get('股息率1', 0)),
-                'hs300_date': str(latest_hs300.get('日期', datetime.now().strftime('%Y-%m-%d'))),
-            })
-            print(f"      沪深300 PE: {valuation_data['hs300_pe']:.2f}")
-        
-    except Exception as e:
-        print(f"   ❌ 获取沪深300估值失败: {e}")
+    # 支持估值数据的指数代码映射（主要是中证指数系列）
+    valuation_indices = {
+        '沪深300': '000300',
+        '中证500': '000905', 
+        '中证1000': '000852',
+        '中证2000': '932000',
+        '上证50': '000016',
+        '科创50': '000688',         # 科创板代表
+        '沪深300成长': '000918',    # 成长风格
+        '中证信息技术': '000935',   # 科技行业
+    }
+    
+    for index_name, index_code in valuation_indices.items():
+        try:
+            print(f"   获取{index_name}估值...")
+            df_index = ak.stock_zh_index_value_csindex(index_code)
+            if not df_index.empty:
+                if debug:
+                    print(f"{index_name}数据:")
+                    print(df_index.tail(3))
+                    
+                latest_data = df_index.iloc[-1]
+                
+                # 生成统一的数据key
+                index_key = index_name.lower().replace('沪深', 'hs').replace('中证', 'zz')
+                
+                pe_value = latest_data.get('市盈率1', 0)
+                dividend_yield = latest_data.get('股息率1', 0)
+                date_value = latest_data.get('日期', datetime.now().strftime('%Y-%m-%d'))
+                
+                # 存储指数估值数据
+                valuation_data[f'{index_key}_pe'] = float(pe_value) if pe_value else 0
+                valuation_data[f'{index_key}_dividend_yield'] = float(dividend_yield) if dividend_yield else 0
+                valuation_data[f'{index_key}_date'] = str(date_value)
+                
+                # 同时保留原有的hs300格式以兼容现有代码
+                if index_name == '沪深300':
+                    valuation_data.update({
+                        'hs300_pe': float(pe_value) if pe_value else 0,
+                        'hs300_dividend_yield': float(dividend_yield) if dividend_yield else 0,
+                        'hs300_date': str(date_value),
+                    })
+                
+                print(f"      {index_name} PE: {pe_value:.2f}")
+                
+        except Exception as e:
+            print(f"   ❌ 获取{index_name}估值失败: {e}")
+            continue
     
     valuation_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    print("   ✓ 估值指标获取完成")
+    print("   ✓ 多指数估值指标获取完成")
     return valuation_data
 
 

@@ -18,7 +18,7 @@ from market.market_report import generate_market_report
 from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
 
-def display_market_fundamentals():
+def display_market_fundamentals(index_name='沪深300'):
     """显示市场基本面分析"""
     st.subheader("市场基本面分析")
     
@@ -26,24 +26,48 @@ def display_market_fundamentals():
     
     st.markdown("#### 💰 估值水平")
     
-    valuation_data = get_market_tools().get_valuation_data(use_cache=use_cache)
+    # 根据指数获取对应的估值数据
+    market_tools = get_market_tools()
+    index_valuation_data = market_tools.get_index_valuation_data(index_name, use_cache=use_cache)
     
-    if not valuation_data:
+    if not index_valuation_data:
         st.warning("未获取到估值数据")
     else:
-        val_col1, val_col2, val_col3 = st.columns(3)
+        # 获取估值参考信息
+        reference_index = index_valuation_data.get('reference_index', index_name)
+        is_direct = index_valuation_data.get('is_direct_valuation', True)
+        valuation_desc = index_valuation_data.get('valuation_description', '')
+        
+        # 显示估值数据来源说明
+        if not is_direct:
+            st.info(f"💡 **{index_name} 估值参考说明**: {valuation_desc}")
+        
+        val_col1, val_col2 = st.columns(2)
         with val_col1:
-            hs300_pe = valuation_data.get('hs300_pe')
-            st.metric("沪深300 PE", f"{hs300_pe:.2f}" if hs300_pe else "N/A")
+            index_pe = index_valuation_data.get('index_pe')
+            # 根据是否为直接估值决定显示方式
+            if is_direct:
+                pe_title = f"{index_name} PE"
+                pe_help = f"基于{index_name}成分股的市盈率"
+            else:
+                pe_title = f"{index_name} PE"
+                pe_help = f"基于{reference_index}估值数据作为参考，{valuation_desc}"
+            
+            st.metric(pe_title, f"{index_pe:.2f}" if index_pe else "N/A", help=pe_help)
+            
         with val_col2:
-            hs300_pb = valuation_data.get('hs300_pb')
-            st.metric("沪深300 PB", f"{hs300_pb:.2f}" if hs300_pb else "N/A")
-        with val_col3:
-            dividend_yield = valuation_data.get('hs300_dividend_yield')
-            st.metric("股息率", f"{dividend_yield:.2f}%" if dividend_yield else "N/A")
+            dividend_yield = index_valuation_data.get('index_dividend_yield')
+            if is_direct:
+                div_title = f"{index_name} 股息率"
+                div_help = f"基于{index_name}成分股的股息收益率"
+            else:
+                div_title = f"{index_name} 股息率" 
+                div_help = f"基于{reference_index}股息率数据作为参考"
+                
+            st.metric(div_title, f"{dividend_yield:.2f}%" if dividend_yield else "N/A", help=div_help)
             
         with st.expander("📈 估值分析", expanded=True):
-            pe_value = valuation_data.get('hs300_pe', 0)
+            pe_value = index_valuation_data.get('index_pe', 0)
             if pe_value:
                 if pe_value < 12:
                     pe_level = "极低估"
@@ -63,7 +87,7 @@ def display_market_fundamentals():
                 
                 st.write(f"**PE估值水平:** {pe_color} {pe_level}")
                 
-            dividend_value = valuation_data.get('hs300_dividend_yield', 0)
+            dividend_value = index_valuation_data.get('index_dividend_yield', 0)
             if dividend_value:
                 if dividend_value > 3:
                     div_level = "高股息"
@@ -77,7 +101,7 @@ def display_market_fundamentals():
                 
                 st.write(f"**股息水平:** {div_color} {div_level}")
     
-    val_time = valuation_data.get('update_time') or valuation_data.get('date')
+    val_time = index_valuation_data.get('update_time') or index_valuation_data.get('index_date')
     if val_time:
         st.caption(f"估值数据获取时间: {val_time}")
     
@@ -530,7 +554,7 @@ def display_market_overview():
                             st.error(f"获取风险分析失败: {str(e)}")
 
                     with tab3:
-                        display_market_fundamentals()
+                        display_market_fundamentals(current_index)
 
                     with tab4:
                         display_market_summary(current_index)
