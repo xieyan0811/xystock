@@ -52,11 +52,11 @@ class MarketTools:
         print(f"📡 获取{'综合市场情绪分析' if comprehensive else '基础市场情绪'}...")
         try:
             if comprehensive:
-                data = fetch_comprehensive_market_sentiment()
+                ret, data = fetch_comprehensive_market_sentiment()
             else:
-                data = fetch_market_sentiment()
+                ret, data = fetch_market_sentiment()
                 
-            if use_cache:
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -73,8 +73,8 @@ class MarketTools:
         
         print(f"📡 获取{self.cache_configs[data_type]['description']}...")
         try:
-            data = fetch_valuation_data()
-            if use_cache:
+            ret, data = fetch_valuation_data()
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -202,8 +202,8 @@ class MarketTools:
         
         print(f"📡 获取{self.cache_configs[data_type]['description']}...")
         try:
-            data = fetch_money_flow_data(debug=debug)
-            if use_cache:
+            ret, data = fetch_money_flow_data(debug=debug)
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -220,8 +220,8 @@ class MarketTools:
         
         print(f"📡 获取{self.cache_configs[data_type]['description']}...")
         try:
-            data = fetch_margin_data_unified(include_historical=True)
-            if use_cache:
+            ret, data = fetch_margin_data_unified(include_historical=True)
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -238,8 +238,8 @@ class MarketTools:
         
         print(f"📡 获取{self.cache_configs[data_type]['description']}...")
         try:
-            data = fetch_current_indices()
-            if use_cache:
+            ret, data = fetch_current_indices()
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -256,8 +256,8 @@ class MarketTools:
         
         print(f"📡 获取市场新闻数据...")
         try:
-            data = get_market_news_caixin(debug=debug)
-            if use_cache:
+            ret, data = get_market_news_caixin(debug=debug)
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
         except Exception as e:
@@ -284,12 +284,12 @@ class MarketTools:
         
         print(f"📡 获取技术指标: {index_name}...")
         try:
-            data = fetch_index_technical_indicators(index_name)
+            ret, data = fetch_index_technical_indicators(index_name)
             print(f"📊 技术指标数据:")
             # 转换numpy类型为Python原生类型以便JSON序列化
             if data:
                 data = self._convert_numpy_types(data)
-            if use_cache:
+            if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data, index_name)
             return data
         except Exception as e:
@@ -457,22 +457,26 @@ class MarketTools:
         """生成格式化的摘要markdown字符串"""
         summary = {}
         
-        tech = report['technical_indicators']
+        # 技术指标
+        tech = report.get('technical_indicators', {})
         if tech:
             summary['technical_trend'] = f"{tech.get('ma_trend', '未知')} | MACD {tech.get('macd_trend', '未知')}"
-            #summary['current_price'] = tech.get('latest_close', 0)
             summary['rsi_level'] = judge_rsi_level(tech.get('rsi_14', 50))
         
-        margin = report['margin_detail']
+        # 融资融券
+        margin = report.get('margin_detail', {})
         if margin:
-            summary['margin_balance'] = f"融资余额 {margin.get('margin_buy_balance', 0)/100000000:.2f}亿"
+            margin_balance = margin.get('margin_buy_balance', 0)
+            summary['margin_balance'] = f"融资余额 {margin_balance/100000000:.2f}亿"
         
-        valuation = report['valuation_indicators']
+        # 估值指标
+        valuation = report.get('valuation_indicators', {})
         if valuation:
             pe = valuation.get('hs300_pe', 0)
             summary['valuation_level'] = f"沪深300 PE {pe:.2f}"
         
-        money = report['money_flow_indicators']
+        # 资金流向
+        money = report.get('money_flow_indicators', {})
         if money:
             m2_growth = money.get('m2_growth', 0)
             summary['liquidity_condition'] = f"M2同比增长 {m2_growth:.1f}%"
@@ -481,12 +485,10 @@ class MarketTools:
         
         dimension_map = {
             'technical_trend': ('📈', '技术面'),
-            'margin_balance': ('💳', '融资面'),
+            'margin_balance': ('💳', '融资面'), 
             'valuation_level': ('💰', '估值面'),
             'liquidity_condition': ('💸', '资金面'),
-            'money_flow_indicators': ('💵', '资金流向'),
             'rsi_level': ('📊', 'RSI'),
-            #'current_price': ('💹', '当前价格')
         }
         
         for key, (icon, label) in dimension_map.items():
@@ -499,6 +501,25 @@ class MarketTools:
         """生成详细文本报告"""
         lines = []
         
+        # 添加报告头部
+        lines.extend(self._add_report_header(report, markdown))
+        
+        # 添加各个部分
+        lines.extend(self._add_technical_section(report.get('technical_indicators', {}), markdown))
+        lines.extend(self._add_sentiment_section(report.get('sentiment_indicators', {}), markdown))
+        lines.extend(self._add_valuation_section(report.get('valuation_indicators', {}), markdown))
+        lines.extend(self._add_money_flow_section(report.get('money_flow_indicators', {}), markdown))
+        lines.extend(self._add_margin_section(report.get('margin_detail', {}), markdown))
+        lines.extend(self._add_news_section(report.get('market_news_data', {}), markdown))
+        
+        # 添加报告尾部
+        lines.extend(self._add_report_footer(markdown))
+        
+        return '\n'.join(lines)
+    
+    def _add_report_header(self, report: Dict, markdown: bool) -> list:
+        """添加报告头部"""
+        lines = []
         if markdown:
             lines.append(f"\n# 📊 A股市场综合报告")
             lines.append(f"**🕐 报告时间:** {report['report_time']}")
@@ -509,197 +530,194 @@ class MarketTools:
             lines.append(f"🕐 报告时间: {report['report_time']}")
             lines.append(f"🎯 关注指数: {report['focus_index']}")
             lines.append("=" * 80)
-        
-        tech = report['technical_indicators']
-        if tech:
-            if markdown:
-                lines.append(f"\n## 📈 技术指标分析")
-                lines.append(f"- **MA趋势:** {tech.get('ma_trend', 'N/A')}")
-                lines.append(f"- **MACD趋势:** {tech.get('macd_trend', 'N/A')}")
-                rsi_14 = tech.get('rsi_14', 'N/A')
-                if isinstance(rsi_14, (int, float)):
-                    lines.append(f"- **RSI(14):** {rsi_14:.2f}")
-                else:
-                    lines.append(f"- **RSI(14):** {rsi_14}")
-            else:
-                lines.append(f"\n📈 技术指标分析:")
-                lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
-                lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
-                rsi_14 = tech.get('rsi_14', 'N/A')
-                if isinstance(rsi_14, (int, float)):
-                    lines.append(f"   RSI(14): {rsi_14:.2f}")
-                else:
-                    lines.append(f"   RSI(14): {rsi_14}")
-        
-        sentiment = report['sentiment_indicators']
-        if sentiment:
-            if markdown:
-                lines.append(f"\n## 😊 市场情绪指标")
-                lines.append(f"- **涨跌家数:** ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-                up_ratio = sentiment.get('up_ratio', 0)
-                lines.append(f"- **上涨占比:** {up_ratio*100:.1f}%")
-            else:
-                lines.append(f"\n😊 市场情绪指标:")
-                lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-                up_ratio = sentiment.get('up_ratio', 0)
-                lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
-        
-        valuation = report['valuation_indicators']
-        if valuation:
-            if markdown:
-                lines.append(f"\n## 💰 估值水平")
-                hs300_pe = valuation.get('hs300_pe', 'N/A')
-                if isinstance(hs300_pe, (int, float)):
-                    lines.append(f"- **沪深300 PE:** {hs300_pe:.2f}")
-                else:
-                    lines.append(f"- **沪深300 PE:** {hs300_pe}")
-                dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
-                if isinstance(dividend_yield, (int, float)):
-                    lines.append(f"- **股息率:** {dividend_yield:.2f}%")
-                else:
-                    lines.append(f"- **股息率:** {dividend_yield}%")
-            else:
-                lines.append(f"\n💰 估值水平:")
-                hs300_pe = valuation.get('hs300_pe', 'N/A')
-                if isinstance(hs300_pe, (int, float)):
-                    lines.append(f"   沪深300 PE: {hs300_pe:.2f}")
-                else:
-                    lines.append(f"   沪深300 PE: {hs300_pe}")
-                dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
-                if isinstance(dividend_yield, (int, float)):
-                    lines.append(f"   股息率: {dividend_yield:.2f}%")
-                else:
-                    lines.append(f"   股息率: {dividend_yield}%")
-        
-        money = report['money_flow_indicators']
-        if money:
-            if markdown:
-                lines.append(f"\n## 💸 资金流向")
-                m2_amount = money.get('m2_amount', 'N/A')
-                if isinstance(m2_amount, (int, float)):
-                    lines.append(f"- **M2余额:** {m2_amount/10000:.2f}万亿")
-                else:
-                    lines.append(f"- **M2余额:** {m2_amount}")
-                m2_growth = money.get('m2_growth', 'N/A')
-                if isinstance(m2_growth, (int, float)):
-                    lines.append(f"- **M2同比增长:** {m2_growth:.2f}%")
-                else:
-                    lines.append(f"- **M2同比增长:** {m2_growth}%")
-            else:
-                lines.append(f"\n💸 资金流向:")
-                m2_amount = money.get('m2_amount', 'N/A')
-                if isinstance(m2_amount, (int, float)):
-                    lines.append(f"   M2余额: {m2_amount/10000:.2f}万亿")
-                else:
-                    lines.append(f"   M2余额: {m2_amount}")
-                m2_growth = money.get('m2_growth', 'N/A')
-                if isinstance(m2_growth, (int, float)):
-                    lines.append(f"   M2同比增长: {m2_growth:.2f}%")
-                else:
-                    lines.append(f"   M2同比增长: {m2_growth}%")
-        
-        margin_data = report['margin_detail']
-        if margin_data:
-            if markdown:
-                lines.append(f"\n## 💳 融资融券")
-                margin_balance = margin_data.get('margin_balance', 'N/A')
-                if isinstance(margin_balance, (int, float)):
-                    lines.append(f"- **融资余额:** {margin_balance/100000000:.2f}亿")
-                else:
-                    lines.append(f"- **融资余额:** {margin_balance}")
-                
-                margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
-                if isinstance(margin_buy_balance, (int, float)):
-                    lines.append(f"- **融资买入:** {margin_buy_balance/100000000:.2f}亿")
-                else:
-                    lines.append(f"- **融资买入:** {margin_buy_balance}")
-                    
-                change_ratio = margin_data.get('change_ratio', 'N/A')
-                if isinstance(change_ratio, (int, float)):
-                    lines.append(f"- **周变化率:** {change_ratio:.2f}%")
-                else:
-                    lines.append(f"- **周变化率:** {change_ratio}%")
-            else:
-                lines.append(f"\n💳 融资融券:")
-                margin_balance = margin_data.get('margin_balance', 'N/A')
-                if isinstance(margin_balance, (int, float)):
-                    lines.append(f"   融资余额: {margin_balance/100000000:.2f}亿")
-                else:
-                    lines.append(f"   融资余额: {margin_balance}")
-                
-                margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
-                if isinstance(margin_buy_balance, (int, float)):
-                    lines.append(f"   融资买入: {margin_buy_balance/100000000:.2f}亿")
-                else:
-                    lines.append(f"   融资买入: {margin_buy_balance}")
-                    
-                change_ratio = margin_data.get('change_ratio', 'N/A')
-                if isinstance(change_ratio, (int, float)):
-                    lines.append(f"   周变化率: {change_ratio:.2f}%")
-                else:
-                    lines.append(f"   周变化率: {change_ratio}%")
-        
-        # 添加市场新闻部分
-        news_data = report.get('market_news_data', {})
-        if news_data and news_data.get('market_news'):
-            market_news = news_data['market_news']
-            news_summary = news_data.get('news_summary', {})
+        return lines
+    
+    def _add_technical_section(self, tech: Dict, markdown: bool) -> list:
+        """添加技术指标部分"""
+        lines = []
+        if not tech:
+            return lines
             
-            if markdown:
-                lines.append(f"\n## 📰 市场资讯")
-                lines.append(f"- **新闻数量:** {news_summary.get('total_market_news_count', len(market_news))}条")
-                lines.append(f"- **数据源:** {news_summary.get('data_source', '财新网')}")
-                
-                # 显示前5条新闻标题
-                if market_news:
-                    lines.append(f"\n### 📄 重要资讯")
-                    for idx, news in enumerate(market_news[:5]):
-                        title = news.get('新闻标题', '无标题')
-                        time_info = news.get('发布时间', '')
-                        relative_time = news.get('相对时间', '')
-                        
-                        time_display = f"{time_info} ({relative_time})" if relative_time else time_info
-                        lines.append(f"{idx+1}. **{title}**")
-                        if time_display:
-                            lines.append(f"   *发布时间: {time_display}*")
-                        
-                        # 添加新闻内容摘要（前100字符）
-                        content = news.get('新闻内容', '')
-                        if content:
-                            content_preview = content[:100] + "..." if len(content) > 100 else content
-                            lines.append(f"   {content_preview}")
-                        lines.append("")  # 空行分隔
+        if markdown:
+            lines.append(f"\n## 📈 技术指标分析")
+            lines.append(f"- **MA趋势:** {tech.get('ma_trend', 'N/A')}")
+            lines.append(f"- **MACD趋势:** {tech.get('macd_trend', 'N/A')}")
+            rsi_14 = tech.get('rsi_14', 'N/A')
+            if isinstance(rsi_14, (int, float)):
+                lines.append(f"- **RSI(14):** {rsi_14:.2f}")
             else:
-                lines.append(f"\n📰 市场资讯:")
-                lines.append(f"   新闻数量: {news_summary.get('total_market_news_count', len(market_news))}条")
-                lines.append(f"   数据源: {news_summary.get('data_source', '财新网')}")
+                lines.append(f"- **RSI(14):** {rsi_14}")
+        else:
+            lines.append(f"\n📈 技术指标分析:")
+            lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
+            lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
+            rsi_14 = tech.get('rsi_14', 'N/A')
+            if isinstance(rsi_14, (int, float)):
+                lines.append(f"   RSI(14): {rsi_14:.2f}")
+            else:
+                lines.append(f"   RSI(14): {rsi_14}")
+        return lines
+    
+    def _add_sentiment_section(self, sentiment: Dict, markdown: bool) -> list:
+        """添加市场情绪部分"""
+        lines = []
+        if not sentiment:
+            return lines
+            
+        if markdown:
+            lines.append(f"\n## 😊 市场情绪指标")
+            lines.append(f"- **涨跌家数:** ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
+            up_ratio = sentiment.get('up_ratio', 0)
+            lines.append(f"- **上涨占比:** {up_ratio*100:.1f}%")
+        else:
+            lines.append(f"\n😊 市场情绪指标:")
+            lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
+            up_ratio = sentiment.get('up_ratio', 0)
+            lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
+        return lines
+    
+    def _add_valuation_section(self, valuation: Dict, markdown: bool) -> list:
+        """添加估值水平部分"""
+        lines = []
+        if not valuation:
+            return lines
+            
+        if markdown:
+            lines.append(f"\n## 💰 估值水平")
+            hs300_pe = valuation.get('hs300_pe', 'N/A')
+            lines.append(f"- **沪深300 PE:** {hs300_pe:.2f}" if isinstance(hs300_pe, (int, float)) else f"- **沪深300 PE:** {hs300_pe}")
+            dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
+            lines.append(f"- **股息率:** {dividend_yield:.2f}%" if isinstance(dividend_yield, (int, float)) else f"- **股息率:** {dividend_yield}%")
+        else:
+            lines.append(f"\n💰 估值水平:")
+            hs300_pe = valuation.get('hs300_pe', 'N/A')
+            lines.append(f"   沪深300 PE: {hs300_pe:.2f}" if isinstance(hs300_pe, (int, float)) else f"   沪深300 PE: {hs300_pe}")
+            dividend_yield = valuation.get('hs300_dividend_yield', 'N/A')
+            lines.append(f"   股息率: {dividend_yield:.2f}%" if isinstance(dividend_yield, (int, float)) else f"   股息率: {dividend_yield}%")
+        return lines
+    
+    def _add_money_flow_section(self, money: Dict, markdown: bool) -> list:
+        """添加资金流向部分"""
+        lines = []
+        if not money:
+            return lines
+            
+        if markdown:
+            lines.append(f"\n## 💸 资金流向")
+            m2_amount = money.get('m2_amount', 'N/A')
+            lines.append(f"- **M2余额:** {m2_amount/10000:.2f}万亿" if isinstance(m2_amount, (int, float)) else f"- **M2余额:** {m2_amount}")
+            m2_growth = money.get('m2_growth', 'N/A')
+            lines.append(f"- **M2同比增长:** {m2_growth:.2f}%" if isinstance(m2_growth, (int, float)) else f"- **M2同比增长:** {m2_growth}%")
+        else:
+            lines.append(f"\n💸 资金流向:")
+            m2_amount = money.get('m2_amount', 'N/A')
+            lines.append(f"   M2余额: {m2_amount/10000:.2f}万亿" if isinstance(m2_amount, (int, float)) else f"   M2余额: {m2_amount}")
+            m2_growth = money.get('m2_growth', 'N/A')
+            lines.append(f"   M2同比增长: {m2_growth:.2f}%" if isinstance(m2_growth, (int, float)) else f"   M2同比增长: {m2_growth}%")
+        return lines
+    
+    def _add_margin_section(self, margin_data: Dict, markdown: bool) -> list:
+        """添加融资融券部分"""
+        lines = []
+        if not margin_data:
+            return lines
+            
+        if markdown:
+            lines.append(f"\n## 💳 融资融券")
+            margin_balance = margin_data.get('margin_balance', 'N/A')
+            lines.append(f"- **融资余额:** {margin_balance/100000000:.2f}亿" if isinstance(margin_balance, (int, float)) else f"- **融资余额:** {margin_balance}")
+            
+            margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
+            lines.append(f"- **融资买入:** {margin_buy_balance/100000000:.2f}亿" if isinstance(margin_buy_balance, (int, float)) else f"- **融资买入:** {margin_buy_balance}")
                 
-                # 显示前5条新闻标题
-                if market_news:
-                    lines.append(f"\n   📄 重要资讯:")
-                    for idx, news in enumerate(market_news[:5]):
-                        title = news.get('新闻标题', '无标题')
-                        time_info = news.get('发布时间', '')
-                        relative_time = news.get('相对时间', '')
-                        
-                        time_display = f"{time_info} ({relative_time})" if relative_time else time_info
-                        lines.append(f"   {idx+1}. {title}")
-                        if time_display:
-                            lines.append(f"      时间: {time_display}")
-                        
-                        # 添加新闻内容摘要（前100字符）
-                        content = news.get('新闻内容', '')
-                        if content:
-                            content_preview = content[:100] + "..." if len(content) > 100 else content
-                            lines.append(f"      摘要: {content_preview}")
-                        lines.append("")  # 空行分隔
+            change_ratio = margin_data.get('change_ratio', 'N/A')
+            lines.append(f"- **周变化率:** {change_ratio:.2f}%" if isinstance(change_ratio, (int, float)) else f"- **周变化率:** {change_ratio}%")
+        else:
+            lines.append(f"\n💳 融资融券:")
+            margin_balance = margin_data.get('margin_balance', 'N/A')
+            lines.append(f"   融资余额: {margin_balance/100000000:.2f}亿" if isinstance(margin_balance, (int, float)) else f"   融资余额: {margin_balance}")
+            
+            margin_buy_balance = margin_data.get('margin_buy_balance', 'N/A')
+            lines.append(f"   融资买入: {margin_buy_balance/100000000:.2f}亿" if isinstance(margin_buy_balance, (int, float)) else f"   融资买入: {margin_buy_balance}")
                 
+            change_ratio = margin_data.get('change_ratio', 'N/A')
+            lines.append(f"   周变化率: {change_ratio:.2f}%" if isinstance(change_ratio, (int, float)) else f"   周变化率: {change_ratio}%")
+        return lines
+    
+    def _add_news_section(self, news_data: Dict, markdown: bool) -> list:
+        """添加市场新闻部分"""
+        lines = []
+        if not news_data or not news_data.get('market_news'):
+            return lines
+            
+        market_news = news_data['market_news']
+        news_summary = news_data.get('news_summary', {})
+        
+        # 添加新闻概况
+        if markdown:
+            lines.append(f"\n## 📰 市场资讯")
+            lines.append(f"- **新闻数量:** {news_summary.get('total_market_news_count', len(market_news))}条")
+            lines.append(f"- **数据源:** {news_summary.get('data_source', '财新网')}")
+        else:
+            lines.append(f"\n📰 市场资讯:")
+            lines.append(f"   新闻数量: {news_summary.get('total_market_news_count', len(market_news))}条")
+            lines.append(f"   数据源: {news_summary.get('data_source', '财新网')}")
+        
+        # 添加重要新闻列表
+        if market_news:
+            lines.extend(self._format_news_list(market_news[:5], markdown))
+        return lines
+    
+    def _format_news_list(self, news_list: list, markdown: bool) -> list:
+        """格式化新闻列表"""
+        lines = []
+        
+        if markdown:
+            lines.append(f"\n### 📄 重要资讯")
+            for idx, news in enumerate(news_list):
+                title = news.get('新闻标题', '无标题')
+                time_info = news.get('发布时间', '')
+                relative_time = news.get('相对时间', '')
+                
+                time_display = f"{time_info} ({relative_time})" if relative_time else time_info
+                lines.append(f"{idx+1}. **{title}**")
+                if time_display:
+                    lines.append(f"   *发布时间: {time_display}*")
+                
+                # 添加新闻内容摘要
+                content = news.get('新闻内容', '')
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    lines.append(f"   {content_preview}")
+                lines.append("")  # 空行分隔
+        else:
+            lines.append(f"\n   📄 重要资讯:")
+            for idx, news in enumerate(news_list):
+                title = news.get('新闻标题', '无标题')
+                time_info = news.get('发布时间', '')
+                relative_time = news.get('相对时间', '')
+                
+                time_display = f"{time_info} ({relative_time})" if relative_time else time_info
+                lines.append(f"   {idx+1}. {title}")
+                if time_display:
+                    lines.append(f"      时间: {time_display}")
+                
+                # 添加新闻内容摘要
+                content = news.get('新闻内容', '')
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    lines.append(f"      摘要: {content_preview}")
+                lines.append("")  # 空行分隔
+        return lines
+    
+    def _add_report_footer(self, markdown: bool) -> list:
+        """添加报告尾部"""
+        lines = []
         if markdown:
             lines.append("\n---")
         else:
             lines.append("=" * 80)
-        
-        return '\n'.join(lines)
+        return lines
     
     def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:
         """生成AI分析数据"""

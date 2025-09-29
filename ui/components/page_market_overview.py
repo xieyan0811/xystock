@@ -20,14 +20,8 @@ from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
 
 
-
-
-def display_market_fundamentals(index_name='沪深300'):
-    """显示市场基本面分析"""
-    st.subheader("市场基本面分析")
-    
-    use_cache = st.session_state.get('market_use_cache', True)
-    
+def display_valuation_analysis(index_name='沪深300', use_cache=True):
+    """显示估值水平分析"""
     st.markdown("#### 💰 估值水平")
     
     # 根据指数获取对应的估值数据
@@ -108,7 +102,10 @@ def display_market_fundamentals(index_name='沪深300'):
     val_time = index_valuation_data.get('update_time') or index_valuation_data.get('index_date')
     if val_time:
         st.caption(f"估值数据获取时间: {val_time}")
-    
+
+
+def display_money_flow_analysis(use_cache=True):
+    """显示资金流向分析"""
     st.markdown("#### 💸 资金流向")
     
     money_data = get_market_tools().get_money_flow_data(use_cache=use_cache)
@@ -151,7 +148,10 @@ def display_market_fundamentals(index_name='沪深300'):
     money_time = money_data.get('update_time') or money_data.get('date')
     if money_time:
         st.caption(f"资金流向数据获取时间: {money_time}")
-    
+
+
+def display_market_sentiment_analysis(use_cache=True):
+    """显示市场情绪指标分析"""
     st.markdown("#### 😐 市场情绪指标")
     
     # 获取综合市场情绪数据
@@ -286,6 +286,9 @@ def display_market_fundamentals(index_name='沪深300'):
         if update_time:
             st.caption(f"市场情绪数据获取时间: {update_time} | 数据源: {data_source}")
 
+
+def display_margin_trading_analysis(use_cache=True):
+    """显示融资融券数据"""
     st.markdown("#### 💳 融资融券数据")
     
     margin_data = get_market_tools().get_margin_data(use_cache=use_cache)
@@ -310,7 +313,24 @@ def display_market_fundamentals(index_name='沪深300'):
     if margin_time:
         st.caption(f"融资融券数据获取时间: {margin_time}")
 
-    st.markdown("#### 📰 市场资讯")
+
+def display_market_fundamentals(index_name='沪深300'):
+    """显示市场基本面分析"""
+    st.subheader("市场基本面分析")
+    
+    use_cache = st.session_state.get('market_use_cache', True)
+    
+    # 显示各个分析模块
+    display_valuation_analysis(index_name, use_cache)
+    display_money_flow_analysis(use_cache)
+    display_market_sentiment_analysis(use_cache)
+    display_margin_trading_analysis(use_cache)
+
+def display_market_news():
+    """显示市场新闻"""
+    st.subheader("📰 市场资讯")
+    
+    use_cache = st.session_state.get('market_use_cache', True)
     
     market_tools = get_market_tools()
     news_data = market_tools.get_market_news_data(use_cache=use_cache)
@@ -355,6 +375,7 @@ def display_market_fundamentals(index_name='沪深300'):
     news_time = news_data.get('news_summary', {}).get('data_freshness')
     if news_time:
         st.caption(f"市场新闻数据获取时间: {news_time}")
+
 def display_market_indices():
     """显示大盘指数信息"""
     
@@ -754,7 +775,7 @@ def display_market_overview():
                     st.success(f"📊 **指数分析报告** (基于{current_index})")
                     st.caption(f"报告时间: {report_time}")
                     
-                    tab1, tab2, tab3, tab4 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📋 综合摘要"])
+                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📰 市场资讯", "📋 综合摘要"])
                     
                     with tab1:
                         display_market_indices()
@@ -826,6 +847,9 @@ def display_market_overview():
                         display_market_fundamentals(current_index)
 
                     with tab4:
+                        display_market_news()
+
+                    with tab5:
                         display_market_summary(current_index)
                         
                     with st.expander("📊 详细信息", expanded=False):

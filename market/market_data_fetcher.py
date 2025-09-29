@@ -23,9 +23,10 @@ from stock.stock_utils import get_indicators
 from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 from market.kline_data_manager import get_kline_manager
 
-def fetch_market_sentiment() -> Dict:
+def fetch_market_sentiment() -> tuple:
     """获取市场情绪数据 - 优化版本，避免频繁请求导致IP被封"""
     sentiment_data = {}
+    ret = False  # 默认失败，成功时设为True
     
     # 方法1：使用乐咕乐股的市场活跃度数据（推荐）
     try:
@@ -65,6 +66,7 @@ def fetch_market_sentiment() -> Dict:
             
             print(f"      上涨: {up_count} | 下跌: {down_count} | 平盘: {flat_count}")
             print(f"      涨停: {limit_up} | 跌停: {limit_down} | 停牌: {suspended}")
+            ret = True  # 成功获取数据
             
     except Exception as e:
         print(f"   ❌ 获取市场活跃度数据失败: {e}")
@@ -93,6 +95,7 @@ def fetch_market_sentiment() -> Dict:
                 })
                 
                 print(f"      上涨: {total_up} | 下跌: {total_down} (来自板块汇总)")
+                ret = True  # 成功获取数据
                 
         except Exception as e2:
             print(f"   ❌ 备用方案也失败: {e2}")
@@ -123,13 +126,15 @@ def fetch_market_sentiment() -> Dict:
                     })
                     
                     print(f"      主力净流入: {main_net_inflow/1e8:.2f}亿 ({main_net_ratio:.2f}%)")
+                    ret = True  # 成功获取数据
                     
             except Exception as e3:
                 print(f"   ❌ 所有备用方案都失败: {e3}")
                 sentiment_data['error'] = f"所有数据源都失败: {str(e)}, {str(e2)}, {str(e3)}"
+                # ret 保持 False
     
     sentiment_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return sentiment_data
+    return ret, sentiment_data
 
 
 def fetch_limit_stocks_data() -> Dict:
@@ -175,11 +180,12 @@ def fetch_limit_stocks_data() -> Dict:
     return limit_data
 
 
-def fetch_valuation_data(debug=False) -> Dict:
+def fetch_valuation_data(debug=False) -> tuple:
     """获取多个指数的估值指标"""
     print("💰 获取多指数估值指标...")
     
     valuation_data = {}
+    ret = True
     
     # 支持估值数据的指数代码映射（主要是中证指数系列）
     valuation_indices = {
@@ -228,18 +234,24 @@ def fetch_valuation_data(debug=False) -> Dict:
                 
         except Exception as e:
             print(f"   ❌ 获取{index_name}估值失败: {e}")
+            ret = False
             continue
+    
+    # 如果没有获取到任何估值数据，标记为失败
+    if not any(key.endswith('_pe') for key in valuation_data.keys()):
+        ret = False
     
     valuation_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     print("   ✓ 多指数估值指标获取完成")
-    return valuation_data
+    return ret, valuation_data
 
 
-def fetch_money_flow_data(debug=False) -> Dict:
+def fetch_money_flow_data(debug=False) -> tuple:
     """获取资金流向数据"""
     print("💸 获取资金流向指标...")
     
+    ret = True
     money_flow_data = {}
     
     try:
@@ -259,21 +271,26 @@ def fetch_money_flow_data(debug=False) -> Dict:
                 'm2_date': str(latest_m2.get('月份', datetime.now().strftime('%Y-%m'))),
             })
             print(f"      M2余额: {money_flow_data['m2_amount']/10000:.2f}万亿 | 同比增长: {money_flow_data['m2_growth']:.2f}%")
+        else:
+            print("   ⚠️ M2数据为空")
+            ret = False
 
     except Exception as e:
         print(f"   ❌ 获取M2数据失败: {e}")
+        ret = False
     
     money_flow_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     print("   ✓ 资金流向指标获取完成")
-    return money_flow_data
+    return ret, money_flow_data
 
 
-def fetch_current_indices() -> Dict:
+def fetch_current_indices() -> tuple:
     """获取当前指数实时数据"""
     print("📊 获取当前指数实时数据...")
     
     indices_data = {}
+    ret = True
     
     try:
         print("   获取沪深重要指数...")
@@ -320,6 +337,13 @@ def fetch_current_indices() -> Dict:
                     idx = indices_dict[name]
                     change_sign = '+' if idx['change_percent'] >= 0 else ''
                     print(f"      - {name}: {idx['current_price']:.2f} ({change_sign}{idx['change_percent']:.2f}%)")
+        else:
+            print("   ⚠️ 指数数据为空")
+            indices_data = {
+                'error': '指数数据为空',
+                'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            ret = False
         
     except Exception as e:
         print(f"   ❌ 获取指数数据失败: {e}")
@@ -327,12 +351,13 @@ def fetch_current_indices() -> Dict:
             'error': str(e),
             'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+        ret = False
     
     print("   ✓ 指数数据获取完成")
-    return indices_data
+    return ret, indices_data
 
 
-def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
+def fetch_margin_data_unified(include_historical: bool = False) -> tuple:
     """统一的融资融券数据获取方法"""
     result = {
         'margin_balance': 0,
@@ -346,6 +371,7 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
         'margin_sz_sell': 0,
         'margin_date': datetime.now().strftime('%Y-%m-%d'),
     }
+    ret = True
     
     sh_data = {}
     sz_data = {}
@@ -374,6 +400,7 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
         import traceback
         traceback.print_exc()               
         print(f"      ❌ 获取上交所融资融券失败: {e}")
+        ret = False
     
     try:
         df_margin_sz = ak.macro_china_market_margin_sz()
@@ -395,6 +422,7 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
             
     except Exception as e:
         print(f"      ❌ 获取深交所融资融券失败: {e}")
+        ret = False
     
     total_margin_balance = result['margin_sh_balance'] + result['margin_sz_balance']
     total_margin_buy = result['margin_sh_buy'] + result['margin_sz_buy']
@@ -415,7 +443,12 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
             'shenzhen': sz_data,
         })
     
-    return result
+    # 检查是否有有效数据
+    if total_margin_balance == 0 and total_margin_buy == 0:
+        ret = False
+        
+    result['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return ret, result
 
 def update_index_cache_data(index_name: str = '上证指数', period: int = 250) -> bool:
     """更新指数缓存数据（用于定期更新缓存）"""
@@ -429,7 +462,7 @@ def batch_update_indices_cache(indices: list = None, period: int = 250) -> Dict:
     return manager.batch_update_indices_cache(indices, period)
 
 
-def fetch_comprehensive_market_sentiment() -> Dict:
+def fetch_comprehensive_market_sentiment() -> tuple:
     """获取综合市场情绪分析数据"""
     print("🎯 获取综合市场情绪分析...")
     
@@ -438,10 +471,13 @@ def fetch_comprehensive_market_sentiment() -> Dict:
         'sentiment_level': 'neutral',  # 情绪等级: bearish, neutral, bullish
         'confidence': 0,  # 数据可信度 0-100
     }
+    ret = True
     
     # 1. 基础涨跌家数数据
-    sentiment_data = fetch_market_sentiment()
+    ret_sentiment, sentiment_data = fetch_market_sentiment()
     comprehensive_data['basic_sentiment'] = sentiment_data
+    if not ret_sentiment:
+        ret = False
     
     # 2. 涨跌停详细数据  
     limit_data = fetch_limit_stocks_data()
@@ -523,14 +559,15 @@ def fetch_comprehensive_market_sentiment() -> Dict:
         comprehensive_data['sentiment_score'] = 0
         comprehensive_data['sentiment_level'] = 'unknown'
         comprehensive_data['confidence'] = 0
+        ret = False
     
     comprehensive_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print("   ✓ 综合市场情绪分析完成")
     
-    return comprehensive_data
+    return ret, comprehensive_data
 
 
-def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> Dict:
+def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> tuple:
     """获取指数技术指标（使用智能缓存）"""
     print(f"📊 获取{index_name}技术指标...")
         
@@ -565,8 +602,8 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
                 print(f"   ⚠️  风险指标计算失败: {e}")
 
         print(f"   ✓ 成功获取{index_name}技术指标")
-        return indicators
+        return True, indicators
         
     except Exception as e:
         print(f"   ❌ 获取{index_name}技术指标失败: {e}")
-        return {}
+        return False, {}

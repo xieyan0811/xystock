@@ -195,6 +195,7 @@ def get_market_news_caixin(limit=20, debug=False):
         'market_news': [],
         'news_summary': {}
     }
+    ret = True
     
     try:
         # 获取财新网数据
@@ -248,6 +249,8 @@ def get_market_news_caixin(limit=20, debug=False):
         
     except Exception as e:
         print(f"   ⚠️ 获取财新网新闻失败: {e}")
+        ret = False
+        result['error'] = str(e)
     
-    return result
+    return ret, result
 

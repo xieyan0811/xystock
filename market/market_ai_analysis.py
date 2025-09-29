@@ -10,7 +10,7 @@ if project_dir not in sys.path:
 
 from market.market_data_tools import get_market_tools
 from market.market_data_utils import format_indices_for_analysis
-from utils.data_formatters import format_technical_indicators, format_risk_metrics
+from utils.data_formatters import format_technical_indicators, format_risk_metrics, format_market_news
 
 def generate_index_analysis_report(
     stock_code: str,
@@ -93,38 +93,8 @@ def generate_index_analysis_report(
 {tech_text}"""
 
     # 添加市场新闻信息
-    try:
-        news_data = market_report_data.get('market_news_data', {})
-        if news_data and news_data.get('market_news'):
-            market_news = news_data['market_news']
-            news_summary = news_data.get('news_summary', {})
-            
-            user_message += f"""
-
-**市场新闻资讯：**
-数据源：{news_summary.get('data_source', '财新网')}
-新闻数量：{news_summary.get('total_market_news_count', len(market_news))}条
-
-重要资讯摘要："""
-            
-            # 添加前5条重要新闻
-            for idx, news in enumerate(market_news[:5]):
-                title = news.get('新闻标题', '无标题')
-                time_info = news.get('发布时间', '')
-                relative_time = news.get('相对时间', '')
-                content = news.get('新闻内容', '')
-                
-                time_display = f"{time_info} ({relative_time})" if relative_time else time_info
-                user_message += f"\n{idx+1}. {title}"
-                if time_display:
-                    user_message += f" - {time_display}"
-                
-                # 添加新闻内容摘要（前150字符）
-                if content:
-                    content_preview = content[:150] + "..." if len(content) > 150 else content
-                    user_message += f"\n   {content_preview}"
-    except Exception as e:
-        print(f"⚠️ 添加新闻信息到AI分析失败: {e}")
+    news_text = format_market_news(market_report_data, max_news_count=10)
+    user_message += news_text
 
     if user_opinion and user_opinion.strip():
         user_message += f"""
