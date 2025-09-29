@@ -126,7 +126,7 @@ class DataCollector:
         
         return historical_analyses, data_sources
     
-    def collect_market_data(self, market_tools=None) -> Tuple[str, str, List[Dict]]:
+    def collect_market_data(self, market_tools=None, stock_identity: Dict[str, Any] = None) -> Tuple[str, str, List[Dict]]:
         """收集市场数据"""
         market_report_text = ""
         market_ai_analysis = ""
@@ -139,6 +139,21 @@ class DataCollector:
             except Exception as e:
                 print(f"导入market_tools失败: {e}")
                 return market_report_text, market_ai_analysis, data_sources
+        
+        # 根据股票身份信息确定对应的市场指数
+        target_index = '上证指数'  # 默认值
+        board_type = '未知板块'
+        
+        if stock_identity:
+            # 如果stock_identity中包含板块信息，直接使用
+            if 'board_type' in stock_identity and 'corresponding_index' in stock_identity:
+                board_type = stock_identity['board_type']
+                target_index = stock_identity['corresponding_index']
+                stock_code = stock_identity.get('code', '未知')
+                print(f"股票{stock_code}属于{board_type}，使用{target_index}作为参考指数")
+            # 否则使用默认的上证指数
+            else:
+                print(f"股票{stock_identity.get('code', '未知')}未包含板块信息，使用默认的{target_index}作为参考指数")
         
         # 收集市场综合报告
         try:
@@ -155,17 +170,17 @@ class DataCollector:
         
         # 收集AI大盘分析
         try:
-            market_ai_data = market_tools.get_ai_analysis(use_cache=True, index_name='上证指数')
+            market_ai_data = market_tools.get_ai_analysis(use_cache=True, index_name=target_index)
             if market_ai_data:
                 if isinstance(market_ai_data, dict) and 'report' in market_ai_data:
                     market_ai_analysis = market_ai_data['report']
                 data_sources.append({
-                    'type': 'AI大盘分析',
-                    'description': '基于AI模型的市场分析报告',
+                    'type': f'AI{target_index}分析',
+                    'description': f'基于AI模型的{target_index}分析报告',
                     'timestamp': market_ai_data.get('analysis_time', '未知时间')
                 })
         except Exception as e:
-            print(f"获取大盘分析失败: {e}")
+            print(f"获取{target_index}分析失败: {e}")
         
         return market_report_text, market_ai_analysis, data_sources
     
@@ -579,7 +594,7 @@ def generate_comprehensive_analysis_report(
             })
         
         # 3. 收集大盘数据
-        market_report_text, market_ai_analysis, market_sources = collector.collect_market_data(market_tools)
+        market_report_text, market_ai_analysis, market_sources = collector.collect_market_data(market_tools, stock_identity)
         all_data_sources.extend(market_sources)
         
         # 4. 收集用户画像数据
