@@ -185,3 +185,69 @@ def analyze_news_sentiment(news_base, stock_name, start_date=None, end_date=None
 
     return ret_array
 
+
+def get_market_news_caixin(limit=20, debug=False):
+    """
+    获取财新网宏观经济和市场新闻（政策面、大盘相关）
+    """
+    print("📊 获取财新网宏观经济新闻...")
+    result = {
+        'market_news': [],
+        'news_summary': {}
+    }
+    
+    try:
+        # 获取财新网数据
+        caixin_data = ak.stock_news_main_cx()
+        
+        if not caixin_data.empty:
+            market_news = caixin_data.to_dict('records')
+            
+            # 过滤出有实际内容的新闻（有summary和url的）
+            filtered_news = []
+            for news in market_news:
+                if news.get('summary') and news.get('url') and str(news.get('summary')).strip():
+                    # 统一字段名称以便后续处理
+                    formatted_news = {
+                        '新闻标题': news.get('tag', '无标题'),
+                        '新闻内容': news.get('summary', '无内容'),
+                        '发布时间': news.get('pub_time', '无时间'),
+                        '相对时间': news.get('interval_time', ''),
+                        '新闻链接': news.get('url', ''),
+                        '新闻类型': '宏观经济'
+                    }
+                    filtered_news.append(formatted_news)
+            
+            # 按发布时间排序（最新的在前面）
+            try:
+                filtered_news = sorted(filtered_news, 
+                                     key=lambda x: datetime.strptime(x.get('发布时间', '1900-01-01 00:00:00.000').split('.')[0], '%Y-%m-%d %H:%M:%S'), 
+                                     reverse=True)
+            except:
+                # 如果时间格式解析失败，保持原有顺序
+                pass
+            
+            result['market_news'] = filtered_news[:limit]
+            
+            if debug:
+                print(f"   ✓ 成功获取 {len(result['market_news'])} 条宏观新闻")
+                for i, news in enumerate(result['market_news'][:3]):
+                    print(f"   {i+1}. {news['新闻标题']}")
+                    print(f"      时间: {news['发布时间']} ({news['相对时间']})")
+                    print(f"      内容: {news['新闻内容'][:100]}...")
+                    print()
+        
+        result['news_summary'] = {
+            'total_market_news_count': len(result['market_news']),
+            'data_source': '财新网',
+            'data_freshness': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'news_type': '宏观经济、政策面、大盘相关'
+        }
+        
+        print(f"   ✅ 财新网新闻获取完成，共 {result['news_summary']['total_market_news_count']} 条信息")
+        
+    except Exception as e:
+        print(f"   ⚠️ 获取财新网新闻失败: {e}")
+    
+    return result
+

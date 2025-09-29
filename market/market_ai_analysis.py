@@ -51,7 +51,7 @@ def generate_index_analysis_report(
     except Exception as e:
         tech_text = f"## 主要技术指标：\n获取技术指标失败: {str(e)}\n"
     
-    system_message = f"""你是一位资深的投资顾问和市场分析师。请基于市场综合数据、技术指标和用户观点，对{stock_name}（{stock_code}）提供精炼的投资决策分析。
+    system_message = f"""你是一位资深的投资顾问和市场分析师。请基于市场综合数据、技术指标、市场新闻资讯和用户观点，对{stock_name}（{stock_code}）提供精炼的投资决策分析。
 
 请严格按照以下结构输出，内容务必简洁、聚焦决策：
 
@@ -60,22 +60,28 @@ def generate_index_analysis_report(
 1. **市场现状与技术面**
 - 总结当前市场核心特征和技术指标状态
 - 结合指数表现分析市场情绪和资金动向
+- 重点关注市场新闻中的政策面、宏观经济动向对市场的影响
 
-2. **用户观点整合**
+2. **新闻面分析**
+- 结合最新市场资讯，分析对大盘指数的潜在影响
+- 识别政策导向、资金流向等关键信息
+
+3. **用户观点整合**
 - 如有用户观点，简要评价其合理性与风险点
 
-3. **涨跌预测**
-- 下个交易日：上涨、平盘、下跌的概率分布，预测置信度（±1% 内的波动认为“平盘”）
+4. **涨跌预测**
+- 下个交易日：上涨、平盘、下跌的概率分布，预测置信度（±1% 内的波动认为"平盘"）
 - 超短期（1周）短期（1个月）和中期（3-6个月）趋势判断
 
-4. **操作建议**
+5. **操作建议**
 - 针对不同风险偏好给出具体建议（仓位、板块、时机）
 - 市场波动时特别提醒保持理性，避免情绪化操作
 
-5. **风险提示**
+6. **风险提示**
 - 列出1-3个当前最需警惕的市场风险
+- 关注新闻中提到的潜在风险因素
 
-【要求】全文不超过600字，只输出最有决策价值的内容，结论要有明确操作性。
+【要求】全文不超过700字，只输出最有决策价值的内容，结论要有明确操作性。
 """
 
     user_message = f"""基于以下数据，请对{stock_name}({stock_code})提供精简分析报告：
@@ -85,6 +91,40 @@ def generate_index_analysis_report(
 {indices_text}
 
 {tech_text}"""
+
+    # 添加市场新闻信息
+    try:
+        news_data = market_report_data.get('market_news_data', {})
+        if news_data and news_data.get('market_news'):
+            market_news = news_data['market_news']
+            news_summary = news_data.get('news_summary', {})
+            
+            user_message += f"""
+
+**市场新闻资讯：**
+数据源：{news_summary.get('data_source', '财新网')}
+新闻数量：{news_summary.get('total_market_news_count', len(market_news))}条
+
+重要资讯摘要："""
+            
+            # 添加前5条重要新闻
+            for idx, news in enumerate(market_news[:5]):
+                title = news.get('新闻标题', '无标题')
+                time_info = news.get('发布时间', '')
+                relative_time = news.get('相对时间', '')
+                content = news.get('新闻内容', '')
+                
+                time_display = f"{time_info} ({relative_time})" if relative_time else time_info
+                user_message += f"\n{idx+1}. {title}"
+                if time_display:
+                    user_message += f" - {time_display}"
+                
+                # 添加新闻内容摘要（前150字符）
+                if content:
+                    content_preview = content[:150] + "..." if len(content) > 150 else content
+                    user_message += f"\n   {content_preview}"
+    except Exception as e:
+        print(f"⚠️ 添加新闻信息到AI分析失败: {e}")
 
     if user_opinion and user_opinion.strip():
         user_message += f"""

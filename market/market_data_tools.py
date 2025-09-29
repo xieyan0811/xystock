@@ -23,7 +23,8 @@ from market.market_data_fetcher import (
     fetch_index_technical_indicators
 )
 from market.market_data_cache import get_cache_manager
-from utils.format_utils import judge_rsi_level            
+from utils.format_utils import judge_rsi_level
+from utils.news_tools import get_market_news_caixin            
 
 class MarketTools:
     """统一的市场数据工具类"""
@@ -245,6 +246,24 @@ class MarketTools:
             print(f"❌ 获取当前指数数据失败: {e}")
             return self.cache_manager.get_cached_data(data_type) if use_cache else {}
 
+    def get_market_news_data(self, use_cache: bool = True, force_refresh: bool = False, debug: bool = False) -> Dict:
+        """获取市场相关新闻数据"""
+        data_type = 'market_news'
+        
+        if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
+            print(f"📋 使用缓存的市场新闻数据")
+            return self.cache_manager.get_cached_data(data_type)
+        
+        print(f"📡 获取市场新闻数据...")
+        try:
+            data = get_market_news_caixin(debug=debug)
+            if use_cache:
+                self.cache_manager.save_cached_data(data_type, data)
+            return data
+        except Exception as e:
+            print(f"❌ 获取市场新闻失败: {e}")
+            return self.cache_manager.get_cached_data(data_type) if use_cache else {'error': str(e)}
+
     def get_index_current_price(self, index_name: str, use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取单个指数的当前价格信息"""
         indices_data = self.get_current_indices(use_cache, force_refresh)
@@ -378,6 +397,7 @@ class MarketTools:
         self.get_money_flow_data(use_cache=True, force_refresh=True)
         self.get_margin_data(use_cache=True, force_refresh=True)
         self.get_current_indices(use_cache=True, force_refresh=True)
+        self.get_market_news_data(use_cache=True, force_refresh=True)
         
         print("✅ 所有缓存数据刷新完成!")
         self.print_cache_status()
@@ -395,6 +415,7 @@ class MarketTools:
             'valuation_indicators': {},
             'money_flow_indicators': {},
             'margin_detail': {},
+            'market_news_data': {},
             'ai_analysis': {},
             'market_summary': {}
         }
@@ -403,6 +424,7 @@ class MarketTools:
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
+        report['market_news_data'] = self.get_market_news_data(use_cache)
         
         print("=" * 60)
         print("✅ 综合市场报告生成完成!")
@@ -616,6 +638,61 @@ class MarketTools:
                     lines.append(f"   周变化率: {change_ratio:.2f}%")
                 else:
                     lines.append(f"   周变化率: {change_ratio}%")
+        
+        # 添加市场新闻部分
+        news_data = report.get('market_news_data', {})
+        if news_data and news_data.get('market_news'):
+            market_news = news_data['market_news']
+            news_summary = news_data.get('news_summary', {})
+            
+            if markdown:
+                lines.append(f"\n## 📰 市场资讯")
+                lines.append(f"- **新闻数量:** {news_summary.get('total_market_news_count', len(market_news))}条")
+                lines.append(f"- **数据源:** {news_summary.get('data_source', '财新网')}")
+                
+                # 显示前5条新闻标题
+                if market_news:
+                    lines.append(f"\n### 📄 重要资讯")
+                    for idx, news in enumerate(market_news[:5]):
+                        title = news.get('新闻标题', '无标题')
+                        time_info = news.get('发布时间', '')
+                        relative_time = news.get('相对时间', '')
+                        
+                        time_display = f"{time_info} ({relative_time})" if relative_time else time_info
+                        lines.append(f"{idx+1}. **{title}**")
+                        if time_display:
+                            lines.append(f"   *发布时间: {time_display}*")
+                        
+                        # 添加新闻内容摘要（前100字符）
+                        content = news.get('新闻内容', '')
+                        if content:
+                            content_preview = content[:100] + "..." if len(content) > 100 else content
+                            lines.append(f"   {content_preview}")
+                        lines.append("")  # 空行分隔
+            else:
+                lines.append(f"\n📰 市场资讯:")
+                lines.append(f"   新闻数量: {news_summary.get('total_market_news_count', len(market_news))}条")
+                lines.append(f"   数据源: {news_summary.get('data_source', '财新网')}")
+                
+                # 显示前5条新闻标题
+                if market_news:
+                    lines.append(f"\n   📄 重要资讯:")
+                    for idx, news in enumerate(market_news[:5]):
+                        title = news.get('新闻标题', '无标题')
+                        time_info = news.get('发布时间', '')
+                        relative_time = news.get('相对时间', '')
+                        
+                        time_display = f"{time_info} ({relative_time})" if relative_time else time_info
+                        lines.append(f"   {idx+1}. {title}")
+                        if time_display:
+                            lines.append(f"      时间: {time_display}")
+                        
+                        # 添加新闻内容摘要（前100字符）
+                        content = news.get('新闻内容', '')
+                        if content:
+                            content_preview = content[:100] + "..." if len(content) > 100 else content
+                            lines.append(f"      摘要: {content_preview}")
+                        lines.append("")  # 空行分隔
                 
         if markdown:
             lines.append("\n---")

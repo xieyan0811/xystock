@@ -306,11 +306,55 @@ def display_market_fundamentals(index_name='沪深300'):
         
         st.metric("统计时间", margin_data.get('margin_date', 'N/A'))
         
-        margin_time = margin_data.get('update_time') or margin_data.get('margin_date')
-        if margin_time:
-            st.caption(f"融资融券数据获取时间: {margin_time}")
+    margin_time = margin_data.get('update_time') or margin_data.get('margin_date')
+    if margin_time:
+        st.caption(f"融资融券数据获取时间: {margin_time}")
 
-
+    st.markdown("#### 📰 市场资讯")
+    
+    market_tools = get_market_tools()
+    news_data = market_tools.get_market_news_data(use_cache=use_cache)
+    
+    if 'error' in news_data:
+        st.warning(f"获取市场新闻失败: {news_data['error']}")
+    elif news_data and news_data.get('market_news'):
+        market_news = news_data['market_news']
+        news_summary = news_data.get('news_summary', {})
+        
+        st.info(f"共获取到 {news_summary.get('total_market_news_count', len(market_news))} 条宏观经济新闻")
+        
+        if market_news:
+            # 显示前10条新闻
+            for idx, news in enumerate(market_news[:10]):
+                title = news.get('新闻标题', '')
+                time_info = news.get('发布时间', '')
+                relative_time = news.get('相对时间', '')
+                url = news.get('新闻链接', '')
+                
+                # 组合时间信息显示
+                time_display = time_info
+                if relative_time:
+                    time_display = f"{time_info} ({relative_time})"
+                
+                with st.expander(f"📄 {title} - {time_display}", expanded=False):
+                    if '新闻内容' in news and news['新闻内容']:
+                        st.write(news['新闻内容'])
+                    else:
+                        st.write("无详细内容")
+                    
+                    if url:
+                        st.caption(f"[查看原文]({url})")
+            
+            if len(market_news) > 10:
+                st.caption(f"显示前10条，共{len(market_news)}条新闻")
+        else:
+            st.write("暂无市场新闻")
+    else:
+        st.info("未能获取到市场新闻")
+    
+    news_time = news_data.get('news_summary', {}).get('data_freshness')
+    if news_time:
+        st.caption(f"市场新闻数据获取时间: {news_time}")
 def display_market_indices():
     """显示大盘指数信息"""
     
