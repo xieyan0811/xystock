@@ -7,7 +7,7 @@ import datetime
 import sys
 import os
 import pandas as pd
-import plotly.graph_objects as go
+from typing import Dict
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -15,7 +15,7 @@ if project_root not in sys.path:
 
 from utils.format_utils import format_large_number
 from market.market_data_tools import get_market_tools
-from market.market_report import generate_market_report
+from market.market_report import write_market_report
 from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
 
@@ -150,141 +150,31 @@ def display_money_flow_analysis(use_cache=True):
         st.caption(f"资金流向数据获取时间: {money_time}")
 
 
+def convert_markdown_to_streamlit(markdown_text: str, sentiment_data: Dict):
+    """简化版本：直接显示markdown内容"""
+    if not markdown_text:
+        st.warning("未获取到市场情绪数据")
+        return
+    
+    # 直接显示markdown内容
+    st.markdown(markdown_text)
+
+
 def display_market_sentiment_analysis(use_cache=True):
     """显示市场情绪指标分析"""
-    st.markdown("#### 😐 市场情绪指标")
     
     # 获取综合市场情绪数据
-    sentiment_data = get_market_tools().get_market_sentiment(use_cache=use_cache, comprehensive=True)
+    market_tools = get_market_tools()
+    sentiment_data = market_tools.get_market_sentiment(use_cache=use_cache, comprehensive=True)
     
     if not sentiment_data or 'error' in sentiment_data:
         st.warning("未获取到市场情绪数据")
     else:
-        # 显示情绪评分
-        if 'sentiment_score' in sentiment_data:
-            score = sentiment_data.get('sentiment_score', 0)
-            level = sentiment_data.get('sentiment_level', 'unknown')
-            confidence = sentiment_data.get('confidence', 0)
-            
-            score_col1, score_col2, score_col3 = st.columns(3)
-            with score_col1:
-                # 根据情绪等级设置颜色
-                if level == 'bullish':
-                    delta_color = "normal"
-                    level_display = "🟢 乐观"
-                elif level == 'bearish':
-                    delta_color = "inverse"
-                    level_display = "🔴 悲观"
-                else:
-                    delta_color = "off"
-                    level_display = "🟡 中性"
-                
-                st.metric("情绪评分", f"{score:.1f}", help="综合市场情绪评分，范围-100到100")
-            
-            with score_col2:
-                st.metric("情绪等级", level_display, help="基于评分计算的情绪等级")
-            
-            with score_col3:
-                st.metric("数据可信度", f"{confidence}%", help="基于数据源数量计算的可信度")
+        # 使用统一的markdown生成函数
+        sentiment_markdown = market_tools.generate_sentiment_markdown(sentiment_data)
         
-        # 显示基础涨跌数据
-        basic_sentiment = sentiment_data.get('basic_sentiment', sentiment_data)
-        if basic_sentiment:
-            up_stocks = basic_sentiment.get('up_stocks', 0)
-            down_stocks = basic_sentiment.get('down_stocks', 0)
-            flat_stocks = basic_sentiment.get('flat_stocks', 0)
-            total_stocks = basic_sentiment.get('total_stocks', 0)
-            
-            sentiment_col1, sentiment_col2, sentiment_col3, sentiment_col4 = st.columns(4)
-            with sentiment_col1:
-                up_ratio = basic_sentiment.get('up_ratio', 0)
-                st.metric("上涨股票", f"{up_stocks}只", delta=f"{up_ratio:.1%}", delta_color="normal")
-            
-            with sentiment_col2:
-                down_ratio = basic_sentiment.get('down_ratio', 0)
-                st.metric("下跌股票", f"{down_stocks}只", delta=f"{down_ratio:.1%}", delta_color="inverse")
-            
-            with sentiment_col3:
-                limit_up = basic_sentiment.get('limit_up_stocks', 0)
-                limit_up_ratio = basic_sentiment.get('limit_up_ratio', 0)
-                st.metric("涨停股票", f"{limit_up}只", delta=f"{limit_up_ratio:.2%}", delta_color="normal")
-            
-            with sentiment_col4:
-                limit_down = basic_sentiment.get('limit_down_stocks', 0)
-                st.metric("跌停股票", f"{limit_down}只", delta_color="inverse")
-        
-        # 显示资金流向情绪
-        fund_flow = sentiment_data.get('fund_flow', {})
-        if fund_flow:
-            st.markdown("##### 💸 资金流向情绪")
-            fund_col1, fund_col2 = st.columns(2)
-            
-            with fund_col1:
-                main_inflow = fund_flow.get('main_net_inflow', 0)
-                inflow_text = f"{main_inflow/1e8:.1f}亿" if main_inflow else "N/A"
-                inflow_delta_color = "normal" if main_inflow > 0 else "inverse" if main_inflow < 0 else "off"
-                st.metric("主力净流入", inflow_text, delta_color=inflow_delta_color)
-            
-            with fund_col2:
-                main_ratio = fund_flow.get('main_net_ratio', 0)
-                ratio_text = f"{main_ratio:.2f}%" if main_ratio else "N/A"
-                ratio_delta_color = "normal" if main_ratio > 0 else "inverse" if main_ratio < 0 else "off"
-                st.metric("主力净流入占比", ratio_text, delta_color=ratio_delta_color)
-        
-        # 情绪分析解读
-        with st.expander("📊 情绪分析解读", expanded=True):
-            if 'sentiment_score' in sentiment_data and 'score_components' in sentiment_data:
-                components = sentiment_data['score_components']
-                
-                st.write("**评分构成分析：**")
-                for component, value in components.items():
-                    if component == 'ratio':
-                        desc = f"涨跌比例贡献: {value:.1f}分"
-                        if value > 10:
-                            desc += " (上涨股票占优)"
-                        elif value < -10:
-                            desc += " (下跌股票占优)"
-                        else:
-                            desc += " (涨跌相对均衡)"
-                    elif component == 'limit':
-                        desc = f"涨跌停贡献: {value:.1f}分"
-                        if value > 5:
-                            desc += " (涨停股票较多)"
-                        elif value < -5:
-                            desc += " (跌停股票较多)"
-                        else:
-                            desc += " (涨跌停均衡)"
-                    elif component == 'fund':
-                        desc = f"资金流向贡献: {value:.1f}分"
-                        if value > 10:
-                            desc += " (主力大幅净流入)"
-                        elif value < -10:
-                            desc += " (主力大幅净流出)"
-                        else:
-                            desc += " (资金流向相对平衡)"
-                    else:
-                        desc = f"{component}: {value:.1f}分"
-                    
-                    st.write(f"- {desc}")
-                
-                # 总体情绪判断
-                total_score = sentiment_data.get('sentiment_score', 0)
-                if total_score > 30:
-                    st.success("🚀 **市场情绪极度乐观** - 多数指标显示积极信号，适合关注强势股票")
-                elif total_score > 10:
-                    st.info("📈 **市场情绪偏乐观** - 整体向好，但需注意风险控制")
-                elif total_score > -10:
-                    st.warning("😐 **市场情绪中性** - 多空力量相对均衡，等待明确方向")
-                elif total_score > -30:
-                    st.warning("📉 **市场情绪偏悲观** - 下跌压力较大，注意防守")
-                else:
-                    st.error("💥 **市场情绪极度悲观** - 恐慌情绪浓厚，谨慎操作")
-        
-        # 数据源信息
-        data_source = basic_sentiment.get('data_source', '未知')
-        update_time = sentiment_data.get('update_time', basic_sentiment.get('update_time', ''))
-        if update_time:
-            st.caption(f"市场情绪数据获取时间: {update_time} | 数据源: {data_source}")
+        # 转换为Streamlit显示格式
+        convert_markdown_to_streamlit(sentiment_markdown, sentiment_data)
 
 
 def display_margin_trading_analysis(use_cache=True):
@@ -296,6 +186,7 @@ def display_margin_trading_analysis(use_cache=True):
     if not margin_data:
         st.warning("未获取到融资融券数据")
     else:
+        # 第一行：余额数据
         margin_col1, margin_col2, margin_col3 = st.columns(3)
         with margin_col1:
             margin_balance = margin_data.get('margin_balance')
@@ -307,7 +198,20 @@ def display_margin_trading_analysis(use_cache=True):
             margin_sell = margin_data.get('margin_sell_balance')
             st.metric("融券余额", f"{format_large_number(margin_sell)}" if margin_sell else "N/A")
         
-        st.metric("统计时间", margin_data.get('margin_date', 'N/A'))
+        # 第二行：周变化率
+        change_col1 = st.columns(1)[0]  # 获取第一个（也是唯一的）列
+        with change_col1:
+            change_ratio = margin_data.get('change_ratio')
+            if change_ratio is not None:
+                delta_color = "normal" if change_ratio > 0 else "inverse" if change_ratio < 0 else "off"
+                st.metric("周变化率", f"{change_ratio:.2f}%", delta_color=delta_color)
+            else:
+                st.metric("周变化率", "N/A")
+
+        # 统计时间
+        margin_date = margin_data.get('margin_date')
+        if margin_date:
+            st.caption(f"统计时间: {margin_date}")
         
     margin_time = margin_data.get('update_time') or margin_data.get('margin_date')
     if margin_time:
@@ -435,26 +339,15 @@ def display_market_indices():
         st.error(f"显示指数数据时出错: {str(e)}")
         
 
-def display_market_summary(index_name='上证指数'):
-    """显示综合摘要卡片"""
-
-    use_cache = st.session_state.get('market_use_cache', True)
-    
-    market_tools = get_market_tools()    
-    result_data = market_tools.get_comprehensive_market_report(use_cache=use_cache, index_name=index_name)
-    summary_text = market_tools.generate_market_report(result_data, format_type='summary')
-
-    if not summary_text:
-        st.info("综合摘要数据准备中...")
-        return
-    
+def handle_ai_analysis(index_name, use_cache=True):
+    """处理AI分析功能"""
     if st.session_state.get('run_ai_index', False):
         # 检查是否已经生成过AI报告
         stock_code_for_ai = index_name
         with st.spinner(f"🤖 AI正在分析{stock_code_for_ai}数据..."):
             try:
                 user_opinion = st.session_state.get('market_user_opinion', '')
-                
+                market_tools = get_market_tools()
                 ai_data = market_tools.get_ai_analysis(
                     use_cache=use_cache, 
                     index_name=stock_code_for_ai, 
@@ -472,8 +365,11 @@ def display_market_summary(index_name='上证指数'):
                 st.error(f"AI分析失败: {str(e)}")
                 if 'run_ai_index' in st.session_state:
                     del st.session_state['run_ai_index']
-        
-    current_stock_code = result_data.get('focus_index', index_name)
+
+
+def display_ai_analysis_section(index_name):
+    """显示AI分析部分"""
+    current_stock_code = index_name
     if st.session_state.get('ai_index_report') and current_stock_code in st.session_state['ai_index_report']:
         ai_data = st.session_state['ai_index_report'][current_stock_code]
         
@@ -491,16 +387,12 @@ def display_market_summary(index_name='上证指数'):
                     st.caption(f"包含用户观点: ✅")
                 else:
                     st.caption(f"包含用户观点: ❌")
+        return True
+    return False
 
-        st.markdown("---")
-        st.subheader("综合摘要")
-        st.markdown(summary_text)
-    else:
-        detail_text = market_tools.generate_market_report(result_data, format_type='detail')
-        st.markdown("---")
-        st.subheader("综合摘要")
-        st.markdown(detail_text)
 
+def display_comprehensive_rating(result_data, use_cache=True):
+    """显示综合评级"""
     st.markdown("---")
     st.write("**🎯 综合评级:**")
     
@@ -591,14 +483,16 @@ def display_market_summary(index_name='上证指数'):
     else:
         st.write("市场综合评级: 数据不足")
 
-    # 导出市场报告功能
+
+def display_market_report_export(index_name):
+    """显示市场报告导出功能"""
     st.markdown("---")
     st.subheader("📋 导出市场报告")
     
     st.info("💡 可以导出当前市场分析的完整报告")
     
     support_pdf = PDF_SUPPORT_AVAILABLE
-    report_index_name = result_data.get('focus_index', index_name)
+    report_index_name = index_name
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -651,7 +545,7 @@ def display_market_summary(index_name='上证指数'):
                 has_ai_analysis = bool(st.session_state.get('ai_index_report', {}).get(report_index_name))
                 user_opinion = st.session_state.get('market_user_opinion', '')
                 
-                report_content = generate_market_report(
+                report_content = write_market_report(
                     index_name=report_index_name,
                     format_type=generating_format,
                     has_ai_analysis=has_ai_analysis,
@@ -699,6 +593,32 @@ def display_market_summary(index_name='上证指数'):
             help=f"点击下载生成的{current_format.upper()}市场报告文件"
         )
         st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'market_report_timestamp_{report_index_name}']}")
+
+
+def display_market_summary(index_name='上证指数'):
+    """显示综合摘要卡片"""
+    use_cache = st.session_state.get('market_use_cache', True)
+    
+    market_tools = get_market_tools()    
+    result_data = market_tools.get_comprehensive_market_report(use_cache=use_cache, index_name=index_name)
+    summary_text = market_tools.generate_market_report(result_data, format_type='summary')
+
+    if not summary_text:
+        st.info("综合摘要数据准备中...")
+        return
+    
+    # 处理AI分析
+    handle_ai_analysis(index_name, use_cache)
+    
+    # 显示AI分析结果和综合摘要
+    current_stock_code = result_data.get('focus_index', index_name)
+    has_ai_analysis = display_ai_analysis_section(current_stock_code)
+    
+    # 显示综合评级
+    display_comprehensive_rating(result_data, use_cache)
+    
+    # 显示导出功能
+    display_market_report_export(current_stock_code)
 
             
 def display_market_overview():

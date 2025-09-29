@@ -169,7 +169,7 @@ def display_risk_analysis(risk_metrics):
         return
     
     # 尝试使用格式化的风险指标文本
-    formatted_risk_text = format_risk_metrics(risk_metrics)
+    formatted_risk_text = format_risk_metrics(risk_metrics, with_header=False)
     
     if formatted_risk_text:
         # 显示格式化的风险分析文本

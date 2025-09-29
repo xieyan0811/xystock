@@ -66,58 +66,7 @@ def format_technical_indicators(tech_indicators):
     return md_content
 
 
-def format_market_news(market_report_data, max_news_count=10):
-    """
-    为AI分析格化市场新闻数据
-    
-    Args:
-        market_report_data: 市场报告数据
-        max_news_count: 最大新闻数量，默认10条
-    
-    Returns:
-        str: 格式化后的市场新闻文本
-    """
-    news_text = ""
-    
-    try:
-        news_data = market_report_data.get('market_news_data', {})
-        if news_data and news_data.get('market_news'):
-            market_news = news_data['market_news']
-            news_summary = news_data.get('news_summary', {})
-            
-            news_text += f"""
-
-**市场新闻资讯：**
-数据源：{news_summary.get('data_source', '财新网')}
-新闻数量：{news_summary.get('total_market_news_count', len(market_news))}条
-
-重要资讯摘要："""
-            
-            # 添加前N条重要新闻
-            for idx, news in enumerate(market_news[:max_news_count]):
-                title = news.get('新闻标题', '无标题')
-                time_info = news.get('发布时间', '')
-                relative_time = news.get('相对时间', '')
-                content = news.get('新闻内容', '')
-                
-                time_display = f"{time_info} ({relative_time})" if relative_time else time_info
-                news_text += f"\n{idx+1}. {title}"
-                if time_display:
-                    news_text += f" - {time_display}"
-                
-                # 添加新闻内容摘要（前150字符）
-                if content:
-                    content_preview = content[:150] + "..." if len(content) > 150 else content
-                    news_text += f"\n   {content_preview}"
-                    
-    except Exception as e:
-        print(f"⚠️ 格式化新闻信息失败: {e}")
-        news_text = f"\n\n**市场新闻资讯：**\n获取新闻数据失败: {str(e)}"
-    
-    return news_text
-
-
-def format_risk_metrics(risk_metrics):
+def format_risk_metrics(risk_metrics, with_header = True):
     """
     为市场报告格式化风险指标数据（中文化格式）
     
@@ -130,10 +79,15 @@ def format_risk_metrics(risk_metrics):
     if not risk_metrics or 'error' in risk_metrics:
         return ""
         
-    md_content = """---
+    if with_header:
+        md_content = """---
 
 # ⚠️ 风险指标分析
 （注意：使用的 K线数据截至上一交易日）
+
+"""
+    else:
+        md_content = """（注意：使用的 K线数据截至上一交易日）
 
 """
     

@@ -24,7 +24,8 @@ from market.market_data_fetcher import (
 )
 from market.market_data_cache import get_cache_manager
 from utils.format_utils import judge_rsi_level
-from utils.news_tools import get_market_news_caixin            
+from utils.news_tools import get_market_news_caixin
+from utils.string_utils import remove_markdown_format            
 
 class MarketTools:
     """统一的市场数据工具类"""
@@ -373,10 +374,20 @@ class MarketTools:
     def get_ai_analysis(self, use_cache: bool = True, index_name: str = '上证指数', force_regenerate: bool = False, user_opinion: str = '') -> Dict:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
-                
+        
+        # 检查缓存是否有效且不需要强制重新生成
         if use_cache and self.cache_manager.is_cache_valid(data_type, index_name) and not force_regenerate:
-            print(f"📋 使用缓存的AI分析: {index_name}")
-            return self.cache_manager.get_cached_data(data_type, index_name)
+            # 获取缓存数据并检查user_opinion是否一致
+            cached_data = self.cache_manager.get_cached_data(data_type, index_name)
+            cached_user_opinion = cached_data.get('user_opinion', '')
+            
+            # 如果user_opinion与缓存中的一致，则使用缓存
+            if cached_user_opinion == user_opinion:
+                print(f"📋 使用缓存的AI分析: {index_name}")
+                return cached_data
+            else:
+                print(f"🔄 用户观点已变化，重新生成AI分析: {index_name}")
+                print(f"   缓存观点: '{cached_user_opinion}' -> 当前观点: '{user_opinion}'")
         
         return self._generate_ai_analysis(index_name, user_opinion)
         
@@ -421,6 +432,7 @@ class MarketTools:
         }
         
         report['technical_indicators'] = self.get_index_technical_indicators(index_name, use_cache=use_cache)
+        report['sentiment_indicators'] = self.get_market_sentiment(use_cache=use_cache, comprehensive=True)
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
@@ -505,7 +517,6 @@ class MarketTools:
         lines.extend(self._add_report_header(report, markdown))
         
         # 添加各个部分
-        lines.extend(self._add_technical_section(report.get('technical_indicators', {}), markdown))
         lines.extend(self._add_sentiment_section(report.get('sentiment_indicators', {}), markdown))
         lines.extend(self._add_valuation_section(report.get('valuation_indicators', {}), markdown))
         lines.extend(self._add_money_flow_section(report.get('money_flow_indicators', {}), markdown))
@@ -532,48 +543,227 @@ class MarketTools:
             lines.append("=" * 80)
         return lines
     
-    def _add_technical_section(self, tech: Dict, markdown: bool) -> list:
-        """添加技术指标部分"""
-        lines = []
-        if not tech:
-            return lines
-            
-        if markdown:
-            lines.append(f"\n## 📈 技术指标分析")
-            lines.append(f"- **MA趋势:** {tech.get('ma_trend', 'N/A')}")
-            lines.append(f"- **MACD趋势:** {tech.get('macd_trend', 'N/A')}")
-            rsi_14 = tech.get('rsi_14', 'N/A')
-            if isinstance(rsi_14, (int, float)):
-                lines.append(f"- **RSI(14):** {rsi_14:.2f}")
-            else:
-                lines.append(f"- **RSI(14):** {rsi_14}")
-        else:
-            lines.append(f"\n📈 技术指标分析:")
-            lines.append(f"   MA趋势: {tech.get('ma_trend', 'N/A')}")
-            lines.append(f"   MACD趋势: {tech.get('macd_trend', 'N/A')}")
-            rsi_14 = tech.get('rsi_14', 'N/A')
-            if isinstance(rsi_14, (int, float)):
-                lines.append(f"   RSI(14): {rsi_14:.2f}")
-            else:
-                lines.append(f"   RSI(14): {rsi_14}")
-        return lines
+    def generate_sentiment_markdown(self, sentiment: Dict) -> str:
+        """生成市场情绪分析的markdown文本（公开方法）"""
+        return self._generate_sentiment_markdown(sentiment)
     
+    def _generate_sentiment_markdown(self, sentiment: Dict) -> str:
+        """生成市场情绪分析的markdown文本"""
+        if not sentiment:
+            return ""
+        
+        lines = []
+        lines.append("## 😐 市场情绪指标")
+        lines.append("")
+        
+        # 情绪评分部分
+        if 'sentiment_score' in sentiment:
+            score = sentiment.get('sentiment_score', 0)
+            level = sentiment.get('sentiment_level', 'unknown')
+            confidence = sentiment.get('confidence', 0)
+            
+            # 根据情绪等级设置显示
+            if level == 'bullish':
+                level_display = "🟢 乐观"
+            elif level == 'bearish':
+                level_display = "🔴 悲观"
+            else:
+                level_display = "🟡 中性"
+            
+            lines.append("### 📊 综合情绪评分")
+            lines.append(f"- **情绪评分:** {score:.1f} 分 (范围: -100 到 100)")
+            lines.append(f"- **情绪等级:** {level_display}")
+            lines.append(f"- **数据可信度:** {confidence}%")
+            lines.append("")
+        
+        # 基础涨跌数据概览 - 添加卡片式显示
+        basic_sentiment = sentiment.get('basic_sentiment', sentiment)
+        if basic_sentiment:
+            up_stocks = basic_sentiment.get('up_stocks', 0)
+            down_stocks = basic_sentiment.get('down_stocks', 0)
+            flat_stocks = basic_sentiment.get('flat_stocks', 0)
+            total_stocks = basic_sentiment.get('total_stocks', 0)
+            limit_up = basic_sentiment.get('limit_up_stocks', 0)
+            limit_down = basic_sentiment.get('limit_down_stocks', 0)
+            
+            # 涨跌数据概览表格
+            lines.append("### 📊 市场涨跌概览")
+            lines.append("")
+            lines.append("| 指标 | 数量 | 占比 | 备注 |")
+            lines.append("|------|------|------|------|")
+            
+            if total_stocks > 0:
+                up_ratio = basic_sentiment.get('up_ratio', up_stocks / total_stocks)
+                down_ratio = basic_sentiment.get('down_ratio', down_stocks / total_stocks)
+                flat_ratio = flat_stocks / total_stocks if total_stocks > 0 else 0
+                
+                lines.append(f"| 🟢 上涨股票 | {up_stocks:,} 只 | {up_ratio:.1%} | 市场主流 |")
+                lines.append(f"| 🔴 下跌股票 | {down_stocks:,} 只 | {down_ratio:.1%} | 调整压力 |")
+                lines.append(f"| ⚪ 平盘股票 | {flat_stocks:,} 只 | {flat_ratio:.1%} | 观望态度 |")
+                lines.append(f"| 📊 **总计** | **{total_stocks:,} 只** | **100.0%** | **全市场** |")
+            
+            # 涨跌停数据
+            if limit_up > 0 or limit_down > 0:
+                #lines.append("")
+                limit_up_ratio = basic_sentiment.get('limit_up_ratio', 0)
+                limit_down_ratio = basic_sentiment.get('limit_down_ratio', 0)
+                lines.append(f"| 🔥 涨停股票 | {limit_up} 只 | {limit_up_ratio:.2%} | 强势信号 |")
+                lines.append(f"| 💥 跌停股票 | {limit_down} 只 | {limit_down_ratio:.2%} | 恐慌信号 |")
+            
+            lines.append("")
+        
+        # 资金流向情绪
+        fund_flow = sentiment.get('fund_flow', {})
+        if fund_flow:
+            lines.append("### 💸 资金流向情绪")
+            main_inflow = fund_flow.get('main_net_inflow', 0)
+            main_ratio = fund_flow.get('main_net_ratio', 0)
+            
+            if main_inflow or main_ratio:
+                lines.append("")
+                lines.append("| 资金指标 | 数值 | 说明 |")
+                lines.append("|----------|------|------|")
+                
+                if main_inflow:
+                    inflow_text = f"{main_inflow/1e8:.1f}亿"
+                    flow_trend = "💰 净流入" if main_inflow > 0 else "💸 净流出"
+                    lines.append(f"| 主力资金 | {inflow_text} | {flow_trend} |")
+                
+                if main_ratio:
+                    ratio_trend = "活跃" if abs(main_ratio) > 0.5 else "平稳"
+                    lines.append(f"| 流入占比 | {main_ratio:.2f}% | 资金{ratio_trend} |")
+                
+                lines.append("")
+        
+        # 情绪分析解读
+        if 'sentiment_score' in sentiment:
+            lines.append("### 🧠 情绪分析解读")
+            lines.append("")
+            
+            # 评分构成分析
+            if 'score_components' in sentiment:
+                components = sentiment['score_components']
+                lines.append("#### 📋 评分构成分析")
+                lines.append("")
+                
+                for component, value in components.items():
+                    if component == 'ratio':
+                        desc = f"**涨跌比例贡献:** {value:.1f}分"
+                        if value > 10:
+                            desc += " - 🟢 上涨股票占优势，市场偏强"
+                        elif value < -10:
+                            desc += " - 🔴 下跌股票占优势，市场偏弱"
+                        else:
+                            desc += " - 🟡 涨跌相对均衡，市场震荡"
+                    elif component == 'limit':
+                        desc = f"**涨跌停贡献:** {value:.1f}分"
+                        if value > 5:
+                            desc += " - 🔥 涨停股票较多，情绪高涨"
+                        elif value < -5:
+                            desc += " - 💥 跌停股票较多，恐慌蔓延"
+                        else:
+                            desc += " - ⚖️ 涨跌停相对均衡"
+                    elif component == 'fund':
+                        desc = f"**资金流向贡献:** {value:.1f}分"
+                        if value > 10:
+                            desc += " - 💰 主力大幅净流入，资金追捧"
+                        elif value < -10:
+                            desc += " - 💸 主力大幅净流出，资金撤离"
+                        else:
+                            desc += " - 📊 资金流向相对平衡"
+                    else:
+                        desc = f"**{component}:** {value:.1f}分"
+                    
+                    lines.append(f"- {desc}")
+                lines.append("")
+            
+            # 总体情绪判断 - 添加更详细的分析
+            total_score = sentiment.get('sentiment_score', 0)
+            lines.append("#### 🎯 总体情绪判断")
+            lines.append("")
+            
+            if total_score > 30:
+                lines.append("> 🚀 **市场情绪极度乐观**")
+                lines.append(">")
+                lines.append("> 多数指标显示积极信号，市场人气高涨，适合关注强势股票和热点板块。")
+                lines.append("> 建议积极参与，但注意风险控制和适时止盈。")
+            elif total_score > 10:
+                lines.append("> 📈 **市场情绪偏乐观**")
+                lines.append(">")
+                lines.append("> 整体趋势向好，但需要注意潜在风险点。")
+                lines.append("> 建议谨慎乐观，做好风险管理和仓位控制。")
+            elif total_score > -10:
+                lines.append("> 😐 **市场情绪中性**")
+                lines.append(">")
+                lines.append("> 多空力量相对均衡，市场处于震荡状态，等待明确方向。")
+                lines.append("> 建议保持观望，等待更明确的趋势信号。")
+            elif total_score > -30:
+                lines.append("> 📉 **市场情绪偏悲观**")
+                lines.append(">")
+                lines.append("> 下跌压力较大，投资者信心不足，需要注意防守。")
+                lines.append("> 建议降低仓位，关注防御性品种和超跌反弹机会。")
+            else:
+                lines.append("> 💥 **市场情绪极度悲观**")
+                lines.append(">")
+                lines.append("> 恐慌情绪浓厚，市场风险偏好极低，需要谨慎操作。")
+                lines.append("> 建议以观望为主，等待市场企稳信号再考虑介入。")
+        
+        # 数据源信息
+        basic_sentiment = sentiment.get('basic_sentiment', sentiment)
+        data_source = basic_sentiment.get('data_source', '未知')
+        update_time = sentiment.get('update_time', basic_sentiment.get('update_time', ''))
+        if update_time:
+            lines.append("")
+            lines.append("---")
+            lines.append(f"**📅 数据更新时间:** {update_time}")
+            lines.append(f"**🔗 数据源:** {data_source}")
+        
+        return '\n'.join(lines)
+    
+    def _convert_markdown_to_text(self, markdown_text: str) -> list:
+        """将markdown格式转换为纯文本格式，使用 string_utils 中的 remove_markdown_format"""
+        # 使用现有的 remove_markdown_format 函数去除 markdown 格式
+        plain_text = remove_markdown_format(markdown_text)
+        
+        # 转换为列表格式，保持基本的层级结构
+        lines = []
+        for line in plain_text.split('\n'):
+            line = line.strip()
+            
+            # 为了保持某些结构，对特定内容进行简单格式化
+            if line and any(keyword in line for keyword in ['市场情绪指标', '综合情绪评分', '涨跌统计', '涨跌比例', '涨跌停统计', '资金流向情绪', '情绪分析解读']):
+                # 主要标题加上下划线
+                lines.append(f"\n{line}")
+                lines.append("-" * len(line))
+            elif line.startswith('数据更新时间'):
+                # 数据源信息保持原样
+                lines.append(f"\n{line}")
+            elif line:
+                # 普通内容行
+                lines.append(line)
+            else:
+                # 保留空行用于段落分隔
+                lines.append('')
+                
+        return lines
+
     def _add_sentiment_section(self, sentiment: Dict, markdown: bool) -> list:
         """添加市场情绪部分"""
         lines = []
+        
         if not sentiment:
             return lines
             
-        if markdown:
-            lines.append(f"\n## 😊 市场情绪指标")
-            lines.append(f"- **涨跌家数:** ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-            up_ratio = sentiment.get('up_ratio', 0)
-            lines.append(f"- **上涨占比:** {up_ratio*100:.1f}%")
-        else:
-            lines.append(f"\n😊 市场情绪指标:")
-            lines.append(f"   涨跌家数: ↗{sentiment.get('up_stocks', 'N/A')} | ↘{sentiment.get('down_stocks', 'N/A')} | →{sentiment.get('flat_stocks', 'N/A')}")
-            up_ratio = sentiment.get('up_ratio', 0)
-            lines.append(f"   上涨占比: {up_ratio*100:.1f}%")
+        # 使用新的markdown生成函数
+        sentiment_text = self._generate_sentiment_markdown(sentiment)
+        if sentiment_text:
+            if markdown:
+                lines.extend(sentiment_text.split('\n'))
+            else:
+                # 转换markdown格式为纯文本格式
+                text_lines = self._convert_markdown_to_text(sentiment_text)
+                lines.extend(text_lines)
+        
         return lines
     
     def _add_valuation_section(self, valuation: Dict, markdown: bool) -> list:
@@ -665,7 +855,7 @@ class MarketTools:
         
         # 添加重要新闻列表
         if market_news:
-            lines.extend(self._format_news_list(market_news[:5], markdown))
+            lines.extend(self._format_news_list(market_news[:10], markdown))
         return lines
     
     def _format_news_list(self, news_list: list, markdown: bool) -> list:

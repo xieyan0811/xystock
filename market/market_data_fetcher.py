@@ -17,8 +17,6 @@ if PROJECT_ROOT not in sys.path:
 warnings.filterwarnings('ignore')
 
 import akshare as ak
-import pandas as pd
-import efinance as ef
 from stock.stock_utils import get_indicators
 from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 from market.kline_data_manager import get_kline_manager

@@ -10,7 +10,7 @@ if project_dir not in sys.path:
 
 from market.market_data_tools import get_market_tools
 from market.market_data_utils import format_indices_for_analysis
-from utils.data_formatters import format_technical_indicators, format_risk_metrics, format_market_news
+from utils.data_formatters import format_technical_indicators, format_risk_metrics
 
 def generate_index_analysis_report(
     stock_code: str,
@@ -92,14 +92,11 @@ def generate_index_analysis_report(
 
 {tech_text}"""
 
-    # 添加市场新闻信息
-    news_text = format_market_news(market_report_data, max_news_count=10)
-    user_message += news_text
-
     if user_opinion and user_opinion.strip():
         user_message += f"""
 
-**用户观点及关注点：**
+## 用户观点及关注点
+
 {user_opinion.strip()}
 
 请在分析中特别关注用户提到的观点和关注点，并针对性地给出建议。

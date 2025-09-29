@@ -13,7 +13,7 @@ from market.market_data_utils import collect_market_data_for_report, format_inde
 from utils.data_formatters import format_technical_indicators, format_risk_metrics
 
 
-def generate_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
+def write_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
     """生成完整的市场分析报告（安全版本，完全独立于UI）"""
     try:
         # 使用统一的数据收集工具
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     # 测试生成Markdown报告
     print("\n1. 生成上证指数Markdown报告:")
     try:
-        md_report = generate_market_report(
+        md_report = write_market_report(
             index_name="上证指数",
             format_type="markdown",
             has_ai_analysis=False
