@@ -17,6 +17,7 @@ from market.market_data_fetcher import (
     fetch_current_indices,
     fetch_margin_data_unified,
     fetch_market_sentiment,
+    fetch_comprehensive_market_sentiment,
     fetch_money_flow_data,
     fetch_valuation_data,
     fetch_index_technical_indicators
@@ -33,17 +34,27 @@ class MarketTools:
         self.cache_file = self.cache_manager.cache_file
         self.cache_configs = self.cache_manager.cache_configs
     
-    def get_market_sentiment(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
-        """获取市场情绪指标"""
-        data_type = 'market_sentiment'
+    def get_market_sentiment(self, use_cache: bool = True, force_refresh: bool = False, comprehensive: bool = False) -> Dict:
+        """获取市场情绪指标
+        
+        Args:
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            comprehensive: 是否获取综合情绪分析（包含评分）
+        """
+        data_type = 'comprehensive_sentiment' if comprehensive else 'market_sentiment'
         
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
-            print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
+            print(f"📋 使用缓存的{self.cache_configs.get(data_type, {}).get('description', '市场情绪数据')}")
             return self.cache_manager.get_cached_data(data_type)
         
-        print(f"📡 获取{self.cache_configs[data_type]['description']}...")
+        print(f"📡 获取{'综合市场情绪分析' if comprehensive else '基础市场情绪'}...")
         try:
-            data = fetch_market_sentiment()
+            if comprehensive:
+                data = fetch_comprehensive_market_sentiment()
+            else:
+                data = fetch_market_sentiment()
+                
             if use_cache:
                 self.cache_manager.save_cached_data(data_type, data)
             return data
@@ -307,7 +318,7 @@ class MarketTools:
     def refresh_all_cache(self):
         print("🔄 开始刷新所有缓存数据...")
         
-        #self.get_market_sentiment(use_cache=True, force_refresh=True)
+        self.get_market_sentiment(use_cache=True, force_refresh=True)
         self.get_valuation_data(use_cache=True, force_refresh=True)
         self.get_money_flow_data(use_cache=True, force_refresh=True)
         self.get_margin_data(use_cache=True, force_refresh=True)

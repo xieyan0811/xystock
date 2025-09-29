@@ -148,6 +148,140 @@ def display_market_fundamentals(index_name='沪深300'):
     if money_time:
         st.caption(f"资金流向数据获取时间: {money_time}")
     
+    st.markdown("#### 😐 市场情绪指标")
+    
+    # 获取综合市场情绪数据
+    sentiment_data = get_market_tools().get_market_sentiment(use_cache=use_cache, comprehensive=True)
+    
+    if not sentiment_data or 'error' in sentiment_data:
+        st.warning("未获取到市场情绪数据")
+    else:
+        # 显示情绪评分
+        if 'sentiment_score' in sentiment_data:
+            score = sentiment_data.get('sentiment_score', 0)
+            level = sentiment_data.get('sentiment_level', 'unknown')
+            confidence = sentiment_data.get('confidence', 0)
+            
+            score_col1, score_col2, score_col3 = st.columns(3)
+            with score_col1:
+                # 根据情绪等级设置颜色
+                if level == 'bullish':
+                    delta_color = "normal"
+                    level_display = "🟢 乐观"
+                elif level == 'bearish':
+                    delta_color = "inverse"
+                    level_display = "🔴 悲观"
+                else:
+                    delta_color = "off"
+                    level_display = "🟡 中性"
+                
+                st.metric("情绪评分", f"{score:.1f}", help="综合市场情绪评分，范围-100到100")
+            
+            with score_col2:
+                st.metric("情绪等级", level_display, help="基于评分计算的情绪等级")
+            
+            with score_col3:
+                st.metric("数据可信度", f"{confidence}%", help="基于数据源数量计算的可信度")
+        
+        # 显示基础涨跌数据
+        basic_sentiment = sentiment_data.get('basic_sentiment', sentiment_data)
+        if basic_sentiment:
+            up_stocks = basic_sentiment.get('up_stocks', 0)
+            down_stocks = basic_sentiment.get('down_stocks', 0)
+            flat_stocks = basic_sentiment.get('flat_stocks', 0)
+            total_stocks = basic_sentiment.get('total_stocks', 0)
+            
+            sentiment_col1, sentiment_col2, sentiment_col3, sentiment_col4 = st.columns(4)
+            with sentiment_col1:
+                up_ratio = basic_sentiment.get('up_ratio', 0)
+                st.metric("上涨股票", f"{up_stocks}只", delta=f"{up_ratio:.1%}", delta_color="normal")
+            
+            with sentiment_col2:
+                down_ratio = basic_sentiment.get('down_ratio', 0)
+                st.metric("下跌股票", f"{down_stocks}只", delta=f"{down_ratio:.1%}", delta_color="inverse")
+            
+            with sentiment_col3:
+                limit_up = basic_sentiment.get('limit_up_stocks', 0)
+                limit_up_ratio = basic_sentiment.get('limit_up_ratio', 0)
+                st.metric("涨停股票", f"{limit_up}只", delta=f"{limit_up_ratio:.2%}", delta_color="normal")
+            
+            with sentiment_col4:
+                limit_down = basic_sentiment.get('limit_down_stocks', 0)
+                st.metric("跌停股票", f"{limit_down}只", delta_color="inverse")
+        
+        # 显示资金流向情绪
+        fund_flow = sentiment_data.get('fund_flow', {})
+        if fund_flow:
+            st.markdown("##### 💸 资金流向情绪")
+            fund_col1, fund_col2 = st.columns(2)
+            
+            with fund_col1:
+                main_inflow = fund_flow.get('main_net_inflow', 0)
+                inflow_text = f"{main_inflow/1e8:.1f}亿" if main_inflow else "N/A"
+                inflow_delta_color = "normal" if main_inflow > 0 else "inverse" if main_inflow < 0 else "off"
+                st.metric("主力净流入", inflow_text, delta_color=inflow_delta_color)
+            
+            with fund_col2:
+                main_ratio = fund_flow.get('main_net_ratio', 0)
+                ratio_text = f"{main_ratio:.2f}%" if main_ratio else "N/A"
+                ratio_delta_color = "normal" if main_ratio > 0 else "inverse" if main_ratio < 0 else "off"
+                st.metric("主力净流入占比", ratio_text, delta_color=ratio_delta_color)
+        
+        # 情绪分析解读
+        with st.expander("📊 情绪分析解读", expanded=True):
+            if 'sentiment_score' in sentiment_data and 'score_components' in sentiment_data:
+                components = sentiment_data['score_components']
+                
+                st.write("**评分构成分析：**")
+                for component, value in components.items():
+                    if component == 'ratio':
+                        desc = f"涨跌比例贡献: {value:.1f}分"
+                        if value > 10:
+                            desc += " (上涨股票占优)"
+                        elif value < -10:
+                            desc += " (下跌股票占优)"
+                        else:
+                            desc += " (涨跌相对均衡)"
+                    elif component == 'limit':
+                        desc = f"涨跌停贡献: {value:.1f}分"
+                        if value > 5:
+                            desc += " (涨停股票较多)"
+                        elif value < -5:
+                            desc += " (跌停股票较多)"
+                        else:
+                            desc += " (涨跌停均衡)"
+                    elif component == 'fund':
+                        desc = f"资金流向贡献: {value:.1f}分"
+                        if value > 10:
+                            desc += " (主力大幅净流入)"
+                        elif value < -10:
+                            desc += " (主力大幅净流出)"
+                        else:
+                            desc += " (资金流向相对平衡)"
+                    else:
+                        desc = f"{component}: {value:.1f}分"
+                    
+                    st.write(f"- {desc}")
+                
+                # 总体情绪判断
+                total_score = sentiment_data.get('sentiment_score', 0)
+                if total_score > 30:
+                    st.success("🚀 **市场情绪极度乐观** - 多数指标显示积极信号，适合关注强势股票")
+                elif total_score > 10:
+                    st.info("📈 **市场情绪偏乐观** - 整体向好，但需注意风险控制")
+                elif total_score > -10:
+                    st.warning("😐 **市场情绪中性** - 多空力量相对均衡，等待明确方向")
+                elif total_score > -30:
+                    st.warning("📉 **市场情绪偏悲观** - 下跌压力较大，注意防守")
+                else:
+                    st.error("💥 **市场情绪极度悲观** - 恐慌情绪浓厚，谨慎操作")
+        
+        # 数据源信息
+        data_source = basic_sentiment.get('data_source', '未知')
+        update_time = sentiment_data.get('update_time', basic_sentiment.get('update_time', ''))
+        if update_time:
+            st.caption(f"市场情绪数据获取时间: {update_time} | 数据源: {data_source}")
+
     st.markdown("#### 💳 融资融券数据")
     
     margin_data = get_market_tools().get_margin_data(use_cache=use_cache)
@@ -303,10 +437,12 @@ def display_market_summary(index_name='上证指数'):
     
     tech_data = result_data.get('technical_indicators', {})
     margin_data = get_market_tools().get_margin_data(use_cache=use_cache)
+    sentiment_data = get_market_tools().get_market_sentiment(use_cache=use_cache, comprehensive=True)
     
     score = 0
     total_indicators = 0
     
+    # 技术面评分
     if tech_data.get('ma_trend') == '多头排列':
         score += 1
     total_indicators += 1
@@ -315,12 +451,25 @@ def display_market_summary(index_name='上证指数'):
         score += 1
     total_indicators += 1
     
+    # 资金面评分  
     margin_balance = margin_data.get('margin_balance', 0)
     if margin_balance and margin_balance > 15000:
         score += 1
     elif margin_balance and margin_balance > 12000:
         score += 0.5
     total_indicators += 1
+    
+    # 情绪面评分
+    if sentiment_data and 'sentiment_score' in sentiment_data:
+        sentiment_score = sentiment_data.get('sentiment_score', 0)
+        if sentiment_score > 20:
+            score += 1
+        elif sentiment_score > 0:
+            score += 0.5
+        elif sentiment_score > -20:
+            score += 0.25
+        # 负分不加分
+        total_indicators += 1
     
     if total_indicators > 0:
         rating_ratio = score / total_indicators
@@ -336,6 +485,40 @@ def display_market_summary(index_name='上证指数'):
             rating = "🔴 弱势"
         
         st.write(f"市场综合评级: {rating} (评分: {score:.1f}/{total_indicators})")
+        
+        # 显示各维度贡献
+        with st.expander("📊 评级构成详情", expanded=False):
+            st.write("**各维度评分贡献：**")
+            
+            # 技术面
+            tech_score = 0
+            if tech_data.get('ma_trend') == '多头排列':
+                tech_score += 1
+            if tech_data.get('macd_trend') == '金叉向上':
+                tech_score += 1
+            st.write(f"- 📈 技术面: {tech_score}/2")
+            
+            # 资金面
+            fund_score = 0
+            if margin_balance and margin_balance > 15000:
+                fund_score = 1
+            elif margin_balance and margin_balance > 12000:
+                fund_score = 0.5
+            st.write(f"- 💳 资金面: {fund_score}/1")
+            
+            # 情绪面
+            if sentiment_data and 'sentiment_score' in sentiment_data:
+                sentiment_score = sentiment_data.get('sentiment_score', 0)
+                emotion_score = 0
+                if sentiment_score > 20:
+                    emotion_score = 1
+                elif sentiment_score > 0:
+                    emotion_score = 0.5
+                elif sentiment_score > -20:
+                    emotion_score = 0.25
+                st.write(f"- 😊 情绪面: {emotion_score}/1 (评分: {sentiment_score:.1f})")
+            else:
+                st.write(f"- 😊 情绪面: 数据缺失")
     else:
         st.write("市场综合评级: 数据不足")
 

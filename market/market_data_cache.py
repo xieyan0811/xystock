@@ -131,6 +131,7 @@ class MarketDataCache:
         # 缓存配置
         self.cache_configs = {
             'market_sentiment': {'expire_minutes': 15, 'description': '市场情绪指标', 'index_specific': False},
+            'comprehensive_sentiment': {'expire_minutes': 15, 'description': '综合市场情绪分析', 'index_specific': False},
             'valuation_data': {'expire_minutes': 1440, 'description': '估值指标', 'index_specific': False},
             'money_flow_data': {'expire_minutes': 43200, 'description': '资金流向指标', 'index_specific': False},
             'margin_data': {'expire_minutes': 60, 'description': '融资融券数据', 'index_specific': False},

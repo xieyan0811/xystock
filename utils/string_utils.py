@@ -18,18 +18,31 @@
 import re
 from typing import Dict, Any
 
-def remove_markdown_format(text: str) -> str:
+def remove_markdown_format(text: str, only_headers: bool = False) -> str:
     """
     去除markdown文本的格式，输入字符串，输出纯文本字符串
     
     Args:
         text (str): 包含markdown格式的文本
+        only_headers (bool): 如果为True，只去除标题符号；如果为False，去除所有格式
         
     Returns:
         str: 去除markdown格式后的纯文本
     """
     if not text or not isinstance(text, str):
         return ""
+    
+    # 移除标题 # ## ### 等
+    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    
+    # 如果只处理标题，直接返回
+    if only_headers:
+        # 将标题符号替换为粗体格式
+        text = re.sub(r'^#{1,6}\s*(.+)$', r'**\1**', text, flags=re.MULTILINE)
+        return text.strip()
+    else:
+        # 移除标题符号
+        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
     
     # 移除代码块 ```
     text = re.sub(r'```[\s\S]*?```', '', text)
@@ -47,9 +60,6 @@ def remove_markdown_format(text: str) -> str:
     
     # 移除删除线 ~~text~~
     text = re.sub(r'~~([^~]+)~~', r'\1', text)
-    
-    # 移除标题 # ## ### 等
-    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
     
     # 移除图片 ![alt](url) - 需要在链接处理之前
     text = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', text)

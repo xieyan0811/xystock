@@ -24,36 +24,155 @@ from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
 from utils.kline_cache import cache_manager, KLineData
 
 def fetch_market_sentiment() -> Dict:
-    """获取市场情绪数据"""
+    """获取市场情绪数据 - 优化版本，避免频繁请求导致IP被封"""
     sentiment_data = {}
+    
+    # 方法1：使用乐咕乐股的市场活跃度数据（推荐）
     try:
-        # 1. 涨跌家数统计
-        print("   获取涨跌家数...")
-        df_stocks = ef.stock.get_realtime_quotes()
-        df_stocks = df_stocks.dropna(subset=['涨跌幅'])
-        df_stocks["涨跌幅"] = pd.to_numeric(df_stocks["涨跌幅"], errors="coerce")
+        print("   获取市场活跃度数据...")
+        df_activity = ak.stock_market_activity_legu()
         
-        up_count = (df_stocks["涨跌幅"] > 0).sum()
-        down_count = (df_stocks["涨跌幅"] < 0).sum()
-        flat_count = (df_stocks["涨跌幅"] == 0).sum()
-        total_count = len(df_stocks)
-        
-        sentiment_data.update({
-            'up_stocks': int(up_count),
-            'down_stocks': int(down_count),
-            'flat_stocks': int(flat_count),
-            'total_stocks': int(total_count),
-            'up_ratio': float(up_count / total_count) if total_count > 0 else 0,
-            'down_ratio': float(down_count / total_count) if total_count > 0 else 0,
-        })
-        
-        print(f"      上涨: {up_count} | 下跌: {down_count} | 平盘: {flat_count}")
-        
-    except Exception as e:
-        print(f"   ❌ 获取涨跌家数失败: {e}")
+        if not df_activity.empty:
+            # 转换为字典格式便于处理
+            activity_dict = dict(zip(df_activity['item'], df_activity['value']))
             
+            up_count = int(activity_dict.get('上涨', 0))
+            down_count = int(activity_dict.get('下跌', 0))
+            flat_count = int(activity_dict.get('平盘', 0))
+            limit_up = int(activity_dict.get('涨停', 0))
+            limit_down = int(activity_dict.get('跌停', 0))
+            real_limit_up = int(activity_dict.get('真实涨停', 0))
+            real_limit_down = int(activity_dict.get('真实跌停', 0))
+            suspended = int(activity_dict.get('停牌', 0))
+            
+            total_count = up_count + down_count + flat_count
+            
+            sentiment_data.update({
+                'up_stocks': up_count,
+                'down_stocks': down_count,
+                'flat_stocks': flat_count,
+                'limit_up_stocks': limit_up,
+                'limit_down_stocks': limit_down,
+                'real_limit_up_stocks': real_limit_up,
+                'real_limit_down_stocks': real_limit_down,
+                'suspended_stocks': suspended,
+                'total_stocks': total_count,
+                'up_ratio': float(up_count / total_count) if total_count > 0 else 0,
+                'down_ratio': float(down_count / total_count) if total_count > 0 else 0,
+                'limit_up_ratio': float(limit_up / total_count) if total_count > 0 else 0,
+                'data_source': '乐咕乐股-市场活跃度'
+            })
+            
+            print(f"      上涨: {up_count} | 下跌: {down_count} | 平盘: {flat_count}")
+            print(f"      涨停: {limit_up} | 跌停: {limit_down} | 停牌: {suspended}")
+            
+    except Exception as e:
+        print(f"   ❌ 获取市场活跃度数据失败: {e}")
+        
+        # 方法2：备用方案 - 从概念板块汇总数据中获取（速度更快）
+        try:
+            print("   使用备用方案：概念板块数据汇总...")
+            df_concept = ak.stock_board_concept_name_em()
+            
+            if not df_concept.empty:
+                # 汇总所有板块的上涨下跌家数
+                total_up = df_concept['上涨家数'].sum()
+                total_down = df_concept['下跌家数'].sum()
+                
+                # 估算总股票数（可能有重复计算，但能给出大致比例）
+                total_estimated = total_up + total_down
+                
+                sentiment_data.update({
+                    'up_stocks': int(total_up),
+                    'down_stocks': int(total_down),
+                    'flat_stocks': 0,  # 板块数据中没有平盘信息
+                    'total_stocks': int(total_estimated),
+                    'up_ratio': float(total_up / total_estimated) if total_estimated > 0 else 0,
+                    'down_ratio': float(total_down / total_estimated) if total_estimated > 0 else 0,
+                    'data_source': '东方财富-概念板块汇总'
+                })
+                
+                print(f"      上涨: {total_up} | 下跌: {total_down} (来自板块汇总)")
+                
+        except Exception as e2:
+            print(f"   ❌ 备用方案也失败: {e2}")
+            
+            # 方法3：最后备用方案 - 从大盘资金流向推断市场情绪
+            try:
+                print("   使用最后备用方案：大盘资金流向数据...")
+                df_fund = ak.stock_market_fund_flow()
+                
+                if not df_fund.empty:
+                    latest_fund = df_fund.iloc[-1]
+                    main_net_inflow = float(latest_fund.get('主力净流入-净额', 0))
+                    main_net_ratio = float(latest_fund.get('主力净流入-净占比', 0))
+                    
+                    # 根据资金流向推断市场情绪
+                    if main_net_ratio > 1:
+                        market_mood = 'bullish'
+                    elif main_net_ratio < -1:
+                        market_mood = 'bearish' 
+                    else:
+                        market_mood = 'neutral'
+                    
+                    sentiment_data.update({
+                        'main_net_inflow': main_net_inflow,
+                        'main_net_ratio': main_net_ratio,
+                        'market_mood': market_mood,
+                        'data_source': '东方财富-大盘资金流向'
+                    })
+                    
+                    print(f"      主力净流入: {main_net_inflow/1e8:.2f}亿 ({main_net_ratio:.2f}%)")
+                    
+            except Exception as e3:
+                print(f"   ❌ 所有备用方案都失败: {e3}")
+                sentiment_data['error'] = f"所有数据源都失败: {str(e)}, {str(e2)}, {str(e3)}"
+    
     sentiment_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return sentiment_data
+
+
+def fetch_limit_stocks_data() -> Dict:
+    """获取涨跌停股票详细数据"""
+    limit_data = {}
+    
+    try:
+        print("   获取涨跌停股票详情...")
+        
+        # 获取涨停股票
+        try:
+            df_limit_up = ak.stock_zt_pool_em(date=datetime.now().strftime('%Y%m%d'))
+            limit_up_count = len(df_limit_up) if not df_limit_up.empty else 0
+            
+            # 分析涨停原因分布
+            if not df_limit_up.empty and '涨停原因' in df_limit_up.columns:
+                reason_counts = df_limit_up['涨停原因'].value_counts().head(5).to_dict()
+                limit_data['limit_up_reasons'] = {str(k): int(v) for k, v in reason_counts.items()}
+            
+            limit_data['limit_up_detail_count'] = limit_up_count
+            print(f"      详细涨停股票: {limit_up_count}只")
+            
+        except Exception as e:
+            print(f"      ⚠️ 获取涨停详情失败: {e}")
+            limit_data['limit_up_detail_count'] = 0
+        
+        # 获取跌停股票  
+        try:
+            df_limit_down = ak.stock_zt_pool_dtgc_em(date=datetime.now().strftime('%Y%m%d'))
+            limit_down_count = len(df_limit_down) if not df_limit_down.empty else 0
+            limit_data['limit_down_detail_count'] = limit_down_count
+            print(f"      详细跌停股票: {limit_down_count}只")
+            
+        except Exception as e:
+            print(f"      ⚠️ 获取跌停详情失败: {e}")
+            limit_data['limit_down_detail_count'] = 0
+            
+    except Exception as e:
+        print(f"   ❌ 获取涨跌停数据失败: {e}")
+        limit_data['error'] = str(e)
+    
+    limit_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return limit_data
 
 
 def fetch_valuation_data(debug=False) -> Dict:
@@ -382,6 +501,107 @@ def batch_update_indices_cache(indices: list = None, period: int = 250) -> Dict:
     
     print(f"   ✓ 批量更新完成: 成功 {results['success_count']} 个，失败 {results['failed_count']} 个")
     return results
+
+
+def fetch_comprehensive_market_sentiment() -> Dict:
+    """获取综合市场情绪分析数据"""
+    print("🎯 获取综合市场情绪分析...")
+    
+    comprehensive_data = {
+        'sentiment_score': 0,  # 情绪评分 -100到100
+        'sentiment_level': 'neutral',  # 情绪等级: bearish, neutral, bullish
+        'confidence': 0,  # 数据可信度 0-100
+    }
+    
+    # 1. 基础涨跌家数数据
+    sentiment_data = fetch_market_sentiment()
+    comprehensive_data['basic_sentiment'] = sentiment_data
+    
+    # 2. 涨跌停详细数据  
+    limit_data = fetch_limit_stocks_data()
+    comprehensive_data['limit_analysis'] = limit_data
+    
+    # 3. 大盘资金流向数据
+    try:
+        print("   获取资金流向数据...")
+        df_fund = ak.stock_market_fund_flow()
+        if not df_fund.empty:
+            latest_fund = df_fund.iloc[-1]
+            fund_data = {
+                'main_net_inflow': float(latest_fund.get('主力净流入-净额', 0)),
+                'main_net_ratio': float(latest_fund.get('主力净流入-净占比', 0)),
+                'super_large_inflow': float(latest_fund.get('超大单净流入-净额', 0)),
+                'large_inflow': float(latest_fund.get('大单净流入-净额', 0)),
+                'date': str(latest_fund.get('日期', datetime.now().strftime('%Y-%m-%d')))
+            }
+            comprehensive_data['fund_flow'] = fund_data
+            print(f"      主力净流入: {fund_data['main_net_inflow']/1e8:.2f}亿 ({fund_data['main_net_ratio']:.2f}%)")
+    except Exception as e:
+        print(f"   ❌ 获取资金流向失败: {e}")
+        comprehensive_data['fund_flow'] = {}
+    
+    # 4. 计算综合情绪评分
+    try:
+        score_components = []
+        
+        # 基于涨跌比例的评分 (-40到40分)
+        if sentiment_data.get('up_ratio', 0) > 0:
+            up_ratio = sentiment_data['up_ratio']
+            ratio_score = (up_ratio - 0.5) * 80  # 50%为中性，转换为-40到40分
+            score_components.append(('ratio', ratio_score))
+        
+        # 基于涨停跌停比例的评分 (-20到20分)
+        limit_up = sentiment_data.get('limit_up_stocks', 0)
+        limit_down = sentiment_data.get('limit_down_stocks', 0)
+        total_stocks = sentiment_data.get('total_stocks', 1)
+        
+        if total_stocks > 0:
+            limit_score = ((limit_up - limit_down) / total_stocks) * 1000  # 放大1000倍
+            limit_score = max(-20, min(20, limit_score))  # 限制在-20到20分
+            score_components.append(('limit', limit_score))
+        
+        # 基于资金流向的评分 (-40到40分)
+        if 'fund_flow' in comprehensive_data and comprehensive_data['fund_flow']:
+            main_ratio = comprehensive_data['fund_flow'].get('main_net_ratio', 0)
+            fund_score = max(-40, min(40, main_ratio * 10))  # 4%主力净流入为满分
+            score_components.append(('fund', fund_score))
+        
+        # 计算总分
+        total_score = sum(score for _, score in score_components)
+        comprehensive_data['sentiment_score'] = round(total_score, 2)
+        comprehensive_data['score_components'] = dict(score_components)
+        
+        # 确定情绪等级
+        if total_score > 20:
+            comprehensive_data['sentiment_level'] = 'bullish'
+        elif total_score < -20:
+            comprehensive_data['sentiment_level'] = 'bearish' 
+        else:
+            comprehensive_data['sentiment_level'] = 'neutral'
+        
+        # 计算数据可信度
+        data_sources = 0
+        if sentiment_data.get('data_source'):
+            data_sources += 1
+        if comprehensive_data.get('fund_flow'):
+            data_sources += 1
+        if limit_data.get('limit_up_detail_count', 0) > 0:
+            data_sources += 1
+            
+        comprehensive_data['confidence'] = min(100, data_sources * 30 + 10)
+        
+        print(f"   ✓ 综合情绪评分: {total_score:.1f} ({comprehensive_data['sentiment_level']})")
+        
+    except Exception as e:
+        print(f"   ❌ 计算情绪评分失败: {e}")
+        comprehensive_data['sentiment_score'] = 0
+        comprehensive_data['sentiment_level'] = 'unknown'
+        comprehensive_data['confidence'] = 0
+    
+    comprehensive_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print("   ✓ 综合市场情绪分析完成")
+    
+    return comprehensive_data
 
 
 def fetch_index_technical_indicators(index_name: str = '上证指数', period: int = 100) -> Dict:

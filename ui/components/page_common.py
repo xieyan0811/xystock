@@ -7,6 +7,8 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from utils.format_utils import format_price
+from utils.data_formatters import format_risk_metrics
+from utils.string_utils import remove_markdown_format
 
 def display_technical_indicators(tech_data):
     """显示技术指标分析卡片"""
@@ -162,10 +164,24 @@ def display_risk_analysis(risk_metrics):
     """显示风险分析"""
     if risk_metrics is None or 'error' in risk_metrics:
         st.error(f"获取风险指标失败: {risk_metrics.get('error', '未知错误')}")
-    elif risk_metrics and 'summary_table' in risk_metrics:
-        with st.expander("📊 风险分析", expanded=True):
+        return
+    
+    # 尝试使用格式化的风险指标文本
+    formatted_risk_text = format_risk_metrics(risk_metrics)
+    
+    if formatted_risk_text:
+        # 显示格式化的风险分析文本
+        with st.expander("⚠️ 详细风险分析", expanded=True):
+            formatted_risk_text = remove_markdown_format(formatted_risk_text, only_headers=True)
+            st.markdown(formatted_risk_text)
+    
+    # 如果有summary_table，也显示表格形式
+    if risk_metrics and 'summary_table' in risk_metrics:
+        with st.expander("📊 风险分析表格", expanded=False):
             st.table(risk_metrics['summary_table'])
-    elif 'error' not in risk_metrics:
+    
+    # 如果以上都没有，显示原始数据
+    elif not formatted_risk_text and 'error' not in risk_metrics:
         with st.expander("📊 风险分析摘要", expanded=True):
             st.json(risk_metrics)
 
