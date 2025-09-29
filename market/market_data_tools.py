@@ -279,6 +279,61 @@ class MarketTools:
             traceback.print_exc()
             return self.cache_manager.get_cached_data(data_type, index_name) if use_cache else {}
 
+    def get_index_kline_data(self, index_name: str, period: int = 160, use_cache: bool = True, force_refresh: bool = False) -> Dict:
+        """获取指数K线数据用于绘图
+        
+        Args:
+            index_name: 指数名称，如'上证指数'
+            period: 获取的数据条数
+            use_cache: 是否使用缓存
+            force_refresh: 是否强制刷新
+            
+        Returns:
+            Dict: 包含K线数据的字典，格式为 {'kline_data': list, 'indicators': dict, 'error': str}
+        """
+        try:
+            # 使用统一的K线数据管理器
+            from market.kline_data_manager import get_kline_manager
+            
+            manager = get_kline_manager()
+            df, from_cache = manager.get_index_kline_data(
+                index_name, 
+                period=period, 
+                use_cache=use_cache, 
+                force_refresh=force_refresh,
+                for_technical_analysis=False
+            )
+            
+            # 添加均线
+            df = manager.add_moving_averages(df)
+            
+            # 获取技术指标
+            indicators = self.get_index_technical_indicators(index_name, use_cache, force_refresh)
+            
+            # 确定数据来源
+            data_source = 'cache' if from_cache else 'network'
+            update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            return {
+                'kline_data': df.to_dict('records'),
+                'indicators': indicators,
+                'data_source': data_source,
+                'update_time': update_time
+            }
+        except Exception as e:
+            print(f"❌ 处理K线数据失败: {e}")
+            return {'error': f"处理K线数据失败: {str(e)}"}
+
+    def _add_moving_averages(self, df):
+        """为DataFrame添加移动平均线（已废弃，使用KLineDataManager中的方法）"""
+        try:
+            from market.kline_data_manager import get_kline_manager
+            manager = get_kline_manager()
+            return manager.add_moving_averages(df)
+        except Exception as e:
+            print(f"❌ 计算均线失败: {e}")
+            return df
+
     def _convert_numpy_types(self, data):
         """递归转换numpy类型为Python原生类型"""
         import numpy as np

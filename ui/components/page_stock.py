@@ -297,88 +297,7 @@ def display_basic_info(stock_identity):
         st.error(f"获取基本信息失败: {str(e)}")
 
 
-def display_kline_charts(df):
-    """显示K线图和成交量图表"""
-    # 转换日期格式
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    
-    # K线图与均线
-    fig_price = go.Figure()
-    
-    # 添加K线图
-    fig_price.add_trace(go.Candlestick(
-        x=df['datetime'],
-        open=df['open'], 
-        high=df['high'],
-        low=df['low'], 
-        close=df['close'],
-        name='K线',
-        increasing_line_color="#DA1A10",
-        decreasing_line_color="#14AA06",
-        increasing_fillcolor="#F51D12",
-        decreasing_fillcolor="#1BCC0B"
-    ))
-    
-    # 添加均线
-    fig_price.add_trace(go.Scatter(
-        x=df['datetime'], 
-        y=df['MA5'],
-        mode='lines',
-        name='MA5',
-        line=dict(color="#D2FF07", width=1.5)
-    ))
-    
-    fig_price.add_trace(go.Scatter(
-        x=df['datetime'], 
-        y=df['MA10'],
-        mode='lines',
-        name='MA10',
-        line=dict(color="#FF22DA", width=1.5)
-    ))
-    
-    fig_price.add_trace(go.Scatter(
-        x=df['datetime'], 
-        y=df['MA20'],
-        mode='lines',
-        name='MA20',
-        line=dict(color="#0593F1", width=1.5)
-    ))
-    
-    # 设置K线图布局
-    fig_price.update_layout(
-        title='K线图与均线',
-        xaxis_title='日期',
-        yaxis_title='价格',
-        height=500,
-        margin=dict(l=0, r=0, t=40, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(rangeslider=dict(visible=False)),
-        yaxis=dict(fixedrange=True)
-    )
-    
-    st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
-    
-    # 成交量图
-    fig_volume = go.Figure()
-    
-    fig_volume.add_trace(go.Bar(
-        x=df['datetime'], 
-        y=df['volume'],
-        name='成交量',
-        marker=dict(color='#90CAF9')
-    ))
-    
-    fig_volume.update_layout(
-        title='成交量',
-        xaxis_title='日期',
-        yaxis_title='成交量',
-        height=250,
-        margin=dict(l=0, r=0, t=40, b=0),
-        xaxis=dict(rangeslider=dict(visible=False)),
-        yaxis=dict(fixedrange=True)
-    )
-    
-    st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
+
 
 
 def display_ai_market_analysis(kline_info, stock_code):
@@ -448,7 +367,9 @@ def display_market_trend(stock_identity):
             display_risk_analysis(risk_metrics)
             
             # 显示K线图和成交量图
-            display_kline_charts(df)
+            from ui.components.page_common import display_kline_charts
+            stock_name = stock_identity.get('name', stock_identity.get('code', ''))
+            display_kline_charts(df, chart_type="stock", title_prefix=stock_name)
             
             # 显示技术指标分析
             st.markdown("---")

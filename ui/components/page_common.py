@@ -1,6 +1,8 @@
 import streamlit as st
 import sys
 import os
+import pandas as pd
+import plotly.graph_objects as go
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -184,4 +186,104 @@ def display_risk_analysis(risk_metrics):
     elif not formatted_risk_text and 'error' not in risk_metrics:
         with st.expander("📊 风险分析摘要", expanded=True):
             st.json(risk_metrics)
+
+
+def display_kline_charts(df, chart_type="stock", title_prefix=""):
+    """
+    统一的K线图和成交量图表显示函数
+    
+    Args:
+        df: 包含K线数据的DataFrame，必须包含 datetime, open, high, low, close, volume 列
+        chart_type: 图表类型，"stock"表示股票，"index"表示指数
+        title_prefix: 标题前缀，如股票名称或指数名称
+    """
+    if df is None or df.empty:
+        st.warning("无K线数据可显示")
+        return
+    
+    # 转换日期格式
+    df = df.copy()
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    
+    # 根据类型设置标题和Y轴标签
+    if chart_type == "index":
+        price_title = f"{title_prefix}指数K线图与均线" if title_prefix else "指数K线图与均线"
+        yaxis_title = "指数点位"
+    else:
+        price_title = f"{title_prefix}K线图与均线" if title_prefix else "K线图与均线"
+        yaxis_title = "价格"
+    
+    # K线图与均线
+    fig_price = go.Figure()
+    
+    # 添加K线图
+    fig_price.add_trace(go.Candlestick(
+        x=df['datetime'],
+        open=df['open'], 
+        high=df['high'],
+        low=df['low'], 
+        close=df['close'],
+        name='K线',
+        increasing_line_color="#DA1A10",
+        decreasing_line_color="#14AA06",
+        increasing_fillcolor="#F51D12",
+        decreasing_fillcolor="#1BCC0B"
+    ))
+    
+    # 添加均线（如果存在）
+    ma_lines = [
+        ('MA5', '#D2FF07'),
+        ('MA10', '#FF22DA'), 
+        ('MA20', '#0593F1'),
+        ('MA60', '#FFA500')
+    ]
+    
+    for ma_name, color in ma_lines:
+        if ma_name in df.columns and not df[ma_name].isna().all():
+            fig_price.add_trace(go.Scatter(
+                x=df['datetime'], 
+                y=df[ma_name],
+                mode='lines',
+                name=ma_name,
+                line=dict(color=color, width=1.5)
+            ))
+    
+    # 设置K线图布局
+    fig_price.update_layout(
+        title=price_title,
+        xaxis_title='日期',
+        yaxis_title=yaxis_title,
+        height=500,
+        margin=dict(l=0, r=0, t=40, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(rangeslider=dict(visible=False)),
+        yaxis=dict(fixedrange=True)
+    )
+    
+    st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
+    
+    # 成交量图
+    if 'volume' in df.columns and not df['volume'].isna().all():
+        fig_volume = go.Figure()
+        
+        fig_volume.add_trace(go.Bar(
+            x=df['datetime'], 
+            y=df['volume'],
+            name='成交量',
+            marker=dict(color='#90CAF9')
+        ))
+        
+        fig_volume.update_layout(
+            title='成交量',
+            xaxis_title='日期',
+            yaxis_title='成交量',
+            height=250,
+            margin=dict(l=0, r=0, t=40, b=0),
+            xaxis=dict(rangeslider=dict(visible=False)),
+            yaxis=dict(fixedrange=True)
+        )
+        
+        st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
+    else:
+        st.info("暂无成交量数据")
 

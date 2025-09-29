@@ -7,6 +7,7 @@ import datetime
 import sys
 import os
 import pandas as pd
+import plotly.graph_objects as go
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -17,6 +18,9 @@ from market.market_data_tools import get_market_tools
 from market.market_report import generate_market_report
 from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
+
+
+
 
 def display_market_fundamentals(index_name='沪深300'):
     """显示市场基本面分析"""
@@ -712,6 +716,44 @@ def display_market_overview():
                         display_market_indices()
                     
                     with tab2:
+                        # 显示K线图
+                        st.subheader(f"{current_index} K线走势")
+                        try:
+                            use_cache = st.session_state.get('market_use_cache', True)
+                            force_refresh = not use_cache
+                            market_tools = get_market_tools()
+                            
+                            # 获取K线数据
+                            kline_info = market_tools.get_index_kline_data(
+                                current_index, 
+                                period=160, 
+                                use_cache=use_cache, 
+                                force_refresh=force_refresh
+                            )
+                            
+                            if 'error' in kline_info:
+                                st.error(f"获取K线数据失败: {kline_info['error']}")
+                            elif kline_info and kline_info.get('kline_data'):
+                                df = pd.DataFrame(kline_info['kline_data'])
+                                
+                                # 显示K线图和成交量图
+                                from ui.components.page_common import display_kline_charts
+                                display_kline_charts(df, chart_type="index", title_prefix=current_index)
+                                
+                                # 显示数据来源信息
+                                data_source = kline_info.get('data_source', '未知')
+                                update_time = kline_info.get('update_time', '')
+                                if update_time:
+                                    st.caption(f"数据来源: {data_source} | 更新时间: {update_time}")
+                            else:
+                                st.warning(f"未获取到 {current_index} 的K线数据")
+                        
+                        except Exception as e:
+                            st.error(f"加载K线数据失败: {str(e)}")
+                        
+                        # 显示技术指标分析
+                        st.markdown("---")
+                        st.subheader("技术指标分析")
                         # 使用统一的技术指标显示函数
                         from ui.components.page_common import display_technical_analysis_tab, display_risk_analysis
                         display_technical_analysis_tab(index_name=current_index)

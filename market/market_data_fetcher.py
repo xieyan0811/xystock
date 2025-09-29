@@ -21,7 +21,7 @@ import pandas as pd
 import efinance as ef
 from stock.stock_utils import get_indicators
 from ui.config import FOCUS_INDICES, INDEX_SYMBOL_MAPPING
-from utils.kline_cache import cache_manager, KLineData
+from market.kline_data_manager import get_kline_manager
 
 def fetch_market_sentiment() -> Dict:
     """获取市场情绪数据 - 优化版本，避免频繁请求导致IP被封"""
@@ -419,88 +419,14 @@ def fetch_margin_data_unified(include_historical: bool = False) -> Dict:
 
 def update_index_cache_data(index_name: str = '上证指数', period: int = 250) -> bool:
     """更新指数缓存数据（用于定期更新缓存）"""
-    print(f"🔄 更新{index_name}缓存数据...")
-    
-    try:
-        if index_name not in INDEX_SYMBOL_MAPPING:
-            raise ValueError(f"不支持的指数名称: {index_name}")
-        
-        symbol = INDEX_SYMBOL_MAPPING[index_name]
-        df_raw = ak.stock_zh_index_daily(symbol=symbol)
-        
-        if df_raw.empty:
-            raise ValueError(f"无法获取{index_name}数据")
-        
-        # 取最近的period条数据
-        df_raw = df_raw.tail(period).copy()
-        
-        # 数据类型转换
-        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-        for col in numeric_columns:
-            if col in df_raw.columns:
-                df_raw[col] = pd.to_numeric(df_raw[col], errors='coerce')
-        
-        # 确保date列是日期时间格式
-        if 'date' in df_raw.columns:
-            df_raw['date'] = pd.to_datetime(df_raw['date'])
-        
-        # 转换数据格式用于缓存
-        kline_data_list = []
-        for _, row in df_raw.iterrows():
-            # 使用date列作为日期
-            if 'date' in df_raw.columns:
-                date_str = row['date'].strftime('%Y-%m-%d')
-            else:
-                # 备用方案
-                date_str = datetime.now().strftime('%Y-%m-%d')
-            
-            kline_data = KLineData(
-                symbol=index_name,
-                datetime=date_str,
-                open=float(row['open']),
-                high=float(row['high']),
-                low=float(row['low']),
-                close=float(row['close']),
-                volume=int(row['volume']),
-                amount=None,
-                data_type="index"
-            )
-            kline_data_list.append(kline_data)
-        
-        # 更新缓存（智能合并）
-        cache_manager.update_index_kline(index_name, kline_data_list)
-        
-        print(f"   ✓ 成功更新{index_name}缓存数据: {len(kline_data_list)}条")
-        return True
-        
-    except Exception as e:
-        print(f"   ❌ 更新{index_name}缓存数据失败: {e}")
-        return False
+    manager = get_kline_manager()
+    return manager.update_index_cache(index_name, period)
 
 
 def batch_update_indices_cache(indices: list = None, period: int = 250) -> Dict:
     """批量更新指数缓存数据"""
-    if indices is None:
-        indices = FOCUS_INDICES
-    
-    print(f"📊 批量更新指数缓存数据 ({len(indices)}个指数)...")
-    
-    results = {
-        'success_count': 0,
-        'failed_count': 0,
-        'results': {}
-    }
-    
-    for index_name in indices:
-        success = update_index_cache_data(index_name, period)
-        results['results'][index_name] = success
-        if success:
-            results['success_count'] += 1
-        else:
-            results['failed_count'] += 1
-    
-    print(f"   ✓ 批量更新完成: 成功 {results['success_count']} 个，失败 {results['failed_count']} 个")
-    return results
+    manager = get_kline_manager()
+    return manager.batch_update_indices_cache(indices, period)
 
 
 def fetch_comprehensive_market_sentiment() -> Dict:
@@ -612,81 +538,15 @@ def fetch_index_technical_indicators(index_name: str = '上证指数', period: i
         if index_name not in INDEX_SYMBOL_MAPPING:
             raise ValueError(f"不支持的指数名称: {index_name}")
         
-        # 先尝试从缓存获取数据
-        cached_data = cache_manager.get_cached_index_kline(index_name, period)
-        
-        if cached_data and len(cached_data) >= period:
-            print(f"   ✓ 使用缓存数据: {index_name} ({len(cached_data)}条)")
-            
-            # 将缓存数据转换为DataFrame
-            kline_records = []
-            for kdata in cached_data:
-                kline_records.append({
-                    'date': kdata.datetime.split()[0],  # 只取日期部分
-                    'open': kdata.open,
-                    'high': kdata.high,
-                    'low': kdata.low,
-                    'close': kdata.close,
-                    'volume': kdata.volume
-                })
-            
-            df = pd.DataFrame(kline_records)
-            df['date'] = pd.to_datetime(df['date'])
-            # 设置date列为索引，用于技术指标计算
-            df = df.set_index('date')
-            
-        else:
-            print(f"   获取最新数据: {index_name}")
-            symbol = INDEX_SYMBOL_MAPPING[index_name]
-            df_raw = ak.stock_zh_index_daily(symbol=symbol)
-            
-            if df_raw.empty:
-                raise ValueError(f"无法获取{index_name}数据")
-            
-            # 取最近的period条数据
-            df_raw = df_raw.tail(period * 2).copy()  # 多取一些数据以备缓存
-            
-            # 数据类型转换
-            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-            for col in numeric_columns:
-                if col in df_raw.columns:
-                    df_raw[col] = pd.to_numeric(df_raw[col], errors='coerce')
-            
-            # 确保date列是日期时间格式
-            if 'date' in df_raw.columns:
-                df_raw['date'] = pd.to_datetime(df_raw['date'])
-            
-            # 转换数据格式用于缓存
-            kline_data_list = []
-            for _, row in df_raw.iterrows():
-                # 使用date列作为日期
-                if 'date' in df_raw.columns:
-                    date_str = row['date'].strftime('%Y-%m-%d')
-                else:
-                    # 备用方案
-                    date_str = datetime.now().strftime('%Y-%m-%d')
-                
-                kline_data = KLineData(
-                    symbol=index_name,
-                    datetime=date_str,
-                    open=float(row['open']),
-                    high=float(row['high']),
-                    low=float(row['low']),
-                    close=float(row['close']),
-                    volume=int(row['volume']),
-                    amount=None,
-                    data_type="index"
-                )
-                kline_data_list.append(kline_data)
-            
-            # 缓存数据
-            cache_manager.cache_index_kline(index_name, kline_data_list)
-            
-            # 准备用于计算指标的DataFrame  
-            df = df_raw.tail(period).copy()
-            # 设置date列为索引，用于技术指标计算
-            if 'date' in df.columns:
-                df = df.set_index('date')
+        # 使用统一的K线数据管理器获取数据
+        manager = get_kline_manager()
+        df, from_cache = manager.get_index_kline_data(
+            index_name, 
+            period=period, 
+            use_cache=True, 
+            force_refresh=False, 
+            for_technical_analysis=True
+        )
         
         # 计算技术指标
         indicators = get_indicators(df)
