@@ -4,7 +4,6 @@
 
 import sys
 import os
-import datetime
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
@@ -55,10 +54,10 @@ def display_stock_info(stock_identity):
                 display_basic_info(stock_identity)
                 
             with tab2:
-                display_market_trend(stock_identity)
+                display_technical_analysis(stock_identity)
                                 
             with tab3:
-                display_news(stock_identity)
+                display_news_analysis(stock_identity)
 
             with tab4:
                 display_chips_analysis(stock_identity)
@@ -215,9 +214,6 @@ def display_basic_info(stock_identity):
         st.error(f"获取基本信息失败: {str(e)}")
 
 
-
-
-
 def display_ai_market_analysis(kline_info, stock_code):
     """显示AI行情分析报告"""
     if "ai_market_report" not in st.session_state:
@@ -239,9 +235,9 @@ def display_ai_market_analysis(kline_info, stock_code):
             st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
 
 
-def display_market_trend(stock_identity):
-    """显示股票行情走势"""
-    st.subheader("行情走势")
+def display_technical_analysis(stock_identity):
+    """显示股票技术分析"""
+    st.subheader("技术分析")
     stock_code = stock_identity['code']
     
     try:
@@ -278,22 +274,20 @@ def display_market_trend(stock_identity):
             
             # 显示AI分析报告
             display_ai_market_analysis(kline_info, stock_code)
-            
-            # 显示风险分析
-            risk_metrics = kline_info.get('risk_metrics', None)
-            from ui.components.page_common import display_risk_analysis
-            display_risk_analysis(risk_metrics)
-            
+                        
             # 显示K线图和成交量图
             from ui.components.page_common import display_kline_charts
             stock_name = stock_identity.get('name', stock_identity.get('code', ''))
             display_kline_charts(df, chart_type="stock", title_prefix=stock_name)
             
             # 显示技术指标分析
-            st.markdown("---")
-            st.subheader("技术指标分析")
             from ui.components.page_common import display_technical_analysis_tab
             display_technical_analysis_tab(stock_identity=stock_identity)
+
+            # 显示风险分析
+            risk_metrics = kline_info.get('risk_metrics', None)
+            from ui.components.page_common import display_risk_analysis
+            display_risk_analysis(risk_metrics)
 
         else:
             st.warning(f"未获取到 {stock_code} 的K线数据")
@@ -302,7 +296,7 @@ def display_market_trend(stock_identity):
         st.error(f"加载行情数据失败: {str(e)}")
 
 
-def display_news(stock_identity):
+def display_news_analysis(stock_identity):
     """显示股票相关新闻"""
     st.subheader("新闻资讯")
     stock_code = stock_identity['code']

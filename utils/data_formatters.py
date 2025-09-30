@@ -344,6 +344,14 @@ class StockDataFormatter:
                 parts.append(f"- 当前价格: {format_price(basic_info['current_price'])}{currency_symbol}")
             if 'change_percent' in basic_info:
                 parts.append(f"- 涨跌幅: {format_percentage(basic_info['change_percent'])}")
+            if 'high' in basic_info: 
+                parts.append(f"- 最高价: {format_price(basic_info['high'])}{currency_symbol}")
+            if 'low' in basic_info:
+                parts.append(f"- 最低价: {format_price(basic_info['low'])}{currency_symbol}")
+            if 'open' in basic_info:
+                parts.append(f"- 今开: {format_price(basic_info['open'])}{currency_symbol}")
+            if 'volume' in basic_info and basic_info['volume'] is not None:
+                parts.append(f"- 成交量: {format_volume(basic_info['volume'])}")
         
         return "\n".join(parts)
 

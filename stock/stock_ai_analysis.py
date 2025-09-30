@@ -347,7 +347,7 @@ def get_stock_info(stock_identity):
     stock_tools = get_stock_tools()
     return stock_tools.get_basic_info(stock_identity, use_cache=True)
 
-def generate_stock_analysis_report(
+def generate_tech_analysis_report(
     stock_identity: Dict[str, Any],
     kline_info: Dict[str, Any] = None,
 ) -> AnalysisResult:

@@ -28,7 +28,7 @@ from utils.format_utils import judge_rsi_level
 # 导入AI分析模块
 try:
     from stock.stock_ai_analysis import (
-        generate_fundamental_analysis_report, generate_stock_analysis_report, 
+        generate_fundamental_analysis_report, generate_tech_analysis_report, 
         generate_news_analysis_report, generate_chip_analysis_report
     )
     AI_ANALYSIS_AVAILABLE = True
@@ -355,7 +355,7 @@ class StockTools:
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         try:            
-            result = generate_stock_analysis_report(
+            result = generate_tech_analysis_report(
                 stock_identity=stock_identity,
                 kline_info=kline_info,
             )
