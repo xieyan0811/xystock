@@ -231,6 +231,12 @@ def display_market_fundamentals(index_name='沪深300'):
 
 def display_market_news():
     """显示市场新闻"""
+    from config_manager import config
+    
+    # 检查是否启用市场新闻功能
+    if not config.is_market_news_enabled():
+        return  # 直接返回，不显示任何内容
+    
     st.subheader("📰 市场资讯")
     
     use_cache = st.session_state.get('market_use_cache', True)
@@ -239,6 +245,8 @@ def display_market_news():
     news_data = market_tools.get_market_news_data(use_cache=use_cache)
     
     if 'error' in news_data:
+        if news_data.get('disabled'):
+            return  # 功能已禁用，不显示任何内容
         st.warning(f"获取市场新闻失败: {news_data['error']}")
     elif news_data and news_data.get('market_news'):
         market_news = news_data['market_news']
@@ -673,8 +681,15 @@ def display_market_overview():
                     st.success(f"📊 **指数分析报告** (基于{current_index})")
                     st.caption(f"报告时间: {report_time}")
                     
-                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📰 市场资讯", "📋 综合摘要"])
+                    # 根据新闻功能是否启用来创建标签页
+                    from config_manager import config
+                    news_enabled = config.is_market_news_enabled()
                     
+                    if news_enabled:
+                        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📰 市场资讯", "📋 综合摘要"])
+                    else:
+                        tab1, tab2, tab3, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📋 综合摘要"])
+
                     with tab1:
                         display_market_indices()
                     
@@ -684,8 +699,9 @@ def display_market_overview():
                     with tab3:
                         display_market_fundamentals(current_index)
 
-                    with tab4:
-                        display_market_news()
+                    if news_enabled:
+                        with tab4:
+                            display_market_news()
 
                     with tab5:
                         display_market_summary(current_index)

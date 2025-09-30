@@ -25,7 +25,8 @@ from market.market_data_fetcher import (
 from market.market_data_cache import get_cache_manager
 from utils.format_utils import judge_rsi_level
 from utils.news_tools import get_market_news_caixin
-from utils.string_utils import remove_markdown_format            
+from utils.string_utils import remove_markdown_format
+from config_manager import config            
 
 class MarketTools:
     """统一的市场数据工具类"""
@@ -249,6 +250,11 @@ class MarketTools:
 
     def get_market_news_data(self, use_cache: bool = True, force_refresh: bool = False, debug: bool = False) -> Dict:
         """获取市场相关新闻数据"""
+        # 检查是否启用市场新闻功能
+        if not config.is_market_news_enabled():
+            print("📰 市场新闻功能已禁用")
+            return {'error': '市场新闻功能已禁用', 'disabled': True}
+        
         data_type = 'market_news'
         
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
@@ -436,7 +442,12 @@ class MarketTools:
         report['valuation_indicators'] = self.get_valuation_data(use_cache)
         report['money_flow_indicators'] = self.get_money_flow_data(use_cache)
         report['margin_detail'] = self.get_margin_data(use_cache)
-        report['market_news_data'] = self.get_market_news_data(use_cache)
+        
+        # 检查是否启用市场新闻功能
+        if config.is_market_news_enabled():
+            report['market_news_data'] = self.get_market_news_data(use_cache)
+        else:
+            report['market_news_data'] = {'disabled': True}
         
         print("=" * 60)
         print("✅ 综合市场报告生成完成!")
@@ -837,6 +848,9 @@ class MarketTools:
     def _add_news_section(self, news_data: Dict, markdown: bool) -> list:
         """添加市场新闻部分"""
         lines = []
+        # 检查是否禁用了市场新闻功能
+        if not config.is_market_news_enabled() or news_data.get('disabled'):
+            return lines
         if not news_data or not news_data.get('market_news'):
             return lines
             
