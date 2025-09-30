@@ -16,7 +16,6 @@ if project_root not in sys.path:
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_number, format_large_number
 from stock.stock_data_tools import get_stock_tools
 from stock.stock_report import generate_stock_report
-from utils.report_utils import PDF_SUPPORT_AVAILABLE
 
 stock_tools = get_stock_tools()
 
@@ -67,111 +66,30 @@ def display_stock_info(stock_identity):
             with tab5:
                 display_comprehensive_analysis(stock_identity)
 
-            st.divider()
-            st.subheader("📋 导出完整报告")
-            
-            st.info("💡 可以导出包含所有Tab内容的完整分析报告")
-            
-            support_pdf = PDF_SUPPORT_AVAILABLE
-
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if support_pdf:
-                    format_type = st.selectbox(
-                        "选择导出格式",
-                        ["pdf", "docx", "markdown"],
-                        format_func=lambda x: {"pdf": "📄 PDF格式", "docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                        key=f"format_select_{stock_code}"
-                    )
-                else:
-                    format_type = st.selectbox(
-                        "选择导出格式",
-                        ["docx", "markdown"],
-                        format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                        key=f"format_select_{stock_code}"
-                    )
-
-            
-            with col2:
-                if support_pdf:
-                    format_descriptions = {
-                        "pdf": "专业格式，适合打印和正式分享",
-                        "docx": "Word文档，可编辑修改",
-                        "markdown": "Markdown格式，适合程序员和技术人员"
-                    }
-                else:
-                    format_descriptions = {
-                        "docx": "Word文档，可编辑修改",
-                        "markdown": "Markdown格式，适合程序员和技术人员"
-                    }
-                st.caption(format_descriptions[format_type])
-            
-            report_button_key = f"generate_report_{stock_code}"
-            if st.button("🔄 生成报告", key=report_button_key, use_container_width=True):
-                st.session_state[f"generating_report_{stock_code}"] = format_type
-            
-            generating_format = st.session_state.get(f"generating_report_{stock_code}", None)
-            if generating_format:
-                print(f"开始生成{generating_format.upper()}报告...")
-                spinner_text = {
-                    "pdf": "正在收集数据并生成PDF报告...",
-                    "docx": "正在收集数据并生成Word文档...",
-                    "markdown": "正在收集数据并生成Markdown文件..."
-                }
+            # 使用通用的导出功能
+            def generate_stock_report_wrapper(format_type):
+                """包装股票报告生成函数"""
+                has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                 
-                with st.spinner(spinner_text[generating_format]):
-                    try:
-                        has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
-                        
-                        report_content = generate_stock_report(
-                            stock_identity, generating_format,
-                            has_fundamental_ai=has_fundamental_ai,
-                            has_market_ai=has_market_ai,
-                            has_news_ai=has_news_ai,
-                            has_chip_ai=has_chip_ai,
-                            has_comprehensive_ai=has_comprehensive_ai
-                        )
-                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        
-                        format_info = {
-                            "pdf": {"ext": "pdf", "mime": "application/pdf"},
-                            "docx": {"ext": "docx", "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-                            "markdown": {"ext": "md", "mime": "text/markdown"}
-                        }
-                        
-                        ext = format_info[generating_format]["ext"]
-                        mime = format_info[generating_format]["mime"]
-                        filename = f"{stock_code}_完整分析报告_{timestamp}.{ext}"
-                        
-                        st.session_state[f"report_content_{stock_code}"] = report_content
-                        st.session_state[f"report_filename_{stock_code}"] = filename
-                        st.session_state[f"report_mime_{stock_code}"] = mime
-                        st.session_state[f"report_format_{stock_code}"] = generating_format
-                        st.session_state[f"report_timestamp_{stock_code}"] = timestamp
-                        
-                        st.session_state[f"generating_report_{stock_code}"] = None
-                        
-                        format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown"}
-                        st.success(f"✅ {format_names[generating_format]}报告生成成功！")
-                        
-                    except Exception as e:
-                        st.error(f"❌ 生成{generating_format.upper()}报告失败: {str(e)}")
-                        st.session_state[f"generating_report_{stock_code}"] = None
-            
-            if st.session_state.get(f"report_content_{stock_code}"):
-                format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝"}
-                current_format = st.session_state.get(f"report_format_{stock_code}", "pdf")
-                
-                st.download_button(
-                    label=f"{format_icons[current_format]} 下载{current_format.upper()}文件",
-                    data=st.session_state[f"report_content_{stock_code}"],
-                    file_name=st.session_state[f"report_filename_{stock_code}"],
-                    mime=st.session_state[f"report_mime_{stock_code}"],
-                    key=f"download_report_{stock_code}",
-                    use_container_width=True,
-                    help=f"点击下载生成的{current_format.upper()}报告文件"
+                return generate_stock_report(
+                    stock_identity, format_type,
+                    has_fundamental_ai=has_fundamental_ai,
+                    has_market_ai=has_market_ai,
+                    has_news_ai=has_news_ai,
+                    has_chip_ai=has_chip_ai,
+                    has_comprehensive_ai=has_comprehensive_ai
                 )
-                st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'report_timestamp_{stock_code}']}")
+            
+            from ui.components.page_export import display_report_export_section
+            display_report_export_section(
+                entity_id=stock_code,
+                report_type="report",
+                title="📋 导出完整报告",
+                info_text="💡 可以导出包含所有Tab内容的完整分析报告",
+                generate_func=generate_stock_report_wrapper,
+                generate_args=None,
+                filename_prefix=f"{stock_code}_完整分析报告"
+            )
                 
         except Exception as e:
             st.error(f"加载数据失败: {str(e)}")

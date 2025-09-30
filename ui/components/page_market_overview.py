@@ -16,7 +16,6 @@ if project_root not in sys.path:
 from utils.format_utils import format_large_number
 from market.market_data_tools import get_market_tools
 from market.market_report import write_market_report
-from utils.report_utils import PDF_SUPPORT_AVAILABLE
 from ui.config import FOCUS_INDICES
 
 
@@ -486,113 +485,30 @@ def display_comprehensive_rating(result_data, use_cache=True):
 
 def display_market_report_export(index_name):
     """显示市场报告导出功能"""
-    st.markdown("---")
-    st.subheader("📋 导出市场报告")
-    
-    st.info("💡 可以导出当前市场分析的完整报告")
-    
-    support_pdf = PDF_SUPPORT_AVAILABLE
-    report_index_name = index_name
-
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        if support_pdf:
-            format_type = st.selectbox(
-                "选择导出格式",
-                ["pdf", "docx", "markdown"],
-                format_func=lambda x: {"pdf": "📄 PDF格式", "docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                key=f"market_format_select_{report_index_name}"
-            )
-        else:
-            format_type = st.selectbox(
-                "选择导出格式",
-                ["docx", "markdown", "html"],
-                format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown", "html": "🌐 HTML"}[x],
-                key=f"market_format_select_{report_index_name}"
-            )
-
-    with col2:
-        if support_pdf:
-            format_descriptions = {
-                "pdf": "专业格式，适合打印和正式分享",
-                "docx": "Word文档，可编辑修改",
-                "markdown": "Markdown格式，适合程序员和技术人员"
-            }
-        else:
-            format_descriptions = {
-                "docx": "Word文档，可编辑修改",
-                "markdown": "Markdown格式，适合程序员和技术人员",
-                "html": "HTML格式，适合网页浏览"
-            }
-        st.caption(format_descriptions[format_type])
-    
-    market_report_button_key = f"generate_market_report_{report_index_name}"
-    if st.button("🔄 生成市场报告", key=market_report_button_key, use_container_width=True):
-        st.session_state[f"generating_market_report_{report_index_name}"] = format_type
-    
-    generating_format = st.session_state.get(f"generating_market_report_{report_index_name}", None)
-    if generating_format:
-        spinner_text = {
-            "pdf": "正在收集数据并生成PDF报告...",
-            "docx": "正在收集数据并生成Word文档...",
-            "markdown": "正在收集数据并生成Markdown文件...",
-            "html": "正在收集数据并生成HTML文件..."
-        }
+    def generate_market_report_wrapper(format_type):
+        """包装市场报告生成函数"""
+        # 检查是否有AI分析报告
+        has_ai_analysis = bool(st.session_state.get('ai_index_report', {}).get(index_name))
+        user_opinion = st.session_state.get('market_user_opinion', '')
         
-        with st.spinner(spinner_text[generating_format]):
-            try:
-                # 检查是否有AI分析报告
-                has_ai_analysis = bool(st.session_state.get('ai_index_report', {}).get(report_index_name))
-                user_opinion = st.session_state.get('market_user_opinion', '')
-                
-                report_content = write_market_report(
-                    index_name=report_index_name,
-                    format_type=generating_format,
-                    has_ai_analysis=has_ai_analysis,
-                    user_opinion=user_opinion
-                )
-                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                
-                format_info = {
-                    "pdf": {"ext": "pdf", "mime": "application/pdf"},
-                    "docx": {"ext": "docx", "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-                    "markdown": {"ext": "md", "mime": "text/markdown"},
-                    "html": {"ext": "html", "mime": "text/html"}
-                }
-                
-                ext = format_info[generating_format]["ext"]
-                mime = format_info[generating_format]["mime"]
-                filename = f"市场分析报告_{report_index_name}_{timestamp}.{ext}"
-                
-                st.session_state[f"market_report_content_{report_index_name}"] = report_content
-                st.session_state[f"market_report_filename_{report_index_name}"] = filename
-                st.session_state[f"market_report_mime_{report_index_name}"] = mime
-                st.session_state[f"market_report_format_{report_index_name}"] = generating_format
-                st.session_state[f"market_report_timestamp_{report_index_name}"] = timestamp
-                
-                st.session_state[f"generating_market_report_{report_index_name}"] = None
-
-                format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown", "html": "HTML"}
-                st.success(f"✅ {format_names[generating_format]}市场报告生成成功！")
-                
-            except Exception as e:
-                st.error(f"❌ 生成{generating_format.upper()}市场报告失败: {str(e)}")
-                st.session_state[f"generating_market_report_{report_index_name}"] = None
-    
-    if st.session_state.get(f"market_report_content_{report_index_name}"):
-        format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝", "html": "🌐"}
-        current_format = st.session_state.get(f"market_report_format_{report_index_name}", "pdf")
-        
-        st.download_button(
-            label=f"{format_icons[current_format]} 下载{current_format.upper()}文件",
-            data=st.session_state[f"market_report_content_{report_index_name}"],
-            file_name=st.session_state[f"market_report_filename_{report_index_name}"],
-            mime=st.session_state[f"market_report_mime_{report_index_name}"],
-            key=f"download_market_report_{report_index_name}",
-            use_container_width=True,
-            help=f"点击下载生成的{current_format.upper()}市场报告文件"
+        return write_market_report(
+            index_name=index_name,
+            format_type=format_type,
+            has_ai_analysis=has_ai_analysis,
+            user_opinion=user_opinion
         )
-        st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'market_report_timestamp_{report_index_name}']}")
+    
+    # 使用通用的导出功能
+    from ui.components.page_export import display_report_export_section
+    display_report_export_section(
+        entity_id=index_name,
+        report_type="market_report",
+        title="📋 导出市场报告",
+        info_text="💡 可以导出当前市场分析的完整报告",
+        generate_func=generate_market_report_wrapper,
+        generate_args=None,
+        filename_prefix="市场分析报告"
+    )
 
 
 def display_market_summary(index_name='上证指数'):
