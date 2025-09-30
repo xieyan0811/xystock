@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from utils.kline_cache import cache_manager, KLineData, KLineType
 import akshare as ak
+import pandas as pd
 
 @dataclass
 class RealTimeQuote:
@@ -221,7 +222,7 @@ class StockDataFetcher:
                 return cached_data
             return []
     
-    def fetch_stock_info(self, symbol: str, detail = True):
+    def fetch_stock_info(self, symbol: str, detail = True, include_dividend = True):
         """获取股票基本信息"""
         if not self._is_initialized:
             raise DataFetcherNotAvailableError("efinance 未初始化")
@@ -233,8 +234,15 @@ class StockDataFetcher:
                 data = info.to_dict()
                 
                 if detail:
-                    ret2 = self.get_more_stock_info(symbol, ['资产负债率'])
-                data.update(ret2)
+                    # 获取更多财务指标（使用默认的重要指标列表）
+                    ret2 = self.get_more_stock_info(symbol)
+                    data.update(ret2)
+                    
+                    # 获取股息分红信息
+                    if include_dividend:
+                        dividend_info = self.get_dividend_info(symbol)
+                        data.update(dividend_info)
+                
                 ret = self._convert_to_stock_info(data, symbol)
                 return ret
 
@@ -245,14 +253,122 @@ class StockDataFetcher:
             return None
 
     def get_more_stock_info(self, symbol, key_list = None):
+        """获取更多股票财务指标信息"""
         ret_dic = {}
+        
+        # 如果没有指定key_list，使用基本面分析重要指标
+        if key_list is None:
+            key_list = [
+                # 盈利能力指标
+                '总资产报酬率(ROA)', '净资产收益率(ROE)', '销售净利率', '毛利率', '营业利润率',
+                
+                # 偿债能力指标  
+                '资产负债率', '流动比率', '速动比率', '现金比率', '权益乘数',
+                
+                # 营运能力指标
+                '总资产周转率', '应收账款周转率', '存货周转率', '流动资产周转率',
+                
+                # 成长能力指标
+                '营业总收入增长率', '归属母公司净利润增长率',
+                
+                # 每股指标
+                '基本每股收益', '每股净资产', '每股经营现金流', '每股营业收入'
+            ]
+        
         try:
             ret = ak.stock_financial_abstract(symbol=symbol)
-            for idx,item in ret.iterrows():
-                if key_list is None or item['指标'] in key_list:
-                    ret_dic[item.iloc[1]] = item.iloc[2]
+            print(f"📊 获取到 {len(ret)} 项财务指标")
+            
+            # 提取需要的指标
+            for idx, item in ret.iterrows():
+                indicator_name = item.iloc[1]  # 指标名称列
+                indicator_value = item.iloc[2]  # 指标值列
+                
+                # 如果指标在我们需要的列表中
+                if indicator_name in key_list:
+                    ret_dic[indicator_name] = indicator_value
+                    
+            print(f"✅ 成功获取 {len(ret_dic)} 项重要财务指标")
+            
         except Exception as e:
-            print(f"获取更多股票信息失败: {e}")
+            print(f"❌ 获取更多股票信息失败: {e}")
+            
+        return ret_dic
+
+    def get_dividend_info(self, symbol, recent_years=3):
+        """获取个股股息分红信息"""
+        ret_dic = {}
+        
+        try:
+            # 获取历史分红数据
+            dividend_data = ak.stock_dividend_cninfo(symbol=symbol)
+            
+            if dividend_data is not None and not dividend_data.empty:
+                print(f"📈 获取到 {len(dividend_data)} 条分红记录")
+                
+                # 按实施方案公告日期排序（最新的在前）
+                dividend_data = dividend_data.sort_values('实施方案公告日期', ascending=False)
+                
+                # 获取最近的分红信息
+                if len(dividend_data) > 0:
+                    latest_dividend = dividend_data.iloc[0]
+                    
+                    # 最新分红信息
+                    ret_dic['最新分红公告日期'] = str(latest_dividend.get('实施方案公告日期', ''))
+                    ret_dic['最新分红类型'] = str(latest_dividend.get('分红类型', ''))
+                    ret_dic['最新送股比例'] = latest_dividend.get('送股比例') if pd.notna(latest_dividend.get('送股比例')) else None
+                    ret_dic['最新转增比例'] = latest_dividend.get('转增比例') if pd.notna(latest_dividend.get('转增比例')) else None
+                    ret_dic['最新派息比例'] = latest_dividend.get('派息比例') if pd.notna(latest_dividend.get('派息比例')) else None
+                    ret_dic['最新股权登记日'] = str(latest_dividend.get('股权登记日', ''))
+                    ret_dic['最新除权日'] = str(latest_dividend.get('除权日', ''))
+                    ret_dic['最新派息日'] = str(latest_dividend.get('派息日', ''))
+                    ret_dic['最新分红说明'] = str(latest_dividend.get('实施方案分红说明', ''))
+                
+                # 统计最近几年的分红情况
+                current_year = datetime.now().year
+                recent_dividend_data = []
+                
+                for _, row in dividend_data.iterrows():
+                    try:
+                        # 从实施方案公告日期提取年份
+                        date_str = str(row.get('实施方案公告日期', ''))
+                        if date_str and len(date_str) >= 4:
+                            year = int(date_str[:4])
+                            if current_year - year <= recent_years:
+                                dividend_record = {
+                                    '年份': year,
+                                    '分红类型': str(row.get('分红类型', '')),
+                                    '送股比例': row.get('送股比例') if pd.notna(row.get('送股比例')) else 0,
+                                    '转增比例': row.get('转增比例') if pd.notna(row.get('转增比例')) else 0,
+                                    '派息比例': row.get('派息比例') if pd.notna(row.get('派息比例')) else 0,
+                                }
+                                recent_dividend_data.append(dividend_record)
+                    except (ValueError, TypeError):
+                        continue
+                
+                # 计算分红统计信息
+                if recent_dividend_data:
+                    # 计算平均派息比例
+                    dividend_ratios = [d['派息比例'] for d in recent_dividend_data if d['派息比例'] > 0]
+                    if dividend_ratios:
+                        ret_dic['近年平均派息比例'] = round(sum(dividend_ratios) / len(dividend_ratios), 2)
+                    
+                    # 分红频率
+                    ret_dic['近年分红次数'] = len(recent_dividend_data)
+                    
+                    # 最近几年分红详情
+                    ret_dic['近年分红详情'] = recent_dividend_data[:5]  # 最多返回5条记录
+                
+                print(f"✅ 成功获取股息分红信息")
+                
+            else:
+                print(f"⚠️  未获取到分红数据")
+                ret_dic['分红信息'] = '暂无分红记录'
+                
+        except Exception as e:
+            print(f"❌ 获取股息分红信息失败: {e}")
+            ret_dic['分红信息获取失败'] = str(e)
+            
         return ret_dic
 
     def _convert_to_realtime_quote(self, data: Dict[str, Any], original_symbol: str) -> RealTimeQuote:
@@ -339,38 +455,84 @@ class StockDataFetcher:
         return f"<{self.__class__.__name__}(name='{self.name}', available={self.is_available()})>"
     
     def _convert_to_stock_info(self, data: Dict[str, Any], original_symbol: str) -> Dict[str, Any]:
-        """将efinance返回的股票基本信息转换为标准格式"""
+        """将efinance返回的股票基本信息转换为标准格式 - 直接使用中文字段名"""
         try:
             def safe_convert_float(value):
-                """安全转换为浮点数，处理'-'和None值"""
-                if value == '-' or value is None or str(value).strip() == '':
+                """安全转换为浮点数，处理'-'、None和nan值"""
+                if value == '-' or value is None or str(value).strip() == '' or str(value).strip() == '--':
                     return None
                 try:
-                    return float(value)
+                    # 处理百分号
+                    if isinstance(value, str) and '%' in value:
+                        return float(value.replace('%', ''))
+                    float_val = float(value)
+                    # 处理 NaN 值
+                    if float_val != float_val:  # NaN check
+                        return None
+                    return float_val
                 except (ValueError, TypeError):
                     return None
             
             def safe_convert_str(value):
-                """安全转换为字符串，处理'-'和'0.0'值"""
-                if value == '-' or value is None or str(value).strip() == '0.0':
+                """安全转换为字符串，处理'-'、'0.0'和nan值"""
+                if value == '-' or value is None or str(value).strip() == '0.0' or str(value).strip() == '--':
                     return None
+                try:
+                    # 检查是否为NaN
+                    if isinstance(value, float) and value != value:  # NaN check
+                        return None
+                except:
+                    pass
                 return str(value).strip() if str(value).strip() else None
             
-            return {
-                'symbol': data.get('股票代码', original_symbol),
-                'name': data.get('股票名称', ''),
-                'net_profit': safe_convert_str(data.get('净利润')),
-                'total_market_value': safe_convert_float(data.get('总市值')),
-                'circulating_market_value': safe_convert_float(data.get('流通市值')),
-                'industry': safe_convert_str(data.get('所处行业')),
-                'pe_ratio': safe_convert_str(data.get('市盈率(动)')),
-                'pb_ratio': safe_convert_str(data.get('市净率')),
-                'roe': safe_convert_str(data.get('ROE')),
-                'gross_profit_margin': safe_convert_str(data.get('毛利率')),
-                'net_profit_margin': safe_convert_str(data.get('净利率')),
-                'sector_code': safe_convert_str(data.get('板块编号')),
-                'debt_to_asset_ratio': safe_convert_str(data.get('资产负债率'))
+            # 基础信息 - 使用中文字段名
+            result = {
+                '股票代码': data.get('股票代码', original_symbol),
+                '股票名称': data.get('股票名称', ''),
+                '净利润': safe_convert_str(data.get('净利润')),
+                '总市值': safe_convert_float(data.get('总市值')),
+                '流通市值': safe_convert_float(data.get('流通市值')),
+                '所处行业': safe_convert_str(data.get('所处行业')),
+                '市盈率': safe_convert_str(data.get('市盈率(动)')),
+                '市净率': safe_convert_str(data.get('市净率')),
+                '板块编号': safe_convert_str(data.get('板块编号')),
             }
+            
+            # 直接添加财务指标，保持中文名称
+            financial_indicators = [
+                '净资产收益率(ROE)', 'ROE', '总资产报酬率(ROA)', '毛利率', '销售净利率', '营业利润率',
+                '资产负债率', '流动比率', '速动比率', '现金比率', '权益乘数',
+                '总资产周转率', '应收账款周转率', '存货周转率', '流动资产周转率',
+                '营业总收入增长率', '归属母公司净利润增长率',
+                '基本每股收益', '每股净资产', '每股经营现金流', '每股营业收入'
+            ]
+            
+            # 直接添加中文字段名的财务指标
+            for indicator in financial_indicators:
+                if indicator in data:
+                    value = data[indicator]
+                    if value is not None:
+                        # 对于比率类指标，保持字符串格式；对于绝对数值，转换为浮点数
+                        if any(suffix in indicator for suffix in ['率', '比率', 'ROE', 'ROA']):
+                            result[indicator] = safe_convert_str(value)
+                        else:
+                            result[indicator] = safe_convert_float(value)
+            
+            # 添加股息分红相关字段
+            dividend_indicators = [
+                '最新分红公告日期', '最新分红类型', '最新派息比例', '最新送股比例', '最新转增比例',
+                '最新股权登记日', '最新除权日', '最新派息日', '最新分红说明',
+                '近年平均派息比例', '近年分红次数', '近年分红详情'
+            ]
+            
+            for indicator in dividend_indicators:
+                if indicator in data:
+                    value = data[indicator]
+                    if value is not None:
+                        result[indicator] = value
+            
+            return result
+            
         except Exception as e:
             raise DataFetcherError(f"股票信息转换失败: {e}")
 

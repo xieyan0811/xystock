@@ -171,8 +171,8 @@ class StockDataFormatter:
     def __init__(self):
         pass
     
-    def format_basic_info(self, basic_info: Dict[str, Any], stock_identity: Dict[str, Any]) -> str:
-        """格式化基本信息为Markdown格式的文本"""
+    def format_basic_info(self, basic_info: Dict[str, Any], stock_identity: Dict[str, Any], include_dividend: bool = False) -> str:
+        """格式化基本信息为Markdown格式的文本 - 处理中文字段名"""
         if not basic_info or 'error' in basic_info:
             return "## 获取基本信息时出错: 暂无基本信息数据\n"
         
@@ -181,13 +181,13 @@ class StockDataFormatter:
         stock_name = stock_identity.get('name', '')
         market_name = stock_identity.get('market_name', '未知')
         currency_symbol = stock_identity.get('currency_symbol', '¥')
-                
+            
         # 股票信息
         md_content += f"- 股票名称: {stock_name}\n"
         md_content += f"- 股票代码: {stock_code}\n"
         md_content += f"- 所属市场: {market_name}\n"
         
-        # 价格信息
+        # 价格信息  
         if 'current_price' in basic_info:
             md_content += f"- 当前价格: {format_price(basic_info['current_price'])}{currency_symbol}\n"
         if 'change_amount' in basic_info:
@@ -195,31 +195,151 @@ class StockDataFormatter:
         if 'change_percent' in basic_info:
             md_content += f"- 涨跌幅: {format_percentage(basic_info['change_percent'])}\n"
         
-        # 市值信息
-        if 'total_market_value' in basic_info and basic_info['total_market_value']:
-            md_content += f"- 总市值: {format_market_value(basic_info['total_market_value'])}{currency_symbol}\n"
-        if 'circulating_market_value' in basic_info and basic_info['circulating_market_value']:
-            md_content += f"- 流通市值: {format_market_value(basic_info['circulating_market_value'])}{currency_symbol}\n"
+        # 市值信息 - 使用中文字段名
+        if '总市值' in basic_info and basic_info['总市值']:
+            md_content += f"- 总市值: {format_market_value(basic_info['总市值'])}{currency_symbol}\n"
+        if '流通市值' in basic_info and basic_info['流通市值']:
+            md_content += f"- 流通市值: {format_market_value(basic_info['流通市值'])}{currency_symbol}\n"
         
-        # 财务比率
-        ratio_labels = {
-            'pe_ratio': '市盈率',
-            'pb_ratio': '市净率',
-            'roe': 'ROE',
-            'gross_profit_margin': '毛利率',
-            'net_profit_margin': '净利率',
-            'debt_to_asset_ratio': '资产负债率'
-        }
+        # 基本财务比率（直接使用中文字段名）
+        profitability_section = ""
+        profitability_indicators = ['净资产收益率(ROE)', '总资产报酬率(ROA)', '毛利率', '销售净利率', '营业利润率']
         
-        for ratio_key, ratio_label in ratio_labels.items():
-            if ratio_key in basic_info and basic_info[ratio_key] is not None and str(basic_info[ratio_key]).strip():
-                md_content += f"- {ratio_label}: {basic_info[ratio_key]}\n"
+        for field_name in profitability_indicators:
+            if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                value = basic_info[field_name]
+                if isinstance(value, str):
+                    profitability_section += f"- {field_name}: {value}%\n"
+                elif isinstance(value, (int, float)):
+                    profitability_section += f"- {field_name}: {value:.2f}%\n"
         
-        # 公司信息
-        if 'industry' in basic_info and basic_info['industry']:
-            md_content += f"- 所属行业: {basic_info['industry']}\n"
-        if 'net_profit' in basic_info and basic_info['net_profit']:
-            md_content += f"- 净利润: {format_large_number(basic_info['net_profit'])}\n"
+        if profitability_section:
+            md_content += "\n### 📊 盈利能力指标\n" + profitability_section
+        
+        solvency_section = ""
+        solvency_indicators = ['资产负债率', '流动比率', '速动比率', '现金比率', '权益乘数']
+        
+        for field_name in solvency_indicators:
+            if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                value = basic_info[field_name]
+                if field_name == '资产负债率':
+                    if isinstance(value, str):
+                        solvency_section += f"- {field_name}: {value}%\n"
+                    elif isinstance(value, (int, float)):
+                        solvency_section += f"- {field_name}: {value:.2f}%\n"
+                else:
+                    if isinstance(value, (int, float)):
+                        solvency_section += f"- {field_name}: {value:.2f}\n"
+                    else:
+                        solvency_section += f"- {field_name}: {value}\n"
+        
+        if solvency_section:
+            md_content += "\n### 💰 偿债能力指标\n" + solvency_section
+        
+        efficiency_section = ""
+        efficiency_indicators = ['总资产周转率', '应收账款周转率', '存货周转率', '流动资产周转率']
+        
+        for field_name in efficiency_indicators:
+            if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                value = basic_info[field_name]
+                if isinstance(value, (int, float)):
+                    efficiency_section += f"- {field_name}: {value:.2f}\n"
+                else:
+                    efficiency_section += f"- {field_name}: {value}\n"
+        
+        if efficiency_section:
+            md_content += "\n### 🔄 营运能力指标\n" + efficiency_section
+        
+        growth_section = ""
+        growth_indicators = ['营业总收入增长率', '归属母公司净利润增长率']
+        
+        for field_name in growth_indicators:
+            if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                value = basic_info[field_name]
+                if isinstance(value, (int, float)):
+                    growth_section += f"- {field_name}: {value:.2f}%\n"
+                else:
+                    growth_section += f"- {field_name}: {value}\n"
+        
+        if growth_section:
+            md_content += "\n### 📈 成长能力指标\n" + growth_section
+        
+        valuation_section = ""
+        if '市盈率' in basic_info and basic_info['市盈率'] is not None and str(basic_info['市盈率']).strip():
+            valuation_section += f"- 市盈率: {basic_info['市盈率']}\n"
+        if '市净率' in basic_info and basic_info['市净率'] is not None and str(basic_info['市净率']).strip():
+            valuation_section += f"- 市净率: {basic_info['市净率']}\n"
+        
+        if valuation_section:
+            md_content += "\n### 📋 估值指标\n" + valuation_section
+        
+        # 每股指标
+        per_share_section = ""
+        per_share_indicators = ['基本每股收益', '每股净资产', '每股经营现金流', '每股营业收入']
+        
+        for field_name in per_share_indicators:
+            if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                value = basic_info[field_name]
+                if isinstance(value, (int, float)):
+                    per_share_section += f"- {field_name}: {value:.2f}元\n"
+                else:
+                    per_share_section += f"- {field_name}: {value}\n"
+        
+        if per_share_section:
+            md_content += "\n### 💎 每股指标\n" + per_share_section
+        
+        # 股息分红信息（仅在 include_dividend=True 时显示）
+        if include_dividend:
+            dividend_section = ""
+            dividend_indicators = [
+                '最新分红公告日期', '最新分红类型', '最新派息比例', '最新送股比例', '最新转增比例',
+                '最新股权登记日', '最新除权日', '最新派息日', '近年平均派息比例', '近年分红次数'
+            ]
+            
+            for field_name in dividend_indicators:
+                if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
+                    value = basic_info[field_name]
+                    if field_name in ['最新派息比例', '近年平均派息比例']:
+                        if isinstance(value, (int, float)):
+                            dividend_section += f"- {field_name}: {value:.2f}元/10股\n"
+                        else:
+                            dividend_section += f"- {field_name}: {value}\n"
+                    elif field_name in ['最新送股比例', '最新转增比例']:
+                        if isinstance(value, (int, float)):
+                            dividend_section += f"- {field_name}: {value:.2f}股/10股\n"
+                        else:
+                            dividend_section += f"- {field_name}: {value}\n"
+                    else:
+                        dividend_section += f"- {field_name}: {value}\n"
+            
+            # 显示近年分红详情（最多显示3条）
+            if '近年分红详情' in basic_info and basic_info['近年分红详情']:
+                dividend_section += "\n#### 近年分红记录（最近3次）\n"
+                for i, record in enumerate(basic_info['近年分红详情'][:3]):
+                    year = record.get('年份', '')
+                    dividend_type = record.get('分红类型', '')
+                    dividend_ratio = record.get('派息比例', 0)
+                    send_ratio = record.get('送股比例', 0)
+                    bonus_ratio = record.get('转增比例', 0)
+                    
+                    record_text = f"- {year}年 {dividend_type}"
+                    if dividend_ratio > 0:
+                        record_text += f" 派息{dividend_ratio:.2f}元/10股"
+                    if send_ratio > 0:
+                        record_text += f" 送股{send_ratio:.2f}股/10股"
+                    if bonus_ratio > 0:
+                        record_text += f" 转增{bonus_ratio:.2f}股/10股"
+                    
+                    dividend_section += record_text + "\n"
+            
+            if dividend_section:
+                md_content += "\n### 💰 股息分红信息\n" + dividend_section
+        
+        md_content += "\n### 🏢 公司信息\n"
+        if '所处行业' in basic_info and basic_info['所处行业']:
+            md_content += f"- 所属行业: {basic_info['所处行业']}\n"
+        if '净利润' in basic_info and basic_info['净利润']:
+            md_content += f"- 净利润: {format_large_number(basic_info['净利润'])}\n"
         
         return md_content
 
@@ -354,6 +474,11 @@ class StockDataFormatter:
                 parts.append(f"- 成交量: {format_volume(basic_info['volume'])}")
         
         return "\n".join(parts)
+
+
+def get_indicator_value(basic_info: Dict[str, Any], indicator_key: str) -> Any:
+    """获取指标值的统一函数 - 简化版，直接返回字段值"""
+    return basic_info.get(indicator_key)
 
 
 _formatter = None
