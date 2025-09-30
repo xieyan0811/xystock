@@ -514,6 +514,7 @@ def generate_fundamental_analysis_report(
     
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
+    market_name = stock_identity.get('market_name', 'A股')
 
     generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
@@ -521,7 +522,48 @@ def generate_fundamental_analysis_report(
     currency_name = stock_identity.get('currency_name', '人民币')
     currency_symbol = stock_identity.get('currency_symbol', '¥')
     
-    system_message = """你是一位专业的股票基本面分析师，专精于深入的财务和基本面分析。你的任务是基于真实财务数据，提供专业、客观的基本面分析，为投资决策提供基本面依据。
+    # 判断是否为ETF，如果是则获取持仓信息
+    is_etf = (market_name == 'ETF' or 
+              stock_code.startswith('51') or stock_code.startswith('15') or stock_code.startswith('50') or
+              '基金' in stock_name or 'ETF' in stock_name)
+    
+    etf_holdings_section = ""
+    if is_etf:
+        try:
+            from stock.etf_holdings_fetcher import etf_holdings_fetcher
+            holdings_data = etf_holdings_fetcher.get_etf_holdings(stock_code, top_n=10)
+            
+            if 'error' not in holdings_data:
+                etf_holdings_section = formatter.format_etf_holdings_for_ai(holdings_data, max_stocks=10)
+                print(f"✅ 成功获取ETF {stock_code} 持仓信息用于AI分析")
+            else:
+                print(f"⚠️ 获取ETF {stock_code} 持仓信息失败: {holdings_data['error']}")
+        except Exception as e:
+            print(f"❌ 获取ETF持仓信息时出错: {e}")
+    
+    # ETF和股票使用不同的分析模板
+    if is_etf:
+        system_message = """你是一位专业的ETF基金分析师，专精于ETF产品的结构分析和投资价值评估。你的任务是基于ETF的真实持仓数据和基本信息，提供专业、客观的ETF分析，为投资决策提供依据。
+
+**分析重点：**
+- ETF跟踪指数分析：分析跟踪误差、管理费用、流动性等关键指标
+- 持仓结构分析：分析持仓集中度、行业分布、权重股特征
+- 投资价值评估：评估ETF的投资适用性和风险收益特征
+- 市场表现分析：分析ETF相对基准指数的表现和折溢价情况
+
+**输出格式：**
+## 📊 ETF产品概况
+## 🏢 持仓结构分析
+## ⚖️ 投资价值评估
+## 📈 市场表现与风险
+
+**分析要求：**
+- 用中文撰写，报告不超过600字
+- 重点分析持仓股票的质量和风险分散效果
+- 使用专业、客观的语言，不包含具体投资建议
+- 所有分析必须基于真实数据，严禁编造数据或主观臆测"""
+    else:
+        system_message = """你是一位专业的股票基本面分析师，专精于深入的财务和基本面分析。你的任务是基于真实财务数据，提供专业、客观的基本面分析，为投资决策提供基本面依据。
 
 **分析重点：**
 - 财务健康评估：分析资产负债表、现金流和盈利能力
@@ -540,12 +582,28 @@ def generate_fundamental_analysis_report(
 - 使用专业、客观的语言，不包含具体投资建议
 - 所有分析必须基于真实数据，严禁编造数据或主观臆测"""
 
-    user_message = f"""请基于以下真实数据，对{stock_name}({stock_code})进行全面的基本面分析：
+    # 构建用户消息，ETF包含持仓信息
+    if is_etf and etf_holdings_section:
+        user_message = f"""请基于以下真实数据，对{stock_name}({stock_code})进行全面的ETF基本面分析：
+
+**ETF信息：**
+- 产品名称：{stock_name}
+- ETF代码：{stock_code}
+- 市场：{market_name}
+- 货币：{currency_name}({currency_symbol})
+
+**基本面数据：**
+{basic_info_section}
+
+**持仓结构数据：**
+{etf_holdings_section}"""
+    else:
+        user_message = f"""请基于以下真实数据，对{stock_name}({stock_code})进行全面的基本面分析：
 
 **股票信息：**
 - 公司名称：{stock_name}
 - 股票代码：{stock_code}
-- 市场：{stock_identity.get('market_name', '未知')}
+- 市场：{market_name}
 - 货币：{currency_name}({currency_symbol})
 
 **基本面数据：**

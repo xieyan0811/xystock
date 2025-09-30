@@ -100,6 +100,248 @@ def display_stock_info(stock_identity):
                 st.code(str(e), language="text")
 
 
+def display_more_financial_indicators(basic_info_data, stock_identity):
+    """显示更多财务指标"""
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    with st.expander("更多财务指标", expanded=True):
+        # 检查是否为A股，如果不是则显示提示信息
+        if market_name not in ['A股']:
+            st.info(f"💡 更多财务指标功能主要支持A股，{market_name}的详细财务指标数据可能有限")
+        
+        # 使用格式化器获取所有财务指标（包含股息分红信息）
+        formatted_info = formatter.format_basic_info(basic_info_data, stock_identity, include_dividend=True)
+        
+        # 检查是否有实际的财务指标数据
+        has_financial_data = False
+        sections = formatted_info.split('\n## ')
+        
+        for section in sections:
+            if section.startswith('📊 盈利能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📊 盈利能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('💰 偿债能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("💰 偿债能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('🔄 营运能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("🔄 营运能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('📈 成长能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📈 成长能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('📋 估值指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📋 估值指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('💎 每股指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("💎 每股指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('💰 股息分红信息'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("💰 股息分红信息")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+                        elif line.strip() and line.startswith('#### '):
+                            st.write(f"**{line[5:]}**")  # 处理子标题
+        
+        # 如果没有财务数据，显示相应提示
+        if not has_financial_data:
+            if market_name == 'A股':
+                st.warning("⚠️ 暂无该股票的详细财务指标数据")
+            else:
+                st.warning(f"⚠️ {market_name}暂不支持详细财务指标数据获取，建议查看基本价格信息")
+
+
+def display_etf_holdings_info(stock_identity):
+    """显示ETF持仓信息"""
+    stock_code = stock_identity['code']
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    # 判断是否为ETF - 通过代码特征或市场类型判断
+    is_etf = (market_name == 'ETF' or 
+              stock_code.startswith('51') or stock_code.startswith('15') or stock_code.startswith('50') or
+              '基金' in stock_identity.get('name', '') or 'ETF' in stock_identity.get('name', ''))
+    
+    if not is_etf:
+        return
+        
+    with st.expander("📊 ETF持仓信息", expanded=True):
+        try:
+            # 导入ETF持仓获取器
+            from stock.etf_holdings_fetcher import etf_holdings_fetcher
+            from utils.data_formatters import get_stock_formatter
+            
+            # 获取ETF持仓数据
+            holdings_data = etf_holdings_fetcher.get_etf_holdings(stock_code, top_n=10)
+            
+            if 'error' in holdings_data:
+                st.warning(f"⚠️ 获取ETF持仓信息失败: {holdings_data['error']}")
+                st.info("💡 可能原因：该产品不是ETF基金，或暂无持仓数据")
+                return
+            
+            # 显示ETF基本持仓信息
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("持仓股票总数", f"{holdings_data.get('total_holdings_count', 0)}只")
+            
+            with col2:
+                if 'statistics' in holdings_data and 'concentration_analysis' in holdings_data['statistics']:
+                    conc = holdings_data['statistics']['concentration_analysis']
+                    st.metric("集中度水平", conc.get('concentration_level', '未知'))
+            
+            with col3:
+                if 'statistics' in holdings_data and 'concentration_analysis' in holdings_data['statistics']:
+                    conc = holdings_data['statistics']['concentration_analysis']
+                    st.metric("前10大持仓占比", f"{conc.get('top_10_weight', 0)}%")
+            
+            # 显示主要持仓股票
+            st.subheader("🏆 主要持仓股票 (前10名)")
+            
+            holdings = holdings_data.get('holdings', [])
+            if holdings:
+                # 创建表格数据
+                table_data = []
+                for i, holding in enumerate(holdings[:10]):
+                    table_data.append({
+                        '排名': holding.get('序号', i+1),
+                        '股票代码': holding.get('股票代码', ''),
+                        '股票名称': holding.get('股票名称', ''),
+                        '占净值比例(%)': f"{holding.get('占净值比例', 0):.2f}",
+                        '持仓市值(万元)': f"{holding.get('持仓市值', 0):,.0f}" if holding.get('持仓市值') else '-'
+                    })
+                
+                # 显示表格
+                df_holdings = pd.DataFrame(table_data)
+                st.dataframe(df_holdings, use_container_width=True, hide_index=True)
+            
+            st.caption(f"数据更新时间: {holdings_data.get('update_time', '')} | 数据日期: {holdings_data.get('data_date', '')}")
+            
+        except ImportError:
+            st.error("❌ ETF持仓分析功能未安装，请联系管理员")
+        except Exception as e:
+            st.error(f"❌ 获取ETF持仓信息时出错: {str(e)}")
+
+
+def display_dividend_details(basic_info_data, stock_identity):
+    """显示股息分红详情"""
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    # 单独显示股息分红信息区块
+    dividend_fields = [key for key in basic_info_data.keys() if '分红' in key or '派息' in key or '送股' in key or '转增' in key]
+    
+    # 无论是否有分红数据都显示该区块，以便提供用户提示
+    with st.expander("💰 股息分红详情", expanded=False):
+        # 检查是否为A股，如果不是则显示提示信息
+        if market_name not in ['A股']:
+            st.info(f"💡 股息分红功能主要支持A股，{market_name}的分红数据可能无法获取")
+            
+            # 对于港股，可能有股息但格式不同，对于ETF通常没有分红
+            if market_name == '港股':
+                st.info("💡 港股分红信息建议查看相关港股资讯网站或券商APP")
+            elif market_name == 'ETF':
+                st.info("💡 ETF产品通常采用净值增长方式，较少进行现金分红")
+        
+        if dividend_fields:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 最新分红信息
+                if basic_info_data.get('最新分红公告日期'):
+                    st.write(f"**最新分红公告日期:** {basic_info_data['最新分红公告日期']}")
+                
+                if basic_info_data.get('最新派息比例') and basic_info_data['最新派息比例'] not in [None, 0]:
+                    st.write(f"**最新派息比例:** {basic_info_data['最新派息比例']:.2f}元/10股")
+                
+                if basic_info_data.get('近年平均派息比例') and basic_info_data['近年平均派息比例'] not in [None, 0]:
+                    st.write(f"**近年平均派息比例:** {basic_info_data['近年平均派息比例']:.2f}元/10股")
+            
+            with col2:
+                if basic_info_data.get('最新分红类型'):
+                    st.write(f"**分红类型:** {basic_info_data['最新分红类型']}")
+                
+                if basic_info_data.get('近年分红次数'):
+                    st.write(f"**近年分红次数:** {basic_info_data['近年分红次数']}次")
+                
+                # 显示送股和转增信息
+                if basic_info_data.get('最新送股比例') and basic_info_data['最新送股比例'] not in [None, 0]:
+                    st.write(f"**最新送股比例:** {basic_info_data['最新送股比例']:.2f}股/10股")
+                
+                if basic_info_data.get('最新转增比例') and basic_info_data['最新转增比例'] not in [None, 0]:
+                    st.write(f"**最新转增比例:** {basic_info_data['最新转增比例']:.2f}股/10股")
+            
+            # 显示近年分红详情
+            if basic_info_data.get('近年分红详情'):
+                st.subheader("📊 近年分红记录")
+                dividend_records = basic_info_data['近年分红详情'][:5]  # 显示最多5条记录
+                
+                # 创建表格数据
+                table_data = []
+                for record in dividend_records:
+                    year = record.get('年份', '')
+                    dividend_type = record.get('分红类型', '')
+                    dividend_ratio = record.get('派息比例', 0)
+                    send_ratio = record.get('送股比例', 0)
+                    bonus_ratio = record.get('转增比例', 0)
+                    
+                    table_data.append({
+                        '年份': year,
+                        '分红类型': dividend_type,
+                        '派息比例(元/10股)': f"{dividend_ratio:.2f}" if dividend_ratio > 0 else "-",
+                        '送股比例(股/10股)': f"{send_ratio:.2f}" if send_ratio > 0 else "-",
+                        '转增比例(股/10股)': f"{bonus_ratio:.2f}" if bonus_ratio > 0 else "-"
+                    })
+                
+                if table_data:
+                    import pandas as pd
+                    df_dividend = pd.DataFrame(table_data)
+                    st.dataframe(df_dividend, use_container_width=True)
+        else:
+            # 没有分红数据时的提示
+            if market_name == 'A股':
+                st.warning("⚠️ 暂无该股票的分红记录数据")
+            else:
+                st.warning(f"⚠️ {market_name}暂不支持分红数据获取，或该品种无分红记录")
+
+
 def display_basic_info(stock_identity):
     """显示股票基本信息"""
     st.subheader("基本信息")
@@ -160,165 +402,65 @@ def display_basic_info(stock_identity):
                 if roe_value:
                     st.write(f"**ROE:** {roe_value}")
             
-            with st.expander("更多财务指标", expanded=True):
-                # 使用格式化器获取所有财务指标（包含股息分红信息）
-                formatted_info = formatter.format_basic_info(basic_info_data, stock_identity, include_dividend=True)
-                
-                # 解析并显示各个部分的指标
-                sections = formatted_info.split('\n## ')
-                for section in sections:
-                    if section.startswith('📊 盈利能力指标'):
-                        st.subheader("📊 盈利能力指标")
-                        lines = section.split('\n')[1:]  # 跳过标题行
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('💰 偿债能力指标'):
-                        st.subheader("💰 偿债能力指标")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('🔄 营运能力指标'):
-                        st.subheader("🔄 营运能力指标")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('📈 成长能力指标'):
-                        st.subheader("📈 成长能力指标")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('📋 估值指标'):
-                        st.subheader("📋 估值指标")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('💎 每股指标'):
-                        st.subheader("💎 每股指标")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                    
-                    elif section.startswith('💰 股息分红信息'):
-                        st.subheader("💰 股息分红信息")
-                        lines = section.split('\n')[1:]
-                        for line in lines:
-                            if line.strip() and line.startswith('- '):
-                                st.write(f"**{line[2:]}**")
-                            elif line.strip() and line.startswith('#### '):
-                                st.write(f"**{line[5:]}**")  # 处理子标题
-
-            # 单独显示股息分红信息区块
-            dividend_fields = [key for key in basic_info_data.keys() if '分红' in key or '派息' in key or '送股' in key or '转增' in key]
-            if dividend_fields:
-                with st.expander("💰 股息分红详情", expanded=False):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # 最新分红信息
-                        if basic_info_data.get('最新分红公告日期'):
-                            st.write(f"**最新分红公告日期:** {basic_info_data['最新分红公告日期']}")
-                        
-                        if basic_info_data.get('最新派息比例') and basic_info_data['最新派息比例'] not in [None, 0]:
-                            st.write(f"**最新派息比例:** {basic_info_data['最新派息比例']:.2f}元/10股")
-                        
-                        if basic_info_data.get('近年平均派息比例') and basic_info_data['近年平均派息比例'] not in [None, 0]:
-                            st.write(f"**近年平均派息比例:** {basic_info_data['近年平均派息比例']:.2f}元/10股")
-                    
-                    with col2:
-                        if basic_info_data.get('最新分红类型'):
-                            st.write(f"**分红类型:** {basic_info_data['最新分红类型']}")
-                        
-                        if basic_info_data.get('近年分红次数'):
-                            st.write(f"**近年分红次数:** {basic_info_data['近年分红次数']}次")
-                        
-                        # 显示送股和转增信息
-                        if basic_info_data.get('最新送股比例') and basic_info_data['最新送股比例'] not in [None, 0]:
-                            st.write(f"**最新送股比例:** {basic_info_data['最新送股比例']:.2f}股/10股")
-                        
-                        if basic_info_data.get('最新转增比例') and basic_info_data['最新转增比例'] not in [None, 0]:
-                            st.write(f"**最新转增比例:** {basic_info_data['最新转增比例']:.2f}股/10股")
-                    
-                    # 显示近年分红详情
-                    if basic_info_data.get('近年分红详情'):
-                        st.subheader("📊 近年分红记录")
-                        dividend_records = basic_info_data['近年分红详情'][:5]  # 显示最多5条记录
-                        
-                        # 创建表格数据
-                        table_data = []
-                        for record in dividend_records:
-                            year = record.get('年份', '')
-                            dividend_type = record.get('分红类型', '')
-                            dividend_ratio = record.get('派息比例', 0)
-                            send_ratio = record.get('送股比例', 0)
-                            bonus_ratio = record.get('转增比例', 0)
-                            
-                            table_data.append({
-                                '年份': year,
-                                '分红类型': dividend_type,
-                                '派息比例(元/10股)': f"{dividend_ratio:.2f}" if dividend_ratio > 0 else "-",
-                                '送股比例(股/10股)': f"{send_ratio:.2f}" if send_ratio > 0 else "-",
-                                '转增比例(股/10股)': f"{bonus_ratio:.2f}" if bonus_ratio > 0 else "-"
-                            })
-                        
-                        if table_data:
-                            import pandas as pd
-                            df_dividend = pd.DataFrame(table_data)
-                            st.dataframe(df_dividend, use_container_width=True)
+            # 显示ETF持仓信息（如果是ETF）
+            display_etf_holdings_info(stock_identity)
+            
+            # 显示更多财务指标
+            display_more_financial_indicators(basic_info_data, stock_identity)
+            
+            # 显示股息分红详情
+            display_dividend_details(basic_info_data, stock_identity)
 
             st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:
             st.warning(f"未能获取到股票 {stock_code} 的实时数据")
         
-        st.divider()
-        st.subheader("基本面分析")
-        
-        try:
-            use_cache = st.session_state.get('use_cache', True)
-            force_refresh = not use_cache
-            
-            include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
-                                 stock_code not in st.session_state.get('ai_fundamental_report', {}))
-            
-            if include_ai_analysis:
-                with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
-            else:
-                fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
-            
-            if "ai_fundamental_report" not in st.session_state:
-                st.session_state.ai_fundamental_report = {}
-                
-            if 'ai_analysis' in fundamental_data:
-                if 'error' not in fundamental_data['ai_analysis']:
-                    st.session_state.ai_fundamental_report[stock_code] = {
-                        "report": fundamental_data['ai_analysis']['report'],
-                        "timestamp": fundamental_data['ai_analysis']['timestamp']
-                    }
-                else:
-                    st.error(f"AI基本面分析失败: {fundamental_data['ai_analysis']['error']}")
-                    st.info("请稍后再试或联系管理员")
-            
-            if stock_code in st.session_state.ai_fundamental_report:
-                with st.expander("🤖 AI 基本面分析报告", expanded=True):
-                    st.markdown(st.session_state.ai_fundamental_report[stock_code]["report"])
-                    st.caption(f"分析报告生成时间: {st.session_state.ai_fundamental_report[stock_code]['timestamp']}")
-                    
-        except Exception as e:
-            st.error(f"加载基本面分析数据失败: {str(e)}")
+        # 显示基本面分析
+        display_fundamental_analysis(stock_identity)
             
     except Exception as e:
         st.error(f"获取基本信息失败: {str(e)}")
+
+
+def display_fundamental_analysis(stock_identity):
+    """显示基本面分析"""
+    st.divider()
+    st.subheader("基本面分析")
+    
+    stock_code = stock_identity['code']
+    try:
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
+        include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                             stock_code not in st.session_state.get('ai_fundamental_report', {}))
+        
+        if include_ai_analysis:
+            with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
+                fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+        else:
+            fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
+        
+        if "ai_fundamental_report" not in st.session_state:
+            st.session_state.ai_fundamental_report = {}
+            
+        if 'ai_analysis' in fundamental_data:
+            if 'error' not in fundamental_data['ai_analysis']:
+                st.session_state.ai_fundamental_report[stock_code] = {
+                    "report": fundamental_data['ai_analysis']['report'],
+                    "timestamp": fundamental_data['ai_analysis']['timestamp']
+                }
+            else:
+                st.error(f"AI基本面分析失败: {fundamental_data['ai_analysis']['error']}")
+                st.info("请稍后再试或联系管理员")
+        
+        if stock_code in st.session_state.ai_fundamental_report:
+            with st.expander("🤖 AI 基本面分析报告", expanded=True):
+                st.markdown(st.session_state.ai_fundamental_report[stock_code]["report"])
+                st.caption(f"分析报告生成时间: {st.session_state.ai_fundamental_report[stock_code]['timestamp']}")
+                
+    except Exception as e:
+        st.error(f"加载基本面分析数据失败: {str(e)}")
 
 
 def display_ai_market_analysis(kline_info, stock_code):

@@ -474,6 +474,74 @@ class StockDataFormatter:
                 parts.append(f"- 成交量: {format_volume(basic_info['volume'])}")
         
         return "\n".join(parts)
+    
+    def format_etf_holdings(self, holdings_data: Dict[str, Any], max_display: int = 20) -> str:
+        """格式化ETF持仓数据为Markdown格式的文本"""
+        if not holdings_data or 'error' in holdings_data:
+            return f"获取ETF持仓数据时出错: {holdings_data.get('error', '未知错误')}\n"
+        
+        etf_code = holdings_data['etf_code']
+        holdings = holdings_data['holdings']
+        statistics = holdings_data.get('statistics', {})
+        
+        md_content = f"\n## 📊 ETF {etf_code} 持仓分析\n\n"
+        
+        # 基本信息
+        md_content += f"- 数据日期: {holdings_data.get('data_date', '')}\n"
+        md_content += f"- 持仓股票总数: {holdings_data.get('total_holdings_count', 0)}\n"
+        
+        # 集中度分析
+        if statistics and 'concentration_analysis' in statistics:
+            conc = statistics['concentration_analysis']
+            md_content += f"- 集中度分析: {conc.get('analysis', '')}\n"
+            md_content += f"- 前5大持仓占比: {conc.get('top_5_weight', 0)}%\n"
+            md_content += f"- 前10大持仓占比: {conc.get('top_10_weight', 0)}%\n"
+            md_content += f"- 前20大持仓占比: {conc.get('top_20_weight', 0)}%\n"
+        
+        md_content += "\n### 主要持仓股票\n\n"
+        
+        # 显示持仓明细
+        display_count = min(len(holdings), max_display)
+        for i in range(display_count):
+            holding = holdings[i]
+            md_content += f"{holding['序号']:2d}. **{holding['股票代码']}** {holding['股票名称']} - {holding['占净值比例']:.2f}%\n"
+        
+        if len(holdings) > max_display:
+            md_content += f"\n*还有 {len(holdings) - max_display} 只股票...*\n"
+        
+        md_content += f"\n*数据更新时间: {holdings_data.get('update_time', '')}*\n"
+        
+        return md_content
+    
+    def format_etf_holdings_for_ai(self, holdings_data: Dict[str, Any], max_stocks: int = 30) -> str:
+        """为AI分析格式化ETF持仓数据为文本"""
+        if not holdings_data or 'error' in holdings_data:
+            return f"暂无ETF持仓数据: {holdings_data.get('error', '未知错误')}"
+        
+        etf_code = holdings_data['etf_code']
+        holdings = holdings_data['holdings']
+        statistics = holdings_data.get('statistics', {})
+        
+        text_parts = []
+        text_parts.append(f"ETF {etf_code} 持仓分析:")
+        text_parts.append(f"- 持仓股票总数: {holdings_data.get('total_holdings_count', 0)}")
+        text_parts.append(f"- 数据日期: {holdings_data.get('data_date', '')}")
+        
+        # 集中度分析
+        if statistics and 'concentration_analysis' in statistics:
+            conc = statistics['concentration_analysis']
+            text_parts.append(f"- 集中度水平: {conc.get('concentration_level', '')}集中度")
+            text_parts.append(f"- 前10大持仓占比: {conc.get('top_10_weight', 0)}%")
+        
+        # 主要持仓
+        text_parts.append(f"\n前{min(len(holdings), max_stocks)}大持仓:")
+        for i, holding in enumerate(holdings[:max_stocks]):
+            text_parts.append(f"{holding['序号']:2d}. {holding['股票代码']} {holding['股票名称']} {holding['占净值比例']:.2f}%")
+        
+        if len(holdings) > max_stocks:
+            text_parts.append(f"... 另有 {len(holdings) - max_stocks} 只股票")
+        
+        return "\n".join(text_parts)
 
 
 def get_indicator_value(basic_info: Dict[str, Any], indicator_key: str) -> Any:
