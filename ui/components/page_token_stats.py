@@ -76,7 +76,7 @@ def show_model_distribution(days=30):
         color=alt.Color('model', legend=None)
     ).properties(height=300)
     
-    st.altair_chart(chart, width='stretch')
+    st.altair_chart(chart, use_container_width=True)
     
     with st.expander("模型使用详细数据", expanded=False):
         st.dataframe(model_df, width='stretch')

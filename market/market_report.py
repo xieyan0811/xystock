@@ -11,6 +11,7 @@ from utils.report_utils import generate_pdf_report, generate_docx_report, genera
 from ui.config import FOCUS_INDICES
 from market.market_data_utils import collect_market_data_for_report, format_index_detail
 from utils.data_formatters import format_technical_indicators, format_risk_metrics
+from version import get_full_version
 
 
 def write_market_report(index_name="上证指数", format_type="pdf", has_ai_analysis=False, user_opinion=""):
@@ -49,7 +50,12 @@ def write_market_report(index_name="上证指数", format_type="pdf", has_ai_ana
 def generate_markdown_market_report(index_name, report_data):
     """生成Markdown格式的市场报告"""
     
-    md_content = ""
+    md_content = f"# 📊 {index_name} 市场分析报告\n\n"
+    
+    # 添加版本信息和生成时间
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    md_content += f"**📅 报告生成时间:** {current_time}  \n"
+    md_content += f"**🔧 生成工具:** {get_full_version()}  \n\n"
 
     # AI分析部分
     ai_analysis = report_data.get('ai_analysis', {})

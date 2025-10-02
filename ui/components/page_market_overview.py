@@ -16,7 +16,7 @@ if project_root not in sys.path:
 from utils.format_utils import format_large_number
 from market.market_data_tools import get_market_tools
 from market.market_report import write_market_report
-from ui.config import FOCUS_INDICES
+from ui.config import FOCUS_INDICES, FULL_VERSION
 
 
 def display_valuation_analysis(index_name='沪深300', use_cache=True):
@@ -340,7 +340,11 @@ def display_market_indices():
                     )
         
         if 'update_time' in indices_data:
-            st.caption(f"数据更新时间: {indices_data['update_time']}")
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.caption(f"数据更新时间: {indices_data['update_time']}")
+            with col2:
+                st.caption(f"{FULL_VERSION}", help="当前系统版本")
                             
     except Exception as e:
         st.error(f"显示指数数据时出错: {str(e)}")

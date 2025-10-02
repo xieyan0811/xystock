@@ -10,6 +10,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.append(project_root)
 
 from config_manager import config
+from ui.config import FULL_VERSION
 
 def save_config(section, key, value):
     """保存单个配置项到配置文件"""
@@ -164,9 +165,9 @@ def main():
 
     st.markdown("---")
     st.markdown(
-        """
+        f"""
         <div style='text-align: center; color: #666;'>
-            <small>XY Stock 配置管理 | 重启应用后设置生效</small>
+            <small>{FULL_VERSION} | 配置管理 | 重启应用后设置生效</small>
         </div>
         """,
         unsafe_allow_html=True

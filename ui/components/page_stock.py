@@ -16,6 +16,7 @@ from utils.format_utils import format_volume, format_market_value, format_price,
 from utils.data_formatters import get_stock_formatter
 from stock.stock_data_tools import get_stock_tools
 from stock.stock_report import generate_stock_report
+from version import get_full_version
 
 stock_tools = get_stock_tools()
 formatter = get_stock_formatter()

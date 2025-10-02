@@ -1,6 +1,15 @@
 """
 UI配置文件
 """
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from version import get_version, get_app_name, get_full_version
+
+# 版本信息
+VERSION = get_version()
+APP_NAME = get_app_name()
+FULL_VERSION = get_full_version()
 
 # Streamlit 应用配置
 STREAMLIT_CONFIG = {

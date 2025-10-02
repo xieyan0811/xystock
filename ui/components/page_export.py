@@ -12,6 +12,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from utils.report_utils import PDF_SUPPORT_AVAILABLE
+from version import get_version
 
 
 def get_format_config():

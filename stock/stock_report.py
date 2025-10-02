@@ -10,6 +10,7 @@ if project_root not in sys.path:
 from stock.stock_data_tools import get_stock_tools
 from utils.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 from utils.data_formatters import get_stock_formatter
+from version import get_version, get_full_version
 
 
 def generate_stock_report(stock_identity: Dict[str, Any], 
@@ -122,10 +123,12 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
     stock_name = stock_identity['name']
     market_type = stock_identity['market_name']
 
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     md_content = f"""# {stock_name}({stock_code}) 完整分析报告
 
 **市场类型**: {market_type}  
-**报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**报告生成时间**: {current_time}  
+**生成工具**: {get_full_version()}
 
 """
 

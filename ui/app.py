@@ -17,6 +17,7 @@ from ui.components.page_stock import display_stock_info
 from ui.components.page_market_overview import display_market_overview
 from ui.components.page_cache_management import main as display_cache_management
 from stock.stock_code_map import get_stock_identity
+from ui.config import FULL_VERSION
 
 def set_requests_timeout(timeout=30):
     """全局设置 requests 默认超时时间（monkey patch）"""
@@ -51,7 +52,7 @@ def main():
     """
     st.markdown(minimal_hide_style, unsafe_allow_html=True)
     
-    st.title("📈 XY Stock 股票分析系统")
+    #st.title("📈 XY Stock 股票分析系统")
     
     with st.sidebar:
         st.header("功能菜单")
@@ -65,7 +66,7 @@ def main():
         
         st.markdown("---")
         st.write("版本信息:")
-        st.write("- Streamlit UI v1.1")
+        st.write(f"- {FULL_VERSION}")
         st.write("- 端口: 8811")
     
     if menu == "大盘分析":
