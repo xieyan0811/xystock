@@ -114,7 +114,7 @@ def display_more_financial_indicators(basic_info_data, stock_identity):
         
         # 检查是否有实际的财务指标数据
         has_financial_data = False
-        sections = formatted_info.split('\n## ')
+        sections = formatted_info.split('\n### ')
         
         for section in sections:
             if section.startswith('📊 盈利能力指标'):
@@ -170,18 +170,7 @@ def display_more_financial_indicators(basic_info_data, stock_identity):
                     for line in lines:
                         if line.strip() and line.startswith('- '):
                             st.write(f"**{line[2:]}**")
-            
-            elif section.startswith('💰 股息分红信息'):
-                lines = section.split('\n')[1:]
-                if any(line.strip() and line.startswith('- ') for line in lines):
-                    has_financial_data = True
-                    st.subheader("💰 股息分红信息")
-                    for line in lines:
-                        if line.strip() and line.startswith('- '):
-                            st.write(f"**{line[2:]}**")
-                        elif line.strip() and line.startswith('#### '):
-                            st.write(f"**{line[5:]}**")  # 处理子标题
-        
+                        
         # 如果没有财务数据，显示相应提示
         if not has_financial_data:
             if market_name == 'A股':
@@ -251,7 +240,7 @@ def display_etf_holdings_info(stock_identity):
                 
                 # 显示表格
                 df_holdings = pd.DataFrame(table_data)
-                st.dataframe(df_holdings, use_container_width=True, hide_index=True)
+                st.dataframe(df_holdings, width='stretch', hide_index=True)
             
             st.caption(f"数据更新时间: {holdings_data.get('update_time', '')} | 数据日期: {holdings_data.get('data_date', '')}")
             
@@ -333,7 +322,7 @@ def display_dividend_details(basic_info_data, stock_identity):
                 if table_data:
                     import pandas as pd
                     df_dividend = pd.DataFrame(table_data)
-                    st.dataframe(df_dividend, use_container_width=True)
+                    st.dataframe(df_dividend, width='stretch')
         else:
             # 没有分红数据时的提示
             if market_name == 'A股':
@@ -683,7 +672,7 @@ def display_chips_analysis(stock_identity):
             
             df = pd.DataFrame(data)
             
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
             
             st.subheader("关键价格区间")
             col1, col2, col3 = st.columns(3)

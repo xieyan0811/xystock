@@ -103,7 +103,7 @@ def display_generate_button(entity_id, report_type="report", button_text="🔄 �
     safe_entity_id = str(entity_id) if entity_id is not None else "unknown"
     
     button_key = f"generate_{safe_report_type}_{safe_entity_id}"
-    return st.button(button_text, key=button_key, use_container_width=True)
+    return st.button(button_text, key=button_key, width='stretch')
 
 
 def handle_report_generation(entity_id, format_type, report_type="report", 
@@ -227,7 +227,7 @@ def display_download_button(entity_id, report_type="report"):
             file_name=st.session_state[filename_key],
             mime=st.session_state[mime_key],
             key=f"download_{safe_report_type}_{safe_entity_id}",
-            use_container_width=True,
+            width='stretch',
             help=f"点击下载生成的{current_format.upper()}报告文件"
         )
         
@@ -306,7 +306,7 @@ def display_quick_export_buttons(entity_id, report_type="report",
             if st.button(
                 f"{format_icons.get(format_type, '📄')} {format_names.get(format_type, format_type.upper())}", 
                 key=button_key,
-                use_container_width=True
+                width='stretch'
             ):
                 handle_report_generation(
                     entity_id, format_type, report_type, 
@@ -349,7 +349,7 @@ def display_batch_export_options(entities, report_type="report",
     format_type = display_format_selector("batch", f"batch_{report_type}")
     
     # 批量导出按钮
-    if st.button("🔄 批量生成报告", key=f"batch_generate_{report_type}", use_container_width=True):
+    if st.button("🔄 批量生成报告", key=f"batch_generate_{report_type}", width='stretch'):
         progress_bar = st.progress(0)
         status_text = st.empty()
         

@@ -23,7 +23,7 @@ def main():
         
         if st.button("🗑️ 清理股票数据缓存", 
                     type="primary", 
-                    use_container_width=True,
+                    width='stretch',
                     help="清理所有股票相关的数据缓存"):
             try:
                 from stock.stock_data_tools import clear_stock_cache
@@ -38,7 +38,7 @@ def main():
         
         if st.button("🗑️ 清理大盘数据缓存", 
                     type="primary", 
-                    use_container_width=True,
+                    width='stretch',
                     help="清理所有大盘相关的数据缓存"):
             try:
                 from market.market_data_tools import get_market_tools
@@ -58,7 +58,7 @@ def main():
         # 使用session_state实现确认弹窗
         if st.button("🗑️ 清理所有缓存", 
                     type="secondary", 
-                    use_container_width=True,
+                    width='stretch',
                     help="一键清理所有股票和大盘数据缓存"):
             st.session_state['show_clear_all_confirm'] = True
 
