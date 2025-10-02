@@ -11,6 +11,36 @@ if project_dir not in sys.path:
 from utils.format_utils import format_large_number, format_market_value, format_price, format_percentage, format_volume, judge_rsi_level
 
 
+def format_numeric_value(value, decimal_places=2):
+    """
+    格式化数值，处理字符串类型的数值
+    
+    Args:
+        value: 要格式化的值，可能是数值或字符串类型的数值
+        decimal_places: 保留的小数位数
+    
+    Returns:
+        str: 格式化后的数值字符串
+    """
+    if value is None:
+        return "0.00"
+    
+    # 如果是字符串，尝试转换为浮点数
+    if isinstance(value, str):
+        try:
+            # 去除可能的百分号和空格
+            clean_value = value.strip().rstrip('%')
+            numeric_value = float(clean_value)
+            return f"{numeric_value:.{decimal_places}f}"
+        except (ValueError, TypeError):
+            # 如果转换失败，返回原始字符串
+            return value
+    elif isinstance(value, (int, float)):
+        return f"{value:.{decimal_places}f}"
+    else:
+        return str(value)
+
+
 def format_technical_indicators(tech_indicators):
     """
     为市场报告格式化技术指标数据（固定格式）
@@ -208,10 +238,8 @@ class StockDataFormatter:
         for field_name in profitability_indicators:
             if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                 value = basic_info[field_name]
-                if isinstance(value, str):
-                    profitability_section += f"- {field_name}: {value}%\n"
-                elif isinstance(value, (int, float)):
-                    profitability_section += f"- {field_name}: {value:.2f}%\n"
+                formatted_value = format_numeric_value(value, 2)
+                profitability_section += f"- {field_name}: {formatted_value}%\n"
         
         if profitability_section:
             md_content += "\n### 📊 盈利能力指标\n" + profitability_section
@@ -223,15 +251,11 @@ class StockDataFormatter:
             if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                 value = basic_info[field_name]
                 if field_name == '资产负债率':
-                    if isinstance(value, str):
-                        solvency_section += f"- {field_name}: {value}%\n"
-                    elif isinstance(value, (int, float)):
-                        solvency_section += f"- {field_name}: {value:.2f}%\n"
+                    formatted_value = format_numeric_value(value, 2)
+                    solvency_section += f"- {field_name}: {formatted_value}%\n"
                 else:
-                    if isinstance(value, (int, float)):
-                        solvency_section += f"- {field_name}: {value:.2f}\n"
-                    else:
-                        solvency_section += f"- {field_name}: {value}\n"
+                    formatted_value = format_numeric_value(value, 2)
+                    solvency_section += f"- {field_name}: {formatted_value}\n"
         
         if solvency_section:
             md_content += "\n### 💰 偿债能力指标\n" + solvency_section
@@ -242,10 +266,8 @@ class StockDataFormatter:
         for field_name in efficiency_indicators:
             if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                 value = basic_info[field_name]
-                if isinstance(value, (int, float)):
-                    efficiency_section += f"- {field_name}: {value:.2f}\n"
-                else:
-                    efficiency_section += f"- {field_name}: {value}\n"
+                formatted_value = format_numeric_value(value, 2)
+                efficiency_section += f"- {field_name}: {formatted_value}\n"
         
         if efficiency_section:
             md_content += "\n### 🔄 营运能力指标\n" + efficiency_section
@@ -256,19 +278,19 @@ class StockDataFormatter:
         for field_name in growth_indicators:
             if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                 value = basic_info[field_name]
-                if isinstance(value, (int, float)):
-                    growth_section += f"- {field_name}: {value:.2f}%\n"
-                else:
-                    growth_section += f"- {field_name}: {value}\n"
+                formatted_value = format_numeric_value(value, 2)
+                growth_section += f"- {field_name}: {formatted_value}%\n"
         
         if growth_section:
             md_content += "\n### 📈 成长能力指标\n" + growth_section
         
         valuation_section = ""
         if '市盈率' in basic_info and basic_info['市盈率'] is not None and str(basic_info['市盈率']).strip():
-            valuation_section += f"- 市盈率: {basic_info['市盈率']}\n"
+            formatted_pe = format_numeric_value(basic_info['市盈率'], 2)
+            valuation_section += f"- 市盈率: {formatted_pe}\n"
         if '市净率' in basic_info and basic_info['市净率'] is not None and str(basic_info['市净率']).strip():
-            valuation_section += f"- 市净率: {basic_info['市净率']}\n"
+            formatted_pb = format_numeric_value(basic_info['市净率'], 2)
+            valuation_section += f"- 市净率: {formatted_pb}\n"
         
         if valuation_section:
             md_content += "\n### 📋 估值指标\n" + valuation_section
@@ -280,10 +302,8 @@ class StockDataFormatter:
         for field_name in per_share_indicators:
             if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                 value = basic_info[field_name]
-                if isinstance(value, (int, float)):
-                    per_share_section += f"- {field_name}: {value:.2f}元\n"
-                else:
-                    per_share_section += f"- {field_name}: {value}\n"
+                formatted_value = format_numeric_value(value, 2)
+                per_share_section += f"- {field_name}: {formatted_value}元\n"
         
         if per_share_section:
             md_content += "\n### 💎 每股指标\n" + per_share_section
@@ -300,15 +320,11 @@ class StockDataFormatter:
                 if field_name in basic_info and basic_info[field_name] is not None and str(basic_info[field_name]).strip():
                     value = basic_info[field_name]
                     if field_name in ['最新派息比例', '近年平均派息比例']:
-                        if isinstance(value, (int, float)):
-                            dividend_section += f"- {field_name}: {value:.2f}元/10股\n"
-                        else:
-                            dividend_section += f"- {field_name}: {value}\n"
+                        formatted_value = format_numeric_value(value, 2)
+                        dividend_section += f"- {field_name}: {formatted_value}元/10股\n"
                     elif field_name in ['最新送股比例', '最新转增比例']:
-                        if isinstance(value, (int, float)):
-                            dividend_section += f"- {field_name}: {value:.2f}股/10股\n"
-                        else:
-                            dividend_section += f"- {field_name}: {value}\n"
+                        formatted_value = format_numeric_value(value, 2)
+                        dividend_section += f"- {field_name}: {formatted_value}股/10股\n"
                     else:
                         dividend_section += f"- {field_name}: {value}\n"
             

@@ -89,7 +89,7 @@ def display_stock_info(stock_identity):
                 info_text="💡 可以导出包含所有Tab内容的完整分析报告",
                 generate_func=generate_stock_report_wrapper,
                 generate_args=None,
-                filename_prefix=f"{stock_code}_完整分析报告"
+                filename_prefix=f"分析报告"
             )
                 
         except Exception as e:
@@ -258,7 +258,7 @@ def display_dividend_details(basic_info_data, stock_identity):
     dividend_fields = [key for key in basic_info_data.keys() if '分红' in key or '派息' in key or '送股' in key or '转增' in key]
     
     # 无论是否有分红数据都显示该区块，以便提供用户提示
-    with st.expander("💰 股息分红详情", expanded=False):
+    with st.expander("💰 股息分红详情", expanded=True):
         # 检查是否为A股，如果不是则显示提示信息
         if market_name not in ['A股']:
             st.info(f"💡 股息分红功能主要支持A股，{market_name}的分红数据可能无法获取")
@@ -350,11 +350,11 @@ def display_basic_info(stock_identity):
             col1, col2 = st.columns(2)
             
             with col1:
-                if basic_info_data.get('name'):
-                    st.write(f"**股票名称:** {basic_info_data['name']}")
+                if basic_info_data.get('股票名称'):
+                    st.info(f"**股票名称:** {basic_info_data['股票名称']}")
 
                 if basic_info_data.get('所处行业'):
-                    st.info(f"所属行业: {basic_info_data['所处行业']}")
+                    st.write(f"所属行业: {basic_info_data['所处行业']}")
                 
                 if basic_info_data.get('总市值'):
                     st.write(f"总市值: {format_market_value(basic_info_data['总市值'])}")
@@ -362,34 +362,31 @@ def display_basic_info(stock_identity):
                 if basic_info_data.get('流通市值'):
                     st.write(f"流通市值: {format_market_value(basic_info_data['流通市值'])}")
 
+                if basic_info_data.get('市盈率'):
+                    st.write(f"市盈率(动): {basic_info_data['市盈率']}")
+                
+                if basic_info_data.get('市净率'):
+                    st.write(f"市净率: {basic_info_data['市净率']}")
+                
+                roe_value = basic_info_data.get('净资产收益率(ROE)') or basic_info_data.get('ROE')
+                if roe_value:
+                    st.write(f"ROE: {roe_value}")
+
+            with col2:
                 st.metric(
                     label="当前价格", 
                     value=f"{format_price(basic_info_data.get('current_price', 0))}",
                     delta=format_change(basic_info_data.get('change', 0), 
                                         basic_info_data.get('change_percent', 0)),
                     delta_color="inverse"
-                )
-                
+                )                
                 st.metric("成交量", format_volume(basic_info_data.get('volume', 0)))
-
-            with col2:
-                st.write(f"**开盘价:** {format_price(basic_info_data.get('open', 0))}")
-                st.write(f"**最高价:** {format_price(basic_info_data.get('high', 0))}")
-                st.write(f"**最低价:** {format_price(basic_info_data.get('low', 0))}")
+                st.write(f"开盘价: {format_price(basic_info_data.get('open', 0))}")
+                st.write(f"最高价: {format_price(basic_info_data.get('high', 0))}")
+                st.write(f"最低价: {format_price(basic_info_data.get('low', 0))}")
                 prev_close = basic_info_data.get('prev_close', 0)
                 if prev_close > 0:
-                    st.write(f"**昨收价:** {format_price(prev_close)}")
-
-                if basic_info_data.get('市盈率'):
-                    st.write(f"**市盈率(动):** {basic_info_data['市盈率']}")
-                
-                if basic_info_data.get('市净率'):
-                    st.write(f"**市净率:** {basic_info_data['市净率']}")
-                
-                # ROE有两个可能的字段名，优先使用带括号的
-                roe_value = basic_info_data.get('净资产收益率(ROE)') or basic_info_data.get('ROE')
-                if roe_value:
-                    st.write(f"**ROE:** {roe_value}")
+                    st.write(f"昨收价: {format_price(prev_close)}")
             
             # 显示ETF持仓信息（如果是ETF）
             display_etf_holdings_info(stock_identity)
@@ -709,7 +706,7 @@ def display_chips_analysis(stock_identity):
                     yaxis=dict(fixedrange=True)
                 )
                 
-                st.plotly_chart(fig_profit, use_container_width=True, config={"scrollZoom": False})
+                st.plotly_chart(fig_profit, use_container_width=True)
                 st.subheader("平均成本变化趋势")
                 
                 fig_cost = go.Figure()
@@ -730,7 +727,7 @@ def display_chips_analysis(stock_identity):
                     yaxis=dict(fixedrange=True)
                 )
                 
-                st.plotly_chart(fig_cost, use_container_width=True, config={"scrollZoom": False})
+                st.plotly_chart(fig_cost, use_container_width=True)
             else:
                 st.info("未获取到筹码历史数据，无法绘制趋势图表")
         except Exception as e:

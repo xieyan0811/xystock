@@ -261,7 +261,7 @@ def display_kline_charts(df, chart_type="stock", title_prefix=""):
         yaxis=dict(fixedrange=True)
     )
     
-    st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
+    st.plotly_chart(fig_price, use_container_width=True)
     
     # 成交量图
     if 'volume' in df.columns and not df['volume'].isna().all():
@@ -284,7 +284,7 @@ def display_kline_charts(df, chart_type="stock", title_prefix=""):
             yaxis=dict(fixedrange=True)
         )
         
-        st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
+        st.plotly_chart(fig_volume, use_container_width=True)
     else:
         st.info("暂无成交量数据")
 
