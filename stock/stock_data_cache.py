@@ -21,9 +21,43 @@ class StockDataCache:
             'technical_indicators': {'expire_minutes': 30, 'description': '技术指标和风险指标'},
             'news_data': {'expire_minutes': 60, 'description': '新闻资讯数据'},
             'chip_data': {'expire_minutes': 1440, 'description': '筹码分析数据'},
-            'ai_analysis': {'expire_minutes': 180, 'description': 'AI分析报告'},
+            
+            # 细分AI分析类型，不同类型设置不同的过期时间
+            'ai_analysis_technical': {'expire_minutes': 60, 'description': 'AI技术分析'},
+            'ai_analysis_fundamental': {'expire_minutes': 360, 'description': 'AI基本面分析'},
+            'ai_analysis_news': {'expire_minutes': 120, 'description': 'AI新闻分析'},
+            'ai_analysis_chip': {'expire_minutes': 720, 'description': 'AI筹码分析'},
+            'ai_analysis_company': {'expire_minutes': 43200, 'description': 'AI公司分析'},
+            'ai_analysis_comprehensive': {'expire_minutes': 180, 'description': 'AI综合分析'},
+            
+            # 保持向后兼容
+            'ai_analysis': {'expire_minutes': 180, 'description': 'AI分析报告（通用）'},
         }
     
+    def _get_expire_minutes(self, data_type: str, cache_meta: Dict = None) -> int:
+        """动态获取过期时间配置"""
+        # 对于AI分析类型，优先使用具体的配置
+        if data_type == 'ai_analysis' and cache_meta:
+            analysis_type = cache_meta.get('analysis_type')
+            if analysis_type:
+                specific_key = f"ai_analysis_{analysis_type}"
+                if specific_key in self.cache_configs:
+                    return self.cache_configs[specific_key]['expire_minutes']
+        
+        # 使用通用配置
+        return self.cache_configs.get(data_type, {}).get('expire_minutes', 180)
+    
+    def _get_cache_description(self, data_type: str, analysis_type: str = None) -> str:
+        """获取缓存描述信息"""
+        # 对于AI分析类型，优先使用具体的配置
+        if data_type == 'ai_analysis' and analysis_type:
+            specific_key = f"ai_analysis_{analysis_type}"
+            if specific_key in self.cache_configs:
+                return self.cache_configs[specific_key]['description']
+        
+        # 使用通用配置
+        return self.cache_configs.get(data_type, {}).get('description', data_type)
+
     def _make_json_safe(self, obj):
         """对象转为JSON安全格式"""
         import numpy as np
@@ -69,53 +103,79 @@ class StockDataCache:
         except Exception as e:
             print(f"❌ 保存股票数据缓存失败: {e}")
     
-    def get_cache_key(self, data_type: str, stock_code: str) -> str:
+    def get_cache_key(self, data_type: str, stock_code: str, analysis_type: str = None) -> str:
         """生成缓存键"""
+        if data_type == 'ai_analysis' and analysis_type:
+            return f"ai_analysis_{analysis_type}_{stock_code}"
         return f"{data_type}_{stock_code}"
     
-    def is_cache_valid(self, data_type: str, stock_code: str) -> bool:
+    def is_cache_valid(self, data_type: str, stock_code: str, analysis_type: str = None) -> bool:
         """检查缓存是否有效"""
         try:
             cache_data = self.load_cache()
-            cache_key = self.get_cache_key(data_type, stock_code)
+            cache_key = self.get_cache_key(data_type, stock_code, analysis_type)
             if cache_key not in cache_data:
                 return False
             cache_meta = cache_data[cache_key].get('cache_meta', {})
             cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-            expire_minutes = self.cache_configs[data_type]['expire_minutes']
+            
+            # 动态获取过期时间配置
+            expire_minutes = self._get_expire_minutes(data_type, cache_meta)
             expire_time = cache_time + timedelta(minutes=expire_minutes)
             return datetime.now() < expire_time
         except Exception:
             return False
     
-    def get_cached_data(self, data_type: str, stock_code: str) -> Dict:
+    def get_cached_data(self, data_type: str, stock_code: str, analysis_type: str = None) -> Dict:
         """获取缓存数据"""
         try:
             cache_data = self.load_cache()
-            cache_key = self.get_cache_key(data_type, stock_code)
+            cache_key = self.get_cache_key(data_type, stock_code, analysis_type)
             return cache_data.get(cache_key, {}).get('data', {})
         except Exception:
             return {}
     
-    def save_cached_data(self, data_type: str, stock_code: str, data: Dict):
+    def save_cached_data(self, data_type: str, stock_code: str, data: Dict, analysis_type: str = None):
         """保存数据到缓存"""
         try:
             cache_data = self.load_cache()
-            cache_key = self.get_cache_key(data_type, stock_code)
+            cache_key = self.get_cache_key(data_type, stock_code, analysis_type)
+            
+            # 动态获取过期时间配置
+            expire_minutes = self._get_expire_minutes(data_type, {'analysis_type': analysis_type})
+            
             cache_data[cache_key] = {
                 'cache_meta': {
                     'timestamp': datetime.now().isoformat(),
                     'data_type': data_type,
                     'stock_code': stock_code,
-                    'expire_minutes': self.cache_configs[data_type]['expire_minutes']
+                    'analysis_type': analysis_type,
+                    'expire_minutes': expire_minutes
                 },
                 'data': data
             }
             self.save_cache(cache_data)
-            print(f"💾 {stock_code} {self.cache_configs[data_type]['description']}已缓存")
+            
+            # 获取描述信息
+            description = self._get_cache_description(data_type, analysis_type)
+            print(f"💾 {stock_code} {description}已缓存")
         except Exception as e:
             print(f"❌ 缓存股票数据失败: {e}")
     
+    def get_ai_analysis_cache(self, stock_code: str, analysis_type: str, use_cache: bool = True) -> Dict:
+        """获取AI分析缓存的便捷方法"""
+        if not use_cache:
+            return {}
+        return self.get_cached_data('ai_analysis', stock_code, analysis_type)
+    
+    def set_ai_analysis_cache(self, stock_code: str, analysis_type: str, data: Dict):
+        """设置AI分析缓存的便捷方法"""
+        self.save_cached_data('ai_analysis', stock_code, data, analysis_type)
+    
+    def is_ai_analysis_cache_valid(self, stock_code: str, analysis_type: str) -> bool:
+        """检查AI分析缓存是否有效的便捷方法"""
+        return self.is_cache_valid('ai_analysis', stock_code, analysis_type)
+
     def clear_cache(self, stock_code: Optional[str] = None, data_type: Optional[str] = None):
         """清理缓存"""
         try:
@@ -186,7 +246,8 @@ class StockDataCache:
                 if stock_code and cached_stock_code != stock_code:
                     continue
                 cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                expire_minutes = cache_meta.get('expire_minutes', 60)
+                # 动态获取过期时间配置
+                expire_minutes = self._get_expire_minutes(data_type, cache_meta)
                 expire_time = cache_time + timedelta(minutes=expire_minutes)
                 is_valid = current_time < expire_time
                 remaining_minutes = (expire_time - current_time).total_seconds() / 60
@@ -201,7 +262,7 @@ class StockDataCache:
                     'stock_code': cached_stock_code,
                     'data_type': data_type,
                     'analysis_type': analysis_type,
-                    'description': self.cache_configs.get(data_type, {}).get('description', data_type),
+                    'description': self._get_cache_description(data_type, analysis_type),
                     'valid': is_valid,
                     'cache_time': cache_time.strftime('%Y-%m-%d %H:%M:%S'),
                     'expire_minutes': expire_minutes,

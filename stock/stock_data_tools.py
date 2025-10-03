@@ -276,8 +276,8 @@ class StockTools:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
                 
-        # 使用分析类型区分不同的AI分析
-        cache_key = f"{data_type}_{analysis_type}_{stock_code}"
+        # 使用统一的缓存键命名
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
         
         if use_cache:
             try:
@@ -285,9 +285,13 @@ class StockTools:
                 if cache_key in cache_data:
                     cache_meta = cache_data[cache_key].get('cache_meta', {})
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                    expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
+                    
+                    # 使用动态过期时间配置
+                    expire_minutes = self.cache_manager._get_expire_minutes(data_type, cache_meta)
+                    expire_time = cache_time + timedelta(minutes=expire_minutes)
+                    
                     if datetime.now() < expire_time:
-                        print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析")
+                        print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析 (缓存有效期: {expire_minutes}分钟)")
                         return cache_data[cache_key].get('data', {})
             except Exception:
                 pass
@@ -296,26 +300,15 @@ class StockTools:
     
     def set_ai_analysis(self, stock_code: str, analysis_type: str, analysis_data: Dict):
         """设置AI分析数据"""
-            
-        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        """设置AI分析数据"""
         analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        try:
-            cache_data = self.cache_manager.load_cache()
-            cache_data[cache_key] = {
-                'cache_meta': {
-                    'timestamp': datetime.now().isoformat(),
-                    'data_type': 'ai_analysis',
-                    'stock_code': stock_code,
-                    'analysis_type': analysis_type,
-                    'expire_minutes': self.cache_manager.cache_configs['ai_analysis']['expire_minutes']
-                },
-                'data': analysis_data
-            }
-            self.cache_manager.save_cache(cache_data)
-            print(f"💾 {stock_code} {analysis_type} AI分析已缓存")
-        except Exception as e:
-            print(f"❌ 缓存AI分析失败: {e}")
+        # 使用AI分析专用缓存方法，自动处理动态过期时间
+        self.cache_manager.set_ai_analysis_cache(stock_code, analysis_type, analysis_data)
+        
+        # 获取对应的过期时间信息
+        expire_minutes = self.cache_manager._get_expire_minutes('ai_analysis', {'analysis_type': analysis_type})
+        print(f"💾 {stock_code} {analysis_type} AI分析已缓存 (有效期: {expire_minutes}分钟)")
     
     # =========================
     # AI分析报告方法
@@ -447,7 +440,7 @@ class StockTools:
         """生成筹码分析报告（带缓存）"""
         analysis_type = "chip"
         stock_code = stock_identity['code']
-        stock_name = stock_identity['name']
+        stock_name = stock_identity.get('name', '')
 
         if use_cache and not force_refresh:
             cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
@@ -687,4 +680,26 @@ def clear_stock_cache(stock_code: str = None, data_type: str = None):
     """清理股票数据缓存"""
     tools = get_stock_tools()
     tools.clear_cache(stock_code, data_type)
+
+# =========================
+# 筹码缓存管理便捷函数
+# =========================
+
+def show_chip_cache_status(stock_code: str = None):
+    """显示筹码缓存状态"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    chip_cache.print_cache_status(stock_code)
+
+def clear_chip_cache(stock_code: str = None):
+    """清理筹码缓存"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    chip_cache.clear_cache(stock_code)
+
+def get_chip_cache_status(stock_code: str = None) -> Dict:
+    """获取筹码缓存状态"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    return chip_cache.get_cache_status(stock_code)
 

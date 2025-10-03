@@ -19,7 +19,7 @@ def main():
     
     with col1:
         st.subheader("📈 股票数据缓存")
-        st.markdown("清理股票基本信息、技术指标、新闻、筹码、AI分析等数据缓存。")
+        st.markdown("清理股票基本信息、技术指标、新闻、AI分析等数据缓存。")
         
         if st.button("🗑️ 清理股票数据缓存", 
                     type="primary", 
@@ -70,8 +70,9 @@ def main():
             if st.button("确认清理", key="confirm_clear_all_cache"):
                 try:
                     # 清理所有相关缓存
-                    from stock.stock_data_tools import clear_stock_cache
+                    from stock.stock_data_tools import clear_stock_cache, clear_chip_cache
                     clear_stock_cache()
+                    clear_chip_cache()  # 清理筹码缓存
                     
                     from market.market_data_tools import get_market_tools
                     market_tools = get_market_tools()

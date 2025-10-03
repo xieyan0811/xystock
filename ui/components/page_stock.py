@@ -688,11 +688,16 @@ def display_chips_analysis(stock_identity):
                 st.metric("成本中枢", f"{format_price(chip_data['cost_center'])}元")
         
         try:
-            if 'raw_data' in chip_data and chip_data['raw_data']:
-                if isinstance(chip_data['raw_data'], list):
-                    cyq_data = pd.DataFrame(chip_data['raw_data'])
-                else:
-                    cyq_data = chip_data['raw_data']
+            # 尝试获取筹码原始数据
+            cyq_data = None
+            if chip_data.get('raw_data_cached'):
+                # 从专用缓存获取原始数据
+                from stock.stock_utils import get_chip_raw_data
+                raw_data = get_chip_raw_data(stock_code)
+                if raw_data:
+                    cyq_data = pd.DataFrame(raw_data)
+            
+            if cyq_data is not None and not cyq_data.empty:
                 
                 st.subheader("获利比例变化趋势")
                 fig_profit = go.Figure()
