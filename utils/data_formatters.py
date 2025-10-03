@@ -541,7 +541,8 @@ class StockDataFormatter:
         text_parts = []
         text_parts.append(f"ETF {etf_code} 持仓分析:")
         text_parts.append(f"- 持仓股票总数: {holdings_data.get('total_holdings_count', 0)}")
-        text_parts.append(f"- 数据日期: {holdings_data.get('data_date', '')}")
+        text_parts.append(f"- 数据年份: {holdings_data.get('data_date', '')}")
+        text_parts.append(f"- 最新季度: {holdings_data.get('latest_quarter', '')}")
         
         # 集中度分析
         if statistics and 'concentration_analysis' in statistics:

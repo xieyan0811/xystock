@@ -190,6 +190,10 @@ class KLineDataManager:
         # 准备返回的DataFrame
         df = df_raw.tail(period).copy()
         
+        # 确保DataFrame包含datetime列（用于绘图）
+        if 'date' in df.columns and 'datetime' not in df.columns:
+            df['datetime'] = df['date'].dt.strftime('%Y-%m-%d')
+        
         if for_technical_analysis and 'date' in df.columns:
             df = df.set_index('date')
         

@@ -109,9 +109,14 @@ def display_more_financial_indicators(basic_info_data, stock_identity):
     market_name = stock_identity.get('market_name', 'A股')
     
     with st.expander("更多财务指标", expanded=True):
-        # 检查是否为A股，如果不是则显示提示信息
+        # 检查是否为A股，如果不是则显示简化的提示信息
         if market_name not in ['A股']:
-            st.info(f"💡 更多财务指标功能主要支持A股，{market_name}的详细财务指标数据可能有限")
+            if market_name == 'ETF':
+                st.info("💡 ETF无传统财务指标，请查看基本信息")
+            elif market_name == '港股':
+                st.info("💡 港股财务指标数据有限")
+            else:
+                st.info(f"💡 {market_name}财务指标暂不支持")
         
         # 使用格式化器获取所有财务指标（包含股息分红信息）
         formatted_info = formatter.format_basic_info(basic_info_data, stock_identity, include_dividend=True)
@@ -179,8 +184,6 @@ def display_more_financial_indicators(basic_info_data, stock_identity):
         if not has_financial_data:
             if market_name == 'A股':
                 st.warning("⚠️ 暂无该股票的详细财务指标数据")
-            else:
-                st.warning(f"⚠️ {market_name}暂不支持详细财务指标数据获取，建议查看基本价格信息")
 
 
 def display_etf_holdings_info(stock_identity):
@@ -200,7 +203,6 @@ def display_etf_holdings_info(stock_identity):
         try:
             # 导入ETF持仓获取器
             from stock.etf_holdings_fetcher import etf_holdings_fetcher
-            from utils.data_formatters import get_stock_formatter
             
             # 获取ETF持仓数据
             holdings_data = etf_holdings_fetcher.get_etf_holdings(stock_code, top_n=10)
@@ -211,6 +213,12 @@ def display_etf_holdings_info(stock_identity):
                 return
             
             # 显示ETF基本持仓信息
+            # 第一行：最新季度信息
+            latest_quarter = holdings_data.get('latest_quarter', '')
+            if latest_quarter:
+                st.info(f"📅 **最新持仓数据:** {latest_quarter}")
+            
+            # 第二行：关键指标
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -246,7 +254,15 @@ def display_etf_holdings_info(stock_identity):
                 df_holdings = pd.DataFrame(table_data)
                 st.dataframe(df_holdings, width='stretch', hide_index=True)
             
-            st.caption(f"数据更新时间: {holdings_data.get('update_time', '')} | 数据日期: {holdings_data.get('data_date', '')}")
+            # 构建完整的数据说明
+            caption_parts = []
+            if holdings_data.get('update_time'):
+                caption_parts.append(f"数据更新时间: {holdings_data['update_time']}")
+            if holdings_data.get('latest_quarter'):
+                caption_parts.append(f"数据季度: {holdings_data['latest_quarter']}")
+            
+            if caption_parts:
+                st.caption(" | ".join(caption_parts))
             
         except ImportError:
             st.error("❌ ETF持仓分析功能未安装，请联系管理员")
@@ -263,15 +279,14 @@ def display_dividend_details(basic_info_data, stock_identity):
     
     # 无论是否有分红数据都显示该区块，以便提供用户提示
     with st.expander("💰 股息分红详情", expanded=True):
-        # 检查是否为A股，如果不是则显示提示信息
+        # 检查是否为A股，如果不是则显示简化的提示信息
         if market_name not in ['A股']:
-            st.info(f"💡 股息分红功能主要支持A股，{market_name}的分红数据可能无法获取")
-            
-            # 对于港股，可能有股息但格式不同，对于ETF通常没有分红
             if market_name == '港股':
-                st.info("💡 港股分红信息建议查看相关港股资讯网站或券商APP")
+                st.info("💡 港股分红信息请查看相关港股资讯网站")
             elif market_name == 'ETF':
-                st.info("💡 ETF产品通常采用净值增长方式，较少进行现金分红")
+                st.info("💡 ETF通常无现金分红，采用净值增长方式")
+            else:
+                st.info(f"💡 {market_name}分红数据暂不支持")
         
         if dividend_fields:
             col1, col2 = st.columns(2)
@@ -331,8 +346,6 @@ def display_dividend_details(basic_info_data, stock_identity):
             # 没有分红数据时的提示
             if market_name == 'A股':
                 st.warning("⚠️ 暂无该股票的分红记录数据")
-            else:
-                st.warning(f"⚠️ {market_name}暂不支持分红数据获取，或该品种无分红记录")
 
 
 def display_basic_info(stock_identity):

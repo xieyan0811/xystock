@@ -630,7 +630,8 @@ def generate_fundamental_analysis_report(
             
             if 'error' not in holdings_data:
                 etf_holdings_section = formatter.format_etf_holdings_for_ai(holdings_data, max_stocks=10)
-                print(f"✅ 成功获取ETF {stock_code} 持仓信息用于AI分析")
+                latest_quarter = holdings_data.get('latest_quarter', '未知季度')
+                print(f"✅ 成功获取ETF {stock_code} 持仓信息用于AI分析（{latest_quarter}）")
             else:
                 print(f"⚠️ 获取ETF {stock_code} 持仓信息失败: {holdings_data['error']}")
         except Exception as e:

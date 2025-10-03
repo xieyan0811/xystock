@@ -28,11 +28,11 @@ def get_stock_news_by_akshare(stock_code, day = 7, debug=False):
             company_news = sorted(company_news, 
                            key=lambda x: datetime.strptime(x.get('发布时间', '1900-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S'), 
                            reverse=True)
-            # 时间过滤，保留最近day天的数据，最多20条
+            # 时间过滤，保留最近day天的数据，最多10条
             if day > 0:
                 cutoff_date = datetime.now() - timedelta(days=day)
                 company_news = [news for news in company_news if datetime.strptime(news.get('发布时间', '1900-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S') >= cutoff_date]
-            company_news = company_news[:20]
+            company_news = company_news[:10]
             if debug: # 内容有时取的很短，查看获取情况
                 for news in company_news:
                     if '新闻内容' not in news or not news['新闻内容']:
@@ -186,7 +186,7 @@ def analyze_news_sentiment(news_base, stock_name, start_date=None, end_date=None
     return ret_array
 
 
-def get_market_news_caixin(limit=20, debug=False):
+def get_market_news_caixin(limit=10, debug=False):
     """
     获取财新网宏观经济和市场新闻（政策面、大盘相关）
     """

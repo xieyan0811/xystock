@@ -3,7 +3,7 @@ ETF持仓数据获取器
 """
 import akshare as ak
 import pandas as pd
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from datetime import datetime
 
 
@@ -14,20 +14,24 @@ class ETFHoldingsFetcher:
         self.name = "ETF Holdings Fetcher"
         self.description = "基于akshare获取ETF持仓数据"
     
-    def get_etf_holdings(self, etf_code: str, date: str = '2024', top_n: int = -1) -> Dict[str, Any]:
+    def get_etf_holdings(self, etf_code: str, date: str = None, top_n: int = -1) -> Dict[str, Any]:
         """
         获取ETF持仓信息
         
         Args:
             etf_code: ETF代码，如 '510300'
-            date: 查询年份，默认'2024'
+            date: 查询年份，默认为当前年份
             top_n: 返回前N大持仓，-1表示返回全部
             
         Returns:
             Dict: 包含持仓信息的字典
         """
         try:
-            print(f"📊 获取 {etf_code} ETF持仓数据...")
+            # 如果没有指定日期，使用当前年份
+            if date is None:
+                date = str(datetime.now().year)
+            
+            print(f"📊 获取 {etf_code} ETF持仓数据（{date}年）...")
             
             # 获取持仓数据
             df_holdings = ak.fund_portfolio_hold_em(symbol=etf_code, date=date)
@@ -40,15 +44,36 @@ class ETFHoldingsFetcher:
                     'holdings': []
                 }
             
-            # 处理持仓数据
+            # 按季度分组，找到最新的季度
+            quarters = df_holdings['季度'].unique()
+            print(f"📅 发现的季度: {list(quarters)}")
+            
+            # 字符串比较找到最新季度（最大的季度字符串）
+            latest_quarter = max(quarters)
+            print(f"📅 最新季度: {latest_quarter}")
+            
+            # 筛选最新季度的数据
+            df_latest = df_holdings[df_holdings['季度'] == latest_quarter].copy()
+            
+            if df_latest.empty:
+                return {
+                    'error': f'未获取到 {etf_code} 最新季度的持仓数据',
+                    'etf_code': etf_code,
+                    'holdings_count': 0,
+                    'holdings': []
+                }
+            
+            # 按占净值比例降序排序
+            df_latest = df_latest.sort_values('占净值比例', ascending=False)
+            
+            # 处理持仓数据（使用最新季度的数据）
             holdings = []
-            total_holdings = len(df_holdings)
+            total_holdings = len(df_latest)
             
             # 如果指定了top_n，则只取前N条
-            if top_n > 0:
-                df_holdings = df_holdings.head(top_n)
+            display_df = df_latest.head(top_n) if top_n > 0 else df_latest
             
-            for _, row in df_holdings.iterrows():
+            for _, row in display_df.iterrows():
                 holding = {
                     '序号': int(row.get('序号', 0)),
                     '股票代码': str(row.get('股票代码', '')),
@@ -67,6 +92,7 @@ class ETFHoldingsFetcher:
             result = {
                 'etf_code': etf_code,
                 'data_date': date,
+                'latest_quarter': latest_quarter,
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'total_holdings_count': total_holdings,
                 'returned_holdings_count': len(holdings),
@@ -78,7 +104,7 @@ class ETFHoldingsFetcher:
                 }
             }
             
-            print(f"✅ 成功获取 {etf_code} 持仓数据，共 {total_holdings} 只股票")
+            print(f"✅ 成功获取 {etf_code} 持仓数据，{latest_quarter}，共 {total_holdings} 只股票")
             return result
             
         except Exception as e:
@@ -115,7 +141,7 @@ class ETFHoldingsFetcher:
             'analysis': f"前10大持仓占比{top_10_weight:.1f}%，集中度{concentration_level}"
         }
     
-    def get_multiple_etf_holdings(self, etf_codes: List[str], date: str = '2024', top_n: int = 10) -> Dict[str, Any]:
+    def get_multiple_etf_holdings(self, etf_codes: List[str], date: str = None, top_n: int = 10) -> Dict[str, Any]:
         """
         批量获取多个ETF的持仓信息
         
@@ -172,7 +198,8 @@ class ETFHoldingsFetcher:
         lines = []
         lines.append(f"📊 ETF {etf_code} 持仓分析")
         lines.append("=" * 50)
-        lines.append(f"📅 数据日期: {holdings_data.get('data_date', '')}")
+        lines.append(f"📅 数据年份: {holdings_data.get('data_date', '')}")
+        lines.append(f"📆 最新季度: {holdings_data.get('latest_quarter', '')}")
         lines.append(f"📈 持仓股票总数: {holdings_data.get('total_holdings_count', 0)}")
         
         # 集中度分析
