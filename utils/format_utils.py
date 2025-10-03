@@ -177,3 +177,17 @@ def judge_rsi_level(rsi: float) -> str:
         return "弱势"
     else:
         return "超卖"
+    
+def get_section_separator(markdown: bool = False) -> list:
+    """获取章节分隔符
+    
+    Args:
+        markdown: 是否为markdown格式
+        
+    Returns:
+        list: 分隔符行列表
+    """
+    if markdown:
+        return ["\n---\n"]
+    else:
+        return ["\n" + "=" * 40 + "\n"]

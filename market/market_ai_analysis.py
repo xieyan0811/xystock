@@ -9,7 +9,7 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 from market.market_data_tools import get_market_tools
-from market.market_data_utils import format_indices_for_analysis
+from market.market_formatters import MarketDataCollector
 from utils.data_formatters import format_technical_indicators, format_risk_metrics
 from config_manager import config
 
@@ -19,7 +19,7 @@ def generate_index_analysis_report(
     market_report_data: Dict[str, Any],
     user_opinion: str = ''
 ) -> Tuple[str, str]:
-    """生成指数AI分析报告（包含超短期预测）"""
+    """生成指数AI分析报告"""
     client = OpenAIClient()
     
     # 生成市场报告文本    
@@ -27,8 +27,7 @@ def generate_index_analysis_report(
         market_tools = get_market_tools()
         market_report_text = market_tools.generate_market_report(
             market_report_data, 
-            format_type='detail', 
-            markdown=False
+            format_type='comprehensive'
         )
     except Exception as e:
         market_report_text = f"市场报告数据格式化失败: {str(e)}"
@@ -38,7 +37,7 @@ def generate_index_analysis_report(
     try:
         market_tools = get_market_tools()
         current_indices = market_tools.get_current_indices(use_cache=True, force_refresh=False)
-        indices_text = format_indices_for_analysis(current_indices, stock_name)
+        indices_text = MarketDataCollector.format_indices_for_analysis(current_indices, stock_name)
     except Exception as e:
         indices_text = f"## 当前市场指数情况：\n获取指数数据失败: {str(e)}\n"
     

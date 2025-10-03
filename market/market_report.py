@@ -9,7 +9,7 @@ if project_root not in sys.path:
 
 from utils.report_utils import generate_pdf_report, generate_docx_report, generate_markdown_file, generate_html_report
 from ui.config import FOCUS_INDICES
-from market.market_data_utils import collect_market_data_for_report, format_index_detail
+from market.market_formatters import MarketDataCollector
 from utils.data_formatters import format_technical_indicators, format_risk_metrics
 from version import get_full_version
 
@@ -18,7 +18,7 @@ def write_market_report(index_name="上证指数", format_type="pdf", has_ai_ana
     """生成完整的市场分析报告（安全版本，完全独立于UI）"""
     try:
         # 使用统一的数据收集工具
-        report_data = collect_market_data_for_report(index_name, has_ai_analysis, user_opinion)
+        report_data = MarketDataCollector.collect_market_data_for_report(index_name, has_ai_analysis, user_opinion)
         
         md_content = generate_markdown_market_report(index_name, report_data)
         
@@ -128,7 +128,7 @@ def generate_markdown_market_report(index_name, report_data):
         
         # 焦点指数详细信息
         if focus_index_data:
-            md_content += format_index_detail(focus_index_data, index_name)
+            md_content += MarketDataCollector.format_index_detail(focus_index_data, index_name)
     
     # 技术指标分析部分
     tech_indicators = report_data.get('technical_indicators', {})

@@ -170,7 +170,8 @@ def display_market_sentiment_analysis(use_cache=True):
         st.warning("未获取到市场情绪数据")
     else:
         # 使用统一的markdown生成函数
-        sentiment_markdown = market_tools.generate_sentiment_markdown(sentiment_data)
+        from market.market_formatters import MarketTextFormatter
+        sentiment_markdown = MarketTextFormatter.format_sentiment_data(sentiment_data)
         
         # 转换为Streamlit显示格式
         convert_markdown_to_streamlit(sentiment_markdown, sentiment_data)
@@ -226,8 +227,18 @@ def display_market_fundamentals(index_name='沪深300'):
     # 显示各个分析模块
     display_valuation_analysis(index_name, use_cache)
     display_money_flow_analysis(use_cache)
-    display_market_sentiment_analysis(use_cache)
     display_margin_trading_analysis(use_cache)
+
+
+def display_market_sentiment():
+    """显示市场情绪分析页面"""
+    st.subheader("市场情绪分析")
+    
+    use_cache = st.session_state.get('market_use_cache', True)
+    
+    # 显示市场情绪分析
+    display_market_sentiment_analysis(use_cache)
+
 
 def display_market_news():
     """显示市场新闻"""
@@ -690,9 +701,9 @@ def display_market_overview():
                     news_enabled = config.is_market_news_enabled()
                     
                     if news_enabled:
-                        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📰 市场资讯", "📋 综合摘要"])
+                        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "😊 市场情绪", "📰 市场资讯", "📋 综合摘要"])
                     else:
-                        tab1, tab2, tab3, tab5 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "📋 综合摘要"])
+                        tab1, tab2, tab3, tab4, tab6 = st.tabs(["📈 大盘指数", "📊 技术指标", "💰 市场基本面", "😊 市场情绪", "📋 综合摘要"])
 
                     with tab1:
                         display_market_indices()
@@ -703,11 +714,14 @@ def display_market_overview():
                     with tab3:
                         display_market_fundamentals(current_index)
 
+                    with tab4:
+                        display_market_sentiment()
+
                     if news_enabled:
-                        with tab4:
+                        with tab5:
                             display_market_news()
 
-                    with tab5:
+                    with tab6:
                         display_market_summary(current_index)
                         
                     with st.expander("📊 详细信息", expanded=False):
@@ -729,9 +743,10 @@ def display_market_overview():
                 st.markdown("""
                 **大盘整体分析功能包括：**
                 
-                - 📈 **大盘指数**: 显示主要指数的实时价格和涨跌幅，包括上证指数、深证成指、创业板指等
+                - 📈 **大盘指数**: 显示主要指数的实时价格和涨跌幅，包择上证指数、深证成指、创业板指等
                 - 📊 **技术指标分析**: 基于选择指数的技术指标，反映市场走势
-                - 💰 **市场基本面**: 包含估值水平和资金流向分析，反映市场的基本面情况
+                - 💰 **市场基本面**: 包含估值水平、资金流向和融资融券数据，反映市场的基本面情况
+                - 😊 **市场情绪**: 综合多个维度的市场情绪指标分析，反映投资者情绪状况
                 - 📋 **综合摘要**: AI生成的指数分析综合报告
                 
                 **指数选择：** 支持分析多个主要指数，包括上证指数、深证成指、沪深300、中证500、创业板指等。

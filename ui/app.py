@@ -130,11 +130,13 @@ def display_analysis_page():
     
     # 处理按钮逻辑 - 使用session_state保持状态
     if query_btn and stock_code.strip():
+        # 只有在明确点击查询按钮时才设置显示状态
         st.session_state['show_stock_info'] = True
         st.session_state['current_stock_code'] = stock_code.strip()
         st.session_state['current_market_type'] = market_type
         st.session_state['query_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         st.session_state['use_cache'] = use_cache
+        st.session_state['just_reset'] = False  # 标记非重置状态
         
         if use_ai_analysis:
             st.session_state['include_ai_analysis'] = True
@@ -149,26 +151,29 @@ def display_analysis_page():
             st.session_state['include_ai_analysis'] = False
     
     if clear_btn:
-        st.session_state['show_stock_info'] = False
-        if 'current_stock_code' in st.session_state:
-            del st.session_state['current_stock_code']
-        if 'current_market_type' in st.session_state:
-            del st.session_state['current_market_type']
-        if 'query_time' in st.session_state:
-            del st.session_state['query_time']
-        if 'include_ai_analysis' in st.session_state:
-            del st.session_state['include_ai_analysis']
-        if 'user_opinion' in st.session_state:
-            del st.session_state['user_opinion']
-        if 'user_position' in st.session_state:
-            del st.session_state['user_position']
+        # 标记为刚刚重置，防止意外触发查询
+        st.session_state['just_reset'] = True
+        
+        # 清除所有相关的session state
+        keys_to_clear = [
+            'show_stock_info', 'current_stock_code', 'current_market_type', 
+            'query_time', 'include_ai_analysis', 'user_opinion', 'user_position',
+            'use_cache', 'ai_market_report', 'ai_news_report', 'ai_chip_report',
+            'ai_fundamental_report', 'ai_comprehensive_report', 'ai_company_report'
+        ]
+        
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        
         st.rerun()
     
     st.subheader("查询结果")
     
     result_container = st.container()
     
-    if st.session_state.get('show_stock_info', False):
+    # 只有在没有刚刚重置的情况下才显示股票信息
+    if st.session_state.get('show_stock_info', False) and not st.session_state.get('just_reset', False):
         current_stock_code = st.session_state.get('current_stock_code', '')
         current_market_type = st.session_state.get('current_market_type', '')
         query_time = st.session_state.get('query_time', '')
@@ -194,6 +199,10 @@ def display_analysis_page():
                     with st.expander("🔍 错误详情", expanded=False):
                         st.code(str(e), language="text")
     else:
+        # 清除重置标志，避免影响后续操作
+        if 'just_reset' in st.session_state:
+            del st.session_state['just_reset']
+            
         if query_btn:
             if not stock_code.strip():
                 with result_container:
