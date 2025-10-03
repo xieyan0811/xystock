@@ -16,7 +16,6 @@ from utils.format_utils import format_volume, format_market_value, format_price,
 from utils.data_formatters import get_stock_formatter
 from stock.stock_data_tools import get_stock_tools
 from stock.stock_report import generate_stock_report
-from version import get_full_version
 
 stock_tools = get_stock_tools()
 formatter = get_stock_formatter()
@@ -35,11 +34,14 @@ def get_ai_analysis_status_and_reports(stock_code):
     has_chip_ai = (hasattr(st, 'session_state') and 
                  hasattr(st.session_state, 'ai_chip_report') and 
                  stock_code in st.session_state.ai_chip_report)
+    has_company_ai = (hasattr(st, 'session_state') and 
+                     hasattr(st.session_state, 'ai_company_report') and 
+                     stock_code in st.session_state.ai_company_report)
     has_comprehensive_ai = (hasattr(st, 'session_state') and 
                            hasattr(st.session_state, 'ai_comprehensive_report') and 
                            stock_code in st.session_state.ai_comprehensive_report)
     
-    return has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai
+    return has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_company_ai, has_comprehensive_ai
 
 
 def display_stock_info(stock_identity):
@@ -71,7 +73,7 @@ def display_stock_info(stock_identity):
             # 使用通用的导出功能
             def generate_stock_report_wrapper(format_type):
                 """包装股票报告生成函数"""
-                has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
+                has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_company_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                 
                 return generate_stock_report(
                     stock_identity, format_type,
@@ -79,6 +81,7 @@ def display_stock_info(stock_identity):
                     has_market_ai=has_market_ai,
                     has_news_ai=has_news_ai,
                     has_chip_ai=has_chip_ai,
+                    has_company_ai=has_company_ai,
                     has_comprehensive_ai=has_comprehensive_ai
                 )
             
@@ -401,6 +404,9 @@ def display_basic_info(stock_identity):
             st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:
             st.warning(f"未能获取到股票 {stock_code} 的实时数据")
+        
+        # 显示公司分析
+        display_company_analysis(stock_identity)
         
         # 显示基本面分析
         display_fundamental_analysis(stock_identity)
@@ -806,4 +812,55 @@ def run_comprehensive_analysis(stock_identity, force_refresh):
             import traceback
             traceback.print_exc()                    
             return False
+
+
+def display_company_analysis(stock_identity):
+    """显示公司分析"""
+    st.divider()
+    st.subheader("🏢 公司分析")
+    
+    stock_code = stock_identity['code']
+    try:
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
+        # 检查是否需要生成公司分析
+        include_company_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                                   stock_code not in st.session_state.get('ai_company_report', {}))
+        
+        if include_company_analysis:
+            with st.spinner("🤖 AI正在进行公司分析，请稍候..."):
+                basic_info_data = stock_tools.get_basic_info(
+                    stock_identity, 
+                    use_cache=use_cache, 
+                    force_refresh=force_refresh, 
+                    include_company_analysis=True
+                )
+        else:
+            basic_info_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
+        
+        if "ai_company_report" not in st.session_state:
+            st.session_state.ai_company_report = {}
+            
+        # 处理公司分析结果
+        if 'company_analysis' in basic_info_data:
+            if 'error' not in basic_info_data['company_analysis']:
+                st.session_state.ai_company_report[stock_code] = {
+                    "report": basic_info_data['company_analysis']['report'],
+                    "timestamp": basic_info_data['company_analysis']['timestamp']
+                }
+            else:
+                st.error(f"AI公司分析失败: {basic_info_data['company_analysis']['error']}")
+                st.info("请稍后再试或联系管理员")
+        
+        # 显示公司分析报告
+        if stock_code in st.session_state.ai_company_report:
+            with st.expander("🤖 AI 公司分析报告", expanded=True):
+                st.markdown(st.session_state.ai_company_report[stock_code]["report"])
+                st.caption(f"分析报告生成时间: {st.session_state.ai_company_report[stock_code]['timestamp']}")
+        else:
+            st.info("💡 请在查询时勾选「AI分析」选项，AI将按照「干啥、为啥、靠啥、处哪、谁敌、怎么赚、有啥险」七个要点为您分析该公司")
+                
+    except Exception as e:
+        st.error(f"加载公司分析数据失败: {str(e)}")
 

@@ -17,7 +17,7 @@ def generate_stock_report(stock_identity: Dict[str, Any],
                           format_type="pdf",
                           has_fundamental_ai=False, has_market_ai=False,
                           has_news_ai=False, has_chip_ai=False,
-                          has_comprehensive_ai=False):
+                          has_company_ai=False, has_comprehensive_ai=False):
     """生成完整的股票分析报告（安全版本，完全独立于Streamlit）"""
     try:
         stock_tools = get_stock_tools()
@@ -25,7 +25,7 @@ def generate_stock_report(stock_identity: Dict[str, Any],
         
         # 收集基本信息
         try:
-            basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True, include_ai_analysis=has_fundamental_ai)
+            basic_info = stock_tools.get_basic_info(stock_identity, use_cache=True, include_ai_analysis=has_fundamental_ai, include_company_analysis=has_company_ai)
             if 'error' not in basic_info and basic_info:
                 report_data['basic_info'] = basic_info
         except Exception as e:
@@ -71,6 +71,10 @@ def generate_stock_report(stock_identity: Dict[str, Any],
         if has_fundamental_ai:
             if 'ai_analysis' in report_data.get('basic_info', {}):
                 final_ai_reports['fundamental'] = report_data['basic_info']['ai_analysis']
+        
+        if has_company_ai:
+            if 'company_analysis' in report_data.get('basic_info', {}):
+                final_ai_reports['company'] = report_data['basic_info']['company_analysis']
         
         if has_market_ai:
             if 'ai_analysis' in report_data.get('kline_info', {}):
@@ -180,6 +184,19 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
         md_content += basic_info_text + "\n\n"
         
         md_content += "\n"
+        
+        if 'company' in report_data['ai_reports']:
+            company_report = report_data['ai_reports']['company']
+            report_text = company_report['report']
+            report_time = company_report.get('timestamp', '')
+            
+            md_content += f"""## 🏢 AI公司分析
+
+{report_text}
+
+*分析生成时间: {report_time}*
+
+"""
         
         if 'fundamental' in report_data['ai_reports']:
             fundamental_report = report_data['ai_reports']['fundamental']

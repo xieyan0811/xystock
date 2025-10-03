@@ -65,6 +65,7 @@ class AnalysisConfig:
             'news': {'temperature': 0.7, 'model_type': 'default', 'cache_filename': 'req_news.txt'},
             'chip': {'temperature': 0.5, 'model_type': 'default', 'cache_filename': 'req_chip.txt'},
             'fundamental': {'temperature': 0.6, 'model_type': 'default', 'cache_filename': 'req_basic_info.txt'},
+            'company': {'temperature': 0.5, 'model_type': 'default', 'cache_filename': 'req_company.txt'},
             'comprehensive': {'temperature': 0.4, 'model_type': 'default', 'cache_filename': 'req.txt'}
         }
         return defaults.get(analysis_type, defaults['comprehensive'])
@@ -399,6 +400,100 @@ def generate_tech_analysis_report(
     return generator.generate_analysis("technical", messages, stock_code)
 
 
+def generate_company_analysis_report(
+    stock_identity: Dict[str, Any],
+    fundamental_data: Dict[str, Any] = None
+) -> AnalysisResult:
+    """生成公司分析报告
+    
+    Args:
+        stock_identity: 股票身份信息
+        fundamental_data: 基本面数据（可选）
+    
+    Returns:
+        AnalysisResult: 分析结果
+    """
+    stock_code = stock_identity['code']
+    stock_name = stock_identity.get('name', '')
+    market_name = stock_identity.get('market_name', 'A股')
+
+    generator = BaseAnalysisGenerator()
+    formatter = get_stock_formatter()
+    
+    # 获取基本信息
+    basic_info_section = ""
+    if fundamental_data:
+        basic_info_section = formatter.format_basic_info(fundamental_data, stock_identity)
+    else:
+        # 如果没有提供基本面数据，尝试获取
+        try:
+            basic_info = get_stock_info(stock_identity)
+            if basic_info and 'error' not in basic_info:
+                basic_info_section = formatter.format_basic_info(basic_info, stock_identity)
+        except Exception as e:
+            print(f"获取股票基本信息失败: {e}")
+    
+    # 判断是否为ETF
+    is_etf = (market_name == 'ETF' or 
+              stock_code.startswith('51') or stock_code.startswith('15') or stock_code.startswith('50') or
+              '基金' in stock_name or 'ETF' in stock_name)
+    
+    # ETF使用不同的分析模板
+    if is_etf:
+        system_message = """你是一位专业的ETF产品分析师，专精于ETF基金的结构和策略分析。你的任务是基于ETF的基本信息，按照指定要点简要分析该ETF产品。
+
+**分析要点：**
+产品功能 —— ETF跟踪什么指数？投资策略和产品定位是什么？
+投资价值 —— 它满足了什么投资需求，解决了哪些配置问题？
+产品优势 —— 指数编制方法、管理能力、流动性等优势在哪？
+市场地位 —— 在ETF市场或相关板块中的竞争地位如何？
+替代产品 —— 主要的同类ETF产品或替代投资方式有哪些？
+费用收益 —— 管理费率如何？规模效应和成本优势体现在哪？
+投资风险 —— 跟踪误差、流动性风险、市场风险等主要风险是什么？
+
+**输出要求：**
+- 用中文撰写，内容控制在300字左右
+- 每个要点简明扼要，突出核心信息
+- 基于真实信息分析，不得编造
+- 使用专业但易懂的语言"""
+    else:
+        system_message = """你是一位专业的公司研究分析师，专精于上市公司的商业模式和竞争力分析。你的任务是基于公司基本信息，按照指定要点简要分析该公司。
+
+**分析要点：**
+主营业务 —— 公司主要做什么？核心产品/服务是什么？
+市场需求 —— 它满足了什么需求，解决了哪些问题？
+核心优势 —— 技术、资源或模式上的竞争力体现在哪？
+产业地位 —— 在行业或产业链中的位置是什么？
+竞争格局 —— 主要竞争对手或替代方案有哪些？
+盈利模式 —— 公司如何赚钱？财务状况如何？
+风险挑战 —— 可能面临的主要风险和不确定性是什么？
+
+**输出要求：**
+- 用中文撰写，内容控制在300字左右
+- 每个要点简明扼要，突出核心信息
+- 基于真实信息分析，避免过度推测
+- 使用专业但易懂的语言"""
+
+    # 构建用户消息
+    product_type = "ETF" if is_etf else "公司"
+    user_message = f"""请按照指定要点，简要分析{stock_name}（{stock_code}）这个{product_type}：
+
+**{product_type}信息：**
+- 名称：{stock_name}
+- 代码：{stock_code}
+- 市场：{market_name}
+
+请严格按照以下要点进行分析：
+主营业务、市场需求、核心优势、产业地位、竞争格局、盈利模式、风险挑战"""
+
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": user_message}
+    ]
+
+    return generator.generate_analysis("company", messages, stock_code)
+
+
 def generate_news_analysis_report(
     stock_identity: Dict[str, Any],
     news_data: List[Dict]
@@ -667,13 +762,19 @@ def generate_comprehensive_analysis_report(
         historical_summary = formatter.format_historical_summary(historical_analyses, truncate_data)
         market_summary = formatter.format_market_summary(market_report_text, market_ai_analysis, truncate_data)
         
-        system_message = """你是一位资深的投资顾问和股票分析师，专精于整合多维度数据进行综合投资分析。你的任务是基于AI已生成的各类分析和实时数据，对股票当前的投资价值进行高度凝练的综合判断，为投资决策提供明确指导。
+        system_message = """你是一位资深的投资顾问和股票分析师，以诚实、直接的分析风格著称。你的任务是基于AI已生成的各类分析和实时数据，对股票当前的投资价值进行高度凝练的综合判断，为投资决策提供明确指导。
+
+**核心原则：**
+- **诚实第一**：如果股票基本面恶化、技术面破位、行业前景暗淡，要直接说"不建议买入"或"建议回避"
+- **避免客套**：不用委婉的措辞，有问题就直接指出，让投资者避开地雷股
+- **保护资金**：宁可错过机会，也不要让投资者踩雷，资金安全比收益更重要
 
 **分析重点：**
 - 整合技术面、基本面、消息面、筹码面分析，识别核心驱动因素和主要矛盾
 - 预测具体涨跌幅度：超短期(1-3天)、短期(1-3个月)、中期(3-6个月)的涨跌概率和幅度区间
 - 给出明确的操作位置：买入区间、加仓点位、减仓点位、止损位置
-- 评估用户观点的合理性，整合用户补充信息优化预测判断
+- **重点关注负面信号**：业绩大幅下滑、财务造假风险、行业衰退、技术破位等
+- 评估用户观点的合理性，如果用户看好但数据显示风险很大，要明确提醒
 - 结合用户持仓状态、投资特点和易错倾向，提供个性化操作建议
 - 识别当前最需警惕的风险点和最值得关注的机会点
 
@@ -691,6 +792,7 @@ def generate_comprehensive_analysis_report(
 - 避免重复各专项分析的具体内容，重点突出综合判断和操作指导
 - 预测和建议必须具体量化，避免模糊表述
 - 所有判断基于数据分析，结论要有明确的可操作性
+- **对于不值得买的股票要直接说出来，不要给投资者虚假希望**
 - 针对用户特点给出差异化的风险提醒和操作建议"""
         
         user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：

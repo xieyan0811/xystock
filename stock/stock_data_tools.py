@@ -29,7 +29,8 @@ from utils.format_utils import judge_rsi_level
 try:
     from stock.stock_ai_analysis import (
         generate_fundamental_analysis_report, generate_tech_analysis_report, 
-        generate_news_analysis_report, generate_chip_analysis_report
+        generate_news_analysis_report, generate_chip_analysis_report,
+        generate_company_analysis_report
     )
     AI_ANALYSIS_AVAILABLE = True
 except ImportError:
@@ -45,7 +46,7 @@ class StockTools:
         self.cache_manager = get_cache_manager()
 
     def get_basic_info(self, stock_identity: Dict, use_cache: bool = True, force_refresh: bool = False, 
-                       include_ai_analysis: bool = False, debug: bool = True) -> Dict:
+                       include_ai_analysis: bool = False, include_company_analysis: bool = True, debug: bool = True) -> Dict:
         """获取股票基本信息（加锁防止并发重复拉取）"""
         
         data_type = 'basic_info'
@@ -84,6 +85,27 @@ class StockTools:
             except Exception as e:
                 print(f"❌ 生成AI基本面分析失败: {e}")
                 basic_data['ai_analysis'] = {
+                    'error': str(e),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        if include_company_analysis and 'error' not in basic_data:
+            try:
+                company_report, company_timestamp = self.generate_company_analysis_with_cache(
+                    stock_identity=stock_identity,
+                    fundamental_data=basic_data,
+                    use_cache=use_cache,
+                    force_refresh=force_refresh
+                )
+
+                basic_data['company_analysis'] = {
+                    'report': company_report,
+                    'timestamp': company_timestamp
+                }
+
+            except Exception as e:
+                print(f"❌ 生成公司分析失败: {e}")
+                basic_data['company_analysis'] = {
                     'error': str(e),
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -457,6 +479,45 @@ class StockTools:
             
         except Exception as e:
             error_msg = f"筹码分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
+
+    def generate_company_analysis_with_cache(self, stock_identity: Dict = None, fundamental_data: Dict = None,
+                                            use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """生成公司分析报告（带缓存）"""
+        analysis_type = "company"
+        stock_code = stock_identity['code']
+        stock_name = stock_identity.get('name', '')
+
+        if use_cache and not force_refresh:
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            result = generate_company_analysis_report(
+                stock_identity=stock_identity,
+                fundamental_data=fundamental_data or {}
+            )
+            
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            error_msg = f"公司分析失败: {str(e)}"
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
 
