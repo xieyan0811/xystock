@@ -66,7 +66,7 @@ class MarketTools:
     
     def get_valuation_data(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取估值指标"""
-        data_type = 'valuation_data'
+        data_type = 'valuation_indicators'
         
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
@@ -195,7 +195,7 @@ class MarketTools:
     
     def get_money_flow_data(self, use_cache: bool = True, force_refresh: bool = False, debug: bool = False) -> Dict:
         """获取资金流向指标"""
-        data_type = 'money_flow_data'
+        data_type = 'money_flow_indicators'
         
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
@@ -213,7 +213,7 @@ class MarketTools:
     
     def get_margin_data(self, use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取融资融券数据"""
-        data_type = 'margin_data'
+        data_type = 'margin_detail'
         
         if use_cache and not force_refresh and self.cache_manager.is_cache_valid(data_type):
             print(f"📋 使用缓存的{self.cache_configs[data_type]['description']}")
@@ -452,26 +452,6 @@ class MarketTools:
         print("✅ 综合市场报告生成完成!")
         
         return report
-    
-    def generate_market_report(self, report: Dict, format_type: str = 'summary') -> str:
-        """
-        生成市场报告
-        
-        Args:
-            report: 原始报告数据
-            format_type: 报告格式类型
-                - 'summary': 格式化的摘要markdown字符串
-                - 'comprehensive': 详细综合报告
-        
-        Returns:
-            str: Markdown格式的报告字符串
-        """
-        if format_type == 'summary':
-            return MarketTextFormatter.format_summary_report(report)
-        elif format_type == 'comprehensive':
-            return MarketTextFormatter.format_comprehensive_report(report)
-        else:
-            raise ValueError(f"不支持的报告格式类型: {format_type}")
 
     
     def _generate_ai_analysis(self, index_name: str, user_opinion: str = '') -> Dict:

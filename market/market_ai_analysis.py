@@ -8,9 +8,7 @@ project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_dir not in sys.path:
     sys.path.append(project_dir)
 
-from market.market_data_tools import get_market_tools
-from market.market_formatters import MarketDataCollector
-from utils.data_formatters import format_technical_indicators, format_risk_metrics
+from market.market_formatters import MarketTextFormatter
 from config_manager import config
 
 def generate_index_analysis_report(
@@ -21,35 +19,16 @@ def generate_index_analysis_report(
 ) -> Tuple[str, str]:
     """生成指数AI分析报告"""
     client = OpenAIClient()
+    core_data = market_report_data
     
-    # 生成市场报告文本    
+    # 使用统一的格式化函数
     try:
-        market_tools = get_market_tools()
-        market_report_text = market_tools.generate_market_report(
-            market_report_data, 
-            format_type='comprehensive'
+        analysis_data = MarketTextFormatter.format_data_for_ai_analysis(
+            core_data, stock_name
         )
     except Exception as e:
-        market_report_text = f"市场报告数据格式化失败: {str(e)}"
-        return False, market_report_text, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    # 获取当前指数数据并格式化
-    try:
-        market_tools = get_market_tools()
-        current_indices = market_tools.get_current_indices(use_cache=True, force_refresh=False)
-        indices_text = MarketDataCollector.format_indices_for_analysis(current_indices, stock_name)
-    except Exception as e:
-        indices_text = f"## 当前市场指数情况：\n获取指数数据失败: {str(e)}\n"
-    
-    # 获取技术指标数据并格式化
-    try:
-        tech_indicators = market_tools.get_index_technical_indicators(stock_name)
-        tech_text = format_technical_indicators(tech_indicators)
-        if 'risk_metrics' in tech_indicators:
-            risk_metrics = tech_indicators['risk_metrics']
-            tech_text += "\n" + format_risk_metrics(risk_metrics)
-    except Exception as e:
-        tech_text = f"## 主要技术指标：\n获取技术指标失败: {str(e)}\n"
+        error_msg = f"格式化市场数据失败: {str(e)}"
+        return False, error_msg, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     # 根据新闻功能是否启用调整系统消息
     news_enabled = config.is_market_news_enabled()
@@ -102,11 +81,7 @@ def generate_index_analysis_report(
 
     user_message = f"""基于以下数据，请对{stock_name}({stock_code})提供精简分析报告：
 
-{market_report_text}
-
-{indices_text}
-
-{tech_text}"""
+{analysis_data}"""
 
     if user_opinion and user_opinion.strip():
         user_message += f"""

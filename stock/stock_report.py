@@ -255,7 +255,7 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
         
         # 使用统一格式化器
         formatter = get_stock_formatter()
-        news_text = formatter.format_news_data(news_list, has_content=False)
+        news_text = formatter.format_stock_news_data(news_list, has_content=False)
         
         md_content += news_text + "\n\n"
         

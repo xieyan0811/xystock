@@ -171,7 +171,7 @@ def display_market_sentiment_analysis(use_cache=True):
     else:
         # 使用统一的markdown生成函数
         from market.market_formatters import MarketTextFormatter
-        sentiment_markdown = MarketTextFormatter.format_sentiment_data(sentiment_data)
+        sentiment_markdown = MarketTextFormatter.format_sentiment_data(sentiment_data, with_header=False)
         
         # 转换为Streamlit显示格式
         convert_markdown_to_streamlit(sentiment_markdown, sentiment_data)
@@ -598,11 +598,13 @@ def display_market_technical_analysis(index_name='上证指数'):
 
 def display_market_summary(index_name='上证指数'):
     """显示综合摘要卡片"""
+    
+    from market.market_formatters import MarketTextFormatter
     use_cache = st.session_state.get('market_use_cache', True)
     
     market_tools = get_market_tools()    
     result_data = market_tools.get_comprehensive_market_report(use_cache=use_cache, index_name=index_name)
-    summary_text = market_tools.generate_market_report(result_data, format_type='summary')
+    summary_text = MarketTextFormatter.format_summary_report(result_data)
 
     if not summary_text:
         st.info("综合摘要数据准备中...")
