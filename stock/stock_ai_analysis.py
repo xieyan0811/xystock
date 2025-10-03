@@ -160,12 +160,13 @@ class DataCollector:
         try:
             market_report = market_tools.get_comprehensive_market_report(use_cache=True)
             if market_report:
+                from market.market_formatters import MarketTextFormatter
                 data_sources.append({
                     'type': '市场综合报告',
                     'description': '包含技术指标、情绪、估值、资金流向等市场数据',
                     'timestamp': market_report.get('report_time', '未知时间')
                 })
-                market_report_text = market_tools.generate_market_report(market_report, format_type='summary')
+                market_report_text = MarketTextFormatter.format_summary_report(market_report)
         except Exception as e:
             print(f"获取市场综合报告失败: {e}")
         
@@ -370,9 +371,9 @@ def generate_tech_analysis_report(
 - 提供具体数值和专业技术判断
 
 **输出格式：**
-## 📈 技术指标分析
-## 📉 价格趋势分析
-## 🎯 关键技术位
+### 📈 技术指标分析
+### 📉 价格趋势分析
+### 🎯 关键技术位
 
 **分析要求：**
 - 用中文撰写，报告不超过500字
@@ -505,7 +506,7 @@ def generate_news_analysis_report(
     generator = BaseAnalysisGenerator()
     formatter = get_stock_formatter()
     basic_info_section = formatter.format_stock_overview(stock_identity, get_stock_info(stock_identity))
-    news_text = formatter.format_news_data(news_data, has_content=True)
+    news_text = formatter.format_stock_news_data(news_data, has_content=True)
     
     system_message = """你是一位专业的财经新闻分析师，专精于评估新闻事件对股票价格的潜在影响。你的任务是基于真实新闻数据，识别关键信息并评估市场影响，为投资决策提供消息面依据。
 
@@ -516,10 +517,10 @@ def generate_news_analysis_report(
 - 关注新闻对公司基本面的实质性影响
 
 **输出格式：**
-## 📰 新闻概述
-## 📊 关键信息分析
-## 💹 市场影响评估
-## ⚠️ 风险因素识别
+### 📰 新闻概述
+### 📊 关键信息分析
+### 💹 市场影响评估
+### ⚠️ 风险因素识别
 
 **分析要求：**
 - 用中文撰写，报告不超过500字
@@ -570,10 +571,10 @@ def generate_chip_analysis_report(
 - 可用主力成本乖离率、筹码稳定指数等指标辅助分析
 
 **输出格式：**
-## 📊 筹码分布概况
-## 🎯 主力行为画像
-## ⚡ 压力支撑分析
-## 💡 筹码变化信号
+### 📊 筹码分布概况
+### 🎯 主力行为画像
+### ⚡ 压力支撑分析
+### 💡 筹码变化信号
 
 **分析要求：**
 - 用中文撰写，报告不超过500字
@@ -648,10 +649,10 @@ def generate_fundamental_analysis_report(
 - 市场表现分析：分析ETF相对基准指数的表现和折溢价情况
 
 **输出格式：**
-## 📊 ETF产品概况
-## 🏢 持仓结构分析
-## ⚖️ 投资价值评估
-## 📈 市场表现与风险
+### 📊 ETF产品概况
+### 🏢 持仓结构分析
+### ⚖️ 投资价值评估
+### 📈 市场表现与风险
 
 **分析要求：**
 - 用中文撰写，报告不超过600字
@@ -668,10 +669,10 @@ def generate_fundamental_analysis_report(
 - 风险评估：识别财务、经营、行业和市场风险因素
 
 **输出格式：**
-## 📊 基本面概况
-## 💰 财务指标分析
-## 📈 估值与增长分析
-## ⚖️ 优势与风险分析
+### 📊 基本面概况
+### 💰 财务指标分析
+### 📈 估值与增长分析
+### ⚖️ 优势与风险分析
 
 **分析要求：**
 - 用中文撰写，报告不超过500字
@@ -766,15 +767,15 @@ def generate_comprehensive_analysis_report(
         system_message = """你是一位资深的投资顾问和股票分析师，以诚实、直接的分析风格著称。你的任务是基于AI已生成的各类分析和实时数据，对股票当前的投资价值进行高度凝练的综合判断，为投资决策提供明确指导。
 
 **核心原则：**
-- **诚实第一**：如果股票基本面恶化、技术面破位、行业前景暗淡，要直接说"不建议买入"或"建议回避"
-- **避免客套**：不用委婉的措辞，有问题就直接指出，让投资者避开地雷股
-- **保护资金**：宁可错过机会，也不要让投资者踩雷，资金安全比收益更重要
+- **诚实第一**：如实、直接地指出股票的优缺点，避免任何客套和模糊表述。
+- **客观判断**：全面评估正面和负面信号，既要警惕风险，也要把握机会。
+- **操作明确**：当出现合理买入机会时，应明确给出买入建议及理由；如不建议买入，也要直接说明原因。
 
 **分析重点：**
 - 整合技术面、基本面、消息面、筹码面分析，识别核心驱动因素和主要矛盾
 - 预测具体涨跌幅度：超短期(1-3天)、短期(1-3个月)、中期(3-6个月)的涨跌概率和幅度区间
 - 给出明确的操作位置：买入区间、加仓点位、减仓点位、止损位置
-- **重点关注负面信号**：业绩大幅下滑、财务造假风险、行业衰退、技术破位等
+- 提示负面信号：业绩大幅下滑、财务造假风险、行业衰退、技术破位等
 - 评估用户观点的合理性，如果用户看好但数据显示风险很大，要明确提醒
 - 结合用户持仓状态、投资特点和易错倾向，提供个性化操作建议
 - 识别当前最需警惕的风险点和最值得关注的机会点

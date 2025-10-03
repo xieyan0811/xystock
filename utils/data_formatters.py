@@ -56,7 +56,7 @@ def format_technical_indicators(tech_indicators):
         
     md_content = """---
 
-# 📈 技术指标分析
+## 📈 技术指标分析
 （注意：使用的 K线数据截至上一交易日）
 
 """
@@ -112,7 +112,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     if with_header:
         md_content = """---
 
-# ⚠️ 风险指标分析
+## ⚠️ 风险指标分析
 （注意：使用的 K线数据截至上一交易日）
 
 """
@@ -124,7 +124,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     # 周期分析
     if 'period_analysis' in risk_metrics:
         period = risk_metrics['period_analysis']
-        md_content += "## 数据周期分析\n\n"
+        md_content += "### 数据周期分析\n\n"
         if 'data_length' in period:
             md_content += f"- **数据天数**: {int(period['data_length'])}天\n"
         if 'price_change_pct' in period:
@@ -137,7 +137,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     # 波动率分析
     if 'volatility_analysis' in risk_metrics:
         volatility = risk_metrics['volatility_analysis']
-        md_content += "## 波动率分析\n\n"
+        md_content += "### 波动率分析\n\n"
         if 'annual_volatility' in volatility:
             md_content += f"- **年化波动率**: {volatility['annual_volatility']:.2f} ({volatility['annual_volatility']*100:.2f}%)\n"
         if 'recent_volatility' in volatility:
@@ -150,7 +150,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     # 核心风险指标
     if 'risk_metrics' in risk_metrics:
         risk_core = risk_metrics['risk_metrics']
-        md_content += "## 核心风险指标\n\n"
+        md_content += "### 核心风险指标\n\n"
         if 'max_drawdown' in risk_core:
             md_content += f"- **最大回撤**: {risk_core['max_drawdown']:.2f} ({risk_core['max_drawdown']*100:.2f}%)\n"
         if 'sharpe_ratio' in risk_core:
@@ -164,7 +164,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     # 收益统计
     if 'return_statistics' in risk_metrics:
         returns = risk_metrics['return_statistics']
-        md_content += "## 收益统计\n\n"
+        md_content += "### 收益统计\n\n"
         if 'daily_return_mean' in returns:
             md_content += f"- **日均收益率**: {returns['daily_return_mean']:.4f} ({returns['daily_return_mean']*100:.2f}%)\n"
         if 'daily_return_std' in returns:
@@ -180,7 +180,7 @@ def format_risk_metrics(risk_metrics, with_header = True):
     # 风险评估
     if 'risk_assessment' in risk_metrics:
         assessment = risk_metrics['risk_assessment']
-        md_content += "## 风险评估\n\n"
+        md_content += "### 风险评估\n\n"
         if 'risk_level' in assessment:
             risk_level_cn = {'low': '低风险', 'medium': '中等风险', 'high': '高风险'}.get(assessment['risk_level'], assessment['risk_level'])
             md_content += f"- **风险等级**: {risk_level_cn}\n"
@@ -384,7 +384,7 @@ class StockDataFormatter:
             
         return "\n\n".join(text_parts)
         
-    def format_news_data(self, news_data: List[Dict[str, Any]], has_content: bool, max_item: int = -1) -> str:
+    def format_stock_news_data(self, news_data: List[Dict[str, Any]], has_content: bool, max_item: int = -1) -> str:
         """为AI分析格式化新闻数据为文本"""
         if not news_data or len(news_data) == 0:
             return "暂无相关新闻数据"
