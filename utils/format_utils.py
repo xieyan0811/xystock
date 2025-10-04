@@ -155,3 +155,39 @@ def format_number(number, decimal_places=2):
         return f"{number:.{decimal_places}f}"
     except (ValueError, TypeError):
         return str(number)
+
+
+def judge_rsi_level(rsi: float) -> str:
+    """
+    判断RSI水平
+    
+    Args:
+        rsi: RSI值
+        
+    Returns:
+        str: RSI水平描述
+    """
+    if rsi >= 80:
+        return "超买"
+    elif rsi >= 70:
+        return "强势"
+    elif rsi >= 30:
+        return "正常"
+    elif rsi >= 20:
+        return "弱势"
+    else:
+        return "超卖"
+    
+def get_section_separator(markdown: bool = False) -> list:
+    """获取章节分隔符
+    
+    Args:
+        markdown: 是否为markdown格式
+        
+    Returns:
+        list: 分隔符行列表
+    """
+    if markdown:
+        return ["\n---\n"]
+    else:
+        return ["\n" + "=" * 40 + "\n"]

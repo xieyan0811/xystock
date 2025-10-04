@@ -1,6 +1,15 @@
 """
 UI配置文件
 """
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from version import get_version, get_app_name, get_full_version
+
+# 版本信息
+VERSION = get_version()
+APP_NAME = get_app_name()
+FULL_VERSION = get_full_version()
 
 # Streamlit 应用配置
 STREAMLIT_CONFIG = {
@@ -67,6 +76,6 @@ INDEX_SYMBOL_MAPPING = {
     '中证500': 'sh000905',
     '科创50': 'sh000688',
     '中证1000': 'sh000852',
-    '中证2000': 'sh932000',
+    '中证2000': 'sh000932',
     '北证50': 'bj899050'
 }

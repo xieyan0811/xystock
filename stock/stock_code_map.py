@@ -11,6 +11,41 @@ if PROJECT_ROOT not in sys.path:
 
 from ui.config import INDEX_CODE_MAPPING
 
+
+def determine_board_type(stock_code: str) -> str:
+    """根据股票代码判断所属板块"""
+    if not stock_code or not isinstance(stock_code, str):
+        return '未知板块'
+        
+    if stock_code.startswith(('600', '601', '603', '605')):
+        return '上证主板'
+    elif stock_code.startswith(('000', '001')):
+        return '深证主板'  
+    elif stock_code.startswith('002'):
+        return '深证主板'  # 原中小板已并入主板
+    elif stock_code.startswith('300'):
+        return '创业板'
+    elif stock_code.startswith('688'):
+        return '科创板'
+    elif stock_code.startswith(('430', '83', '87', '88')):
+        return '北交所'
+    else:
+        return '未知板块'
+
+
+def get_corresponding_index(board_type: str) -> str:
+    """根据板块类型获取对应的指数名称"""
+    index_mapping = {
+        '上证主板': '上证指数',
+        '深证主板': '深证成指',
+        '创业板': '创业板指',
+        '科创板': '科创50',  # 使用科创50作为科创板代表指数
+        '北交所': '北证50',
+        '未知板块': '上证指数'  # 默认
+    }
+    return index_mapping.get(board_type, '上证指数')
+
+
 # 全局变量，用于缓存股票代码和名称的映射关系
 _STOCK_CODE_NAME_MAP = {}
 _STOCK_NAME_CODE_MAP = {}
@@ -28,7 +63,7 @@ _HK_MAP_FILE_PATH = os.path.join(Path(__file__).parent.parent, 'data', 'cache', 
 
 def get_stock_identity(stock_code, market_type='A股'):
     """
-    获取股票身份信息，包括代码、名称、市场类型、币种等
+    获取股票身份信息，包括代码、名称、市场类型、币种、板块类型等
     """
     stock_name = get_stock_name(stock_code, market_type)
     stock_code = get_stock_code(stock_code, market_type)
@@ -39,13 +74,26 @@ def get_stock_identity(stock_code, market_type='A股'):
     market_name = market_type
     currency_name = '人民币' if market_type in ['A股', 'ETF'] else '港币'
     currency_symbol = '元' if market_type in ['A股', 'ETF'] else 'HK$'
-    return {
+    
+    # 基础身份信息
+    identity = {
         'code': stock_code,
         'name': stock_name,
         'market_name': market_name,
         'currency_name': currency_name,
         'currency_symbol': currency_symbol
     }
+    
+    # 仅对A股计算板块信息
+    if market_type == 'A股':
+        board_type = determine_board_type(stock_code)
+        corresponding_index = get_corresponding_index(board_type)
+        identity.update({
+            'board_type': board_type,
+            'corresponding_index': corresponding_index
+        })
+    
+    return identity
 
 def _ensure_dir_exists(file_path):
     """确保文件目录存在"""

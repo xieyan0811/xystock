@@ -55,6 +55,9 @@ class ConfigManager:
             'LLM_CACHE': {
                 'ENABLE_CACHE': False,
                 'CACHE_TTL': 3600
+            },
+            'MARKET': {
+                'ENABLE_NEWS': True
             }
         }
     
@@ -121,6 +124,14 @@ class ConfigManager:
     def get_cache_config(self) -> Dict[str, Any]:
         """获取缓存相关配置"""
         return self.get('LLM_CACHE', {})
+    
+    def get_market_config(self) -> Dict[str, Any]:
+        """获取市场相关配置"""
+        return self.get('MARKET', {})
+    
+    def is_market_news_enabled(self) -> bool:
+        """检查是否启用市场新闻功能"""
+        return self.get('MARKET.ENABLE_NEWS', True)
     
     def reload(self):
         """重新加载配置"""

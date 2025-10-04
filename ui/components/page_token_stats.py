@@ -79,7 +79,7 @@ def show_model_distribution(days=30):
     st.altair_chart(chart, use_container_width=True)
     
     with st.expander("模型使用详细数据", expanded=False):
-        st.dataframe(model_df, use_container_width=True)
+        st.dataframe(model_df, width='stretch')
 
 def show_detailed_logs():
     """显示详细日志"""
@@ -108,7 +108,7 @@ def show_detailed_logs():
         
         st.dataframe(
             df[display_cols],
-            use_container_width=True,
+            width='stretch',
             column_config={
                 'timestamp': st.column_config.DatetimeColumn('时间'),
                 'model': st.column_config.TextColumn('模型'),

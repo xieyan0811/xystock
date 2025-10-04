@@ -7,17 +7,35 @@ from stockstats import wrap
 def get_chip_analysis_data(stock_code):
     """获取股票筹码分析数据"""
     try:
-        cyq_data = ak.stock_cyq_em(stock_code)
+        # 导入筹码缓存管理器
+        from stock.chip_data_cache import get_chip_cache_manager
+        chip_cache = get_chip_cache_manager()
         
-        if cyq_data is None or cyq_data.empty:
-            return {"error": f"无法获取 {stock_code} 的筹码数据"}
+        # 尝试从缓存获取原始数据
+        cached_raw_data = chip_cache.get_cached_raw_data(stock_code)
+        
+        if cached_raw_data:
+            print(f"📋 使用缓存的 {stock_code} 筹码原始数据")
+            # 从缓存数据重建DataFrame进行计算
+            cyq_data = pd.DataFrame(cached_raw_data)
+            # 转换日期列为datetime类型以便处理
+            if '日期' in cyq_data.columns:
+                cyq_data['日期'] = pd.to_datetime(cyq_data['日期'])
+        else:
+            print(f"📡 获取 {stock_code} 筹码数据...")
+            cyq_data = ak.stock_cyq_em(stock_code)
+            
+            if cyq_data is None or cyq_data.empty:
+                return {"error": f"无法获取 {stock_code} 的筹码数据"}
+            
+            # 保存原始数据到专用缓存
+            cyq_data_for_cache = cyq_data.copy()
+            cyq_data_for_cache['日期'] = cyq_data_for_cache['日期'].astype(str)
+            chip_cache.save_raw_data(stock_code, cyq_data_for_cache.to_dict('records'))
         
         latest = cyq_data.iloc[-1]
         profit_ratio = latest['获利比例']
         concentration_90 = latest['90集中度']
-        
-        cyq_data_for_cache = cyq_data.copy()
-        cyq_data_for_cache['日期'] = cyq_data_for_cache['日期'].astype(str)
         
         chip_data = {
             "latest_date": str(latest['日期']),
@@ -32,7 +50,9 @@ def get_chip_analysis_data(stock_code):
             "support_level": latest['90成本-低'],
             "resistance_level": latest['90成本-高'],
             "cost_center": latest['平均成本'],
-            "raw_data": cyq_data_for_cache.to_dict('records'),
+            # 不再在主缓存中存储raw_data，改为引用到专用缓存
+            "raw_data_cached": True,
+            "raw_data_count": len(cyq_data),
         }
         
         # 添加分析指标
@@ -121,40 +141,17 @@ def get_indicators(df):
         
         # CCI指标
         'cci_14': stock['cci_14'].iloc[-1] if stock_len > 14 else None,
-        
-        # 基础数据
-        'latest_close': stock['close'].iloc[-1],
-        'latest_high': stock['high'].iloc[-1],
-        'latest_low': stock['low'].iloc[-1],
-        'latest_open': stock['open'].iloc[-1],
-        'latest_volume': stock['volume'].iloc[-1],
-        'latest_date': df.iloc[-1].get('datetime', datetime.now().strftime('%Y-%m-%d')),
-        
+                
         # 趋势判断
         'ma_trend': _judge_ma_trend(stock),
         'macd_trend': _judge_macd_trend(stock),
     }
     
-    # 价格变化计算
-    if stock_len > 1:
-        prev_close = stock['close'].iloc[-2]
-        indicators.update({
-            'prev_close': prev_close,
-            'change_amount': stock['close'].iloc[-1] - prev_close,
-            'change_percent': ((stock['close'].iloc[-1] - prev_close) / prev_close * 100) if prev_close != 0 else 0,
-        })
-    else:
-        indicators.update({
-            'prev_close': None,
-            'change_amount': 0,
-            'change_percent': 0,
-        })
-    
     return indicators
 
 def fetch_stock_basic_info(stock_code: str) -> Dict:
     """获取股票基本信息的具体实现"""
-    from providers.stock_data_fetcher import data_manager
+    from stock.stock_data_fetcher import data_manager
     
     basic_info = {}
     
@@ -190,8 +187,8 @@ def fetch_stock_basic_info(stock_code: str) -> Dict:
 
 def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict:
     """获取股票技术指标的具体实现（K线数据不缓存，只缓存计算结果）"""
-    from providers.stock_data_fetcher import data_manager, KLineType
-    from providers.risk_metrics import calculate_portfolio_risk_summary
+    from stock.stock_data_fetcher import data_manager, KLineType
+    from utils.risk_metrics import calculate_portfolio_risk_summary
     
     indicators_info = {}
     
@@ -244,7 +241,7 @@ def fetch_stock_technical_indicators(stock_code: str, period: int = 160) -> Dict
 
 def fetch_stock_news_data(stock_code: str, day=7) -> Dict:
     """获取股票新闻数据的具体实现"""
-    from providers.news_tools import get_stock_news_by_akshare
+    from utils.news_tools import get_stock_news_by_akshare
     
     news_info = {}
     
@@ -279,4 +276,35 @@ def fetch_stock_chip_data(stock_code: str) -> Dict:
     
     chip_info['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return chip_info
+
+def get_chip_raw_data(stock_code):
+    """获取股票筹码原始数据"""
+    try:
+        from stock.chip_data_cache import get_chip_cache_manager
+        chip_cache = get_chip_cache_manager()
+        
+        # 尝试从缓存获取原始数据
+        cached_raw_data = chip_cache.get_cached_raw_data(stock_code)
+        
+        if cached_raw_data:
+            print(f"📋 使用缓存的 {stock_code} 筹码原始数据")
+            return cached_raw_data
+        else:
+            print(f"📡 获取 {stock_code} 筹码原始数据...")
+            cyq_data = ak.stock_cyq_em(stock_code)
+            
+            if cyq_data is None or cyq_data.empty:
+                return None
+            
+            # 保存原始数据到专用缓存
+            cyq_data_for_cache = cyq_data.copy()
+            cyq_data_for_cache['日期'] = cyq_data_for_cache['日期'].astype(str)
+            raw_data = cyq_data_for_cache.to_dict('records')
+            chip_cache.save_raw_data(stock_code, raw_data)
+            
+            return raw_data
+            
+    except Exception as e:
+        print(f"获取筹码原始数据失败: {str(e)}")
+        return None
 

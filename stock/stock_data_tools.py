@@ -17,18 +17,20 @@ if project_root not in sys.path:
 warnings.filterwarnings('ignore')
 
 # 导入必要的模块
-from providers.stock_utils import (
+from stock.stock_utils import (
     fetch_stock_basic_info, fetch_stock_technical_indicators,
     fetch_stock_news_data, fetch_stock_chip_data
 )
-from providers.stock_data_fetcher import data_manager, KLineType
-from providers.stock_data_cache import get_cache_manager
+from stock.stock_data_fetcher import data_manager, KLineType
+from stock.stock_data_cache import get_cache_manager
+from utils.format_utils import judge_rsi_level
 
 # 导入AI分析模块
 try:
-    from providers.stock_ai_analysis import (
-        generate_fundamental_analysis_report, generate_stock_analysis_report, 
-        generate_news_analysis_report, generate_chip_analysis_report
+    from stock.stock_ai_analysis import (
+        generate_fundamental_analysis_report, generate_tech_analysis_report, 
+        generate_news_analysis_report, generate_chip_analysis_report,
+        generate_company_analysis_report
     )
     AI_ANALYSIS_AVAILABLE = True
 except ImportError:
@@ -44,7 +46,7 @@ class StockTools:
         self.cache_manager = get_cache_manager()
 
     def get_basic_info(self, stock_identity: Dict, use_cache: bool = True, force_refresh: bool = False, 
-                       include_ai_analysis: bool = False, debug: bool = True) -> Dict:
+                       include_ai_analysis: bool = False, include_company_analysis: bool = True, debug: bool = True) -> Dict:
         """获取股票基本信息（加锁防止并发重复拉取）"""
         
         data_type = 'basic_info'
@@ -83,6 +85,27 @@ class StockTools:
             except Exception as e:
                 print(f"❌ 生成AI基本面分析失败: {e}")
                 basic_data['ai_analysis'] = {
+                    'error': str(e),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        if include_company_analysis and 'error' not in basic_data:
+            try:
+                company_report, company_timestamp = self.generate_company_analysis_with_cache(
+                    stock_identity=stock_identity,
+                    fundamental_data=basic_data,
+                    use_cache=use_cache,
+                    force_refresh=force_refresh
+                )
+
+                basic_data['company_analysis'] = {
+                    'report': company_report,
+                    'timestamp': company_timestamp
+                }
+
+            except Exception as e:
+                print(f"❌ 生成公司分析失败: {e}")
+                basic_data['company_analysis'] = {
                     'error': str(e),
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -253,8 +276,8 @@ class StockTools:
         """获取AI分析数据"""
         data_type = 'ai_analysis'
                 
-        # 使用分析类型区分不同的AI分析
-        cache_key = f"{data_type}_{analysis_type}_{stock_code}"
+        # 使用统一的缓存键命名
+        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
         
         if use_cache:
             try:
@@ -262,9 +285,13 @@ class StockTools:
                 if cache_key in cache_data:
                     cache_meta = cache_data[cache_key].get('cache_meta', {})
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
-                    expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
+                    
+                    # 使用动态过期时间配置
+                    expire_minutes = self.cache_manager._get_expire_minutes(data_type, cache_meta)
+                    expire_time = cache_time + timedelta(minutes=expire_minutes)
+                    
                     if datetime.now() < expire_time:
-                        print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析")
+                        print(f"📋 使用缓存的 {stock_code} {analysis_type} AI分析 (缓存有效期: {expire_minutes}分钟)")
                         return cache_data[cache_key].get('data', {})
             except Exception:
                 pass
@@ -273,26 +300,15 @@ class StockTools:
     
     def set_ai_analysis(self, stock_code: str, analysis_type: str, analysis_data: Dict):
         """设置AI分析数据"""
-            
-        cache_key = f"ai_analysis_{analysis_type}_{stock_code}"
+        """设置AI分析数据"""
         analysis_data['update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        try:
-            cache_data = self.cache_manager.load_cache()
-            cache_data[cache_key] = {
-                'cache_meta': {
-                    'timestamp': datetime.now().isoformat(),
-                    'data_type': 'ai_analysis',
-                    'stock_code': stock_code,
-                    'analysis_type': analysis_type,
-                    'expire_minutes': self.cache_manager.cache_configs['ai_analysis']['expire_minutes']
-                },
-                'data': analysis_data
-            }
-            self.cache_manager.save_cache(cache_data)
-            print(f"💾 {stock_code} {analysis_type} AI分析已缓存")
-        except Exception as e:
-            print(f"❌ 缓存AI分析失败: {e}")
+        # 使用AI分析专用缓存方法，自动处理动态过期时间
+        self.cache_manager.set_ai_analysis_cache(stock_code, analysis_type, analysis_data)
+        
+        # 获取对应的过期时间信息
+        expire_minutes = self.cache_manager._get_expire_minutes('ai_analysis', {'analysis_type': analysis_type})
+        print(f"💾 {stock_code} {analysis_type} AI分析已缓存 (有效期: {expire_minutes}分钟)")
     
     # =========================
     # AI分析报告方法
@@ -354,7 +370,7 @@ class StockTools:
             return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         try:            
-            result = generate_stock_analysis_report(
+            result = generate_tech_analysis_report(
                 stock_identity=stock_identity,
                 kline_info=kline_info,
             )
@@ -424,7 +440,7 @@ class StockTools:
         """生成筹码分析报告（带缓存）"""
         analysis_type = "chip"
         stock_code = stock_identity['code']
-        stock_name = stock_identity['name']
+        stock_name = stock_identity.get('name', '')
 
         if use_cache and not force_refresh:
             cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
@@ -459,6 +475,45 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
 
+    def generate_company_analysis_with_cache(self, stock_identity: Dict = None, fundamental_data: Dict = None,
+                                            use_cache: bool = True, force_refresh: bool = False) -> Tuple[str, str]:
+        """生成公司分析报告（带缓存）"""
+        analysis_type = "company"
+        stock_code = stock_identity['code']
+        stock_name = stock_identity.get('name', '')
+
+        if use_cache and not force_refresh:
+            cached_data = self.get_cached_ai_analysis(stock_code, analysis_type, use_cache=True)
+            if cached_data and 'report' in cached_data:
+                return cached_data['report'], cached_data.get('timestamp', '')
+        
+        if not AI_ANALYSIS_AVAILABLE:
+            error_msg = "AI分析模块不可用，请检查依赖是否正确安装"
+            return error_msg, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            result = generate_company_analysis_report(
+                stock_identity=stock_identity,
+                fundamental_data=fundamental_data or {}
+            )
+            
+            if result.success:
+                self.set_ai_analysis(stock_code, analysis_type, {
+                    'report': result.report,
+                    'timestamp': result.timestamp,
+                    'stock_name': stock_name
+                })
+                return result.report, result.timestamp
+            else:
+                return result.report, result.timestamp
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            error_msg = f"公司分析失败: {str(e)}"
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return error_msg, timestamp
+
     def get_comprehensive_ai_analysis(self, stock_identity: Dict[str, Any], user_opinion: str = "", user_position: str="不确定",
                                      use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取综合AI分析数据"""
@@ -468,8 +523,8 @@ class StockTools:
 
         cache_key = f"{data_type}_{analysis_type}_{stock_code}"
         
-        # 检查缓存（如果用户观点为空且不强制刷新）
-        if use_cache and not force_refresh and not user_opinion.strip():
+        # 检查缓存（需要同时检查时间有效性和用户观点是否变化）
+        if use_cache and not force_refresh:
             try:
                 cache_data = self.cache_manager.load_cache()
                 if cache_key in cache_data:
@@ -477,9 +532,16 @@ class StockTools:
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
                     expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
                     
-                    if datetime.now() < expire_time:
-                        print(f"📋 使用缓存的 {stock_code} 综合分析")
+                    # 获取缓存中的用户观点和当前用户观点进行比较
+                    cached_user_opinion = cache_meta.get('user_opinion', '')
+                    current_user_opinion = user_opinion.strip()
+                    
+                    # 只有在缓存未过期且用户观点相同时才使用缓存
+                    if datetime.now() < expire_time and cached_user_opinion == current_user_opinion:
+                        print(f"📋 使用缓存的 {stock_code} 综合分析 (用户观点: {'有' if current_user_opinion else '无'})")
                         return cache_data[cache_key].get('data', {})
+                    elif cached_user_opinion != current_user_opinion:
+                        print(f"🔄 用户观点已变化，重新生成 {stock_code} 综合分析")
             except Exception:
                 pass
         
@@ -493,8 +555,8 @@ class StockTools:
             
             print(f"🤖 生成 {stock_code} 综合AI分析...")
             
-            from providers.stock_ai_analysis import generate_comprehensive_analysis_report
-            from providers.market_data_tools import get_market_tools
+            from stock.stock_ai_analysis import generate_comprehensive_analysis_report
+            from market.market_data_tools import get_market_tools
             
             market_tools = get_market_tools()
             
@@ -509,22 +571,25 @@ class StockTools:
             if result.success:
                 report = result.report
                 data_sources = result.data_sources or []
+                
+                analysis_data = {
+                    'report': report,
+                    'data_sources': data_sources,
+                    'analysis_info': {
+                        'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'data_sources_count': len(data_sources),
+                        'user_opinion_included': bool(user_opinion.strip()),
+                        'user_opinion': user_opinion.strip() if user_opinion.strip() else None
+                    },
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'cache_time': datetime.now().isoformat()
+                }
             else:
-                report = result.report
-                data_sources = result.data_sources or []
-            
-            analysis_data = {
-                'report': report,
-                'data_sources': data_sources,
-                'analysis_info': {
-                    'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'data_sources_count': len(data_sources),
-                    'user_opinion_included': bool(user_opinion.strip()),
-                    'user_opinion': user_opinion.strip() if user_opinion.strip() else None
-                },
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'cache_time': datetime.now().isoformat()
-            }
+                # 分析失败，直接返回错误，不缓存
+                return {
+                    'error': result.report,
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
             
             try:
                 cache_data = self.cache_manager.load_cache()
@@ -534,12 +599,14 @@ class StockTools:
                         'data_type': data_type,
                         'stock_code': stock_code,
                         'analysis_type': analysis_type,
-                        'expire_minutes': self.cache_manager.cache_configs[data_type]['expire_minutes']
+                        'expire_minutes': self.cache_manager.cache_configs[data_type]['expire_minutes'],
+                        'user_opinion': user_opinion.strip(),  # 存储用户观点到缓存元数据
+                        'user_position': user_position
                     },
                     'data': analysis_data
                 }
                 self.cache_manager.save_cache(cache_data)
-                print(f"💾 {stock_code} 综合分析已缓存")
+                print(f"💾 {stock_code} 综合分析已缓存 (用户观点: {'有' if user_opinion.strip() else '无'})")
             except Exception as e:
                 print(f"❌ 缓存综合分析失败: {e}")
             
@@ -567,7 +634,7 @@ class StockTools:
         if kline and 'error' not in kline:
             indicators = kline.get('indicators', {})
             summary['technical_trend'] = f"{indicators.get('ma_trend', '未知')} | MACD {indicators.get('macd_trend', '未知')}"
-            summary['rsi_level'] = self._judge_rsi_level(indicators.get('rsi_14', 50))
+            summary['rsi_level'] = judge_rsi_level(indicators.get('rsi_14', 50))
         
         news = report['news_data']
         if news and 'error' not in news:
@@ -579,19 +646,6 @@ class StockTools:
             summary['avg_cost'] = chip.get('avg_cost', 0)
         
         return summary
-    
-    def _judge_rsi_level(self, rsi: float) -> str:
-        """判断RSI水平"""
-        if rsi >= 80:
-            return "超买"
-        elif rsi >= 70:
-            return "强势"
-        elif rsi >= 30:
-            return "正常"
-        elif rsi >= 20:
-            return "弱势"
-        else:
-            return "超卖"
     
     def clear_cache(self, stock_code: str = None, data_type: str = None):
         """清理缓存"""
@@ -630,8 +684,25 @@ def clear_stock_cache(stock_code: str = None, data_type: str = None):
     tools = get_stock_tools()
     tools.clear_cache(stock_code, data_type)
 
-def set_stock_ai_analysis(stock_code: str, analysis_type: str, analysis_data: Dict):
-    """设置股票AI分析数据"""
-    tools = get_stock_tools()
-    tools.set_ai_analysis(stock_code, analysis_type, analysis_data)
+# =========================
+# 筹码缓存管理便捷函数
+# =========================
+
+def show_chip_cache_status(stock_code: str = None):
+    """显示筹码缓存状态"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    chip_cache.print_cache_status(stock_code)
+
+def clear_chip_cache(stock_code: str = None):
+    """清理筹码缓存"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    chip_cache.clear_cache(stock_code)
+
+def get_chip_cache_status(stock_code: str = None) -> Dict:
+    """获取筹码缓存状态"""
+    from stock.chip_data_cache import get_chip_cache_manager
+    chip_cache = get_chip_cache_manager()
+    return chip_cache.get_cache_status(stock_code)
 

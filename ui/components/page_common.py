@@ -1,12 +1,17 @@
 import streamlit as st
 import sys
 import os
+import datetime
+import pandas as pd
+import plotly.graph_objects as go
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
 from utils.format_utils import format_price
+from utils.data_formatters import format_risk_metrics
+from utils.string_utils import remove_markdown_format
 
 def display_technical_indicators(tech_data):
     """显示技术指标分析卡片"""
@@ -97,4 +102,189 @@ def display_technical_indicators(tech_data):
         with other_col3:
             kdj_j = tech_data.get('kdj_j')
             st.metric("KDJ-J", format_price(kdj_j) if kdj_j else "N/A")
+
+
+def display_technical_analysis_tab(stock_identity=None, index_name=None):
+    """
+    显示技术指标分析Tab的完整内容
+    适用于股票和大盘指数的技术分析
+    
+    Args:
+        stock_identity: 股票标识信息 (用于股票分析)
+        index_name: 指数名称 (用于大盘分析，如'上证指数')
+    """
+    if stock_identity and index_name:
+        st.error("stock_identity 和 index_name 不能同时提供")
+        return
+        
+    if not stock_identity and not index_name:
+        st.error("必须提供 stock_identity 或 index_name 中的一个")
+        return
+    
+    try:
+        use_cache = st.session_state.get('use_cache', True) or st.session_state.get('market_use_cache', True)
+        force_refresh = not use_cache
+        
+        # 根据类型获取技术指标数据
+        if stock_identity:
+            # 股票技术分析
+            from stock.stock_data_tools import get_stock_tools
+            stock_tools = get_stock_tools()
+            
+            kline_info = stock_tools.get_stock_kline_data(
+                stock_identity, 
+                period=160, 
+                use_cache=use_cache, 
+                force_refresh=force_refresh
+            )
+            
+            if 'error' in kline_info:
+                st.error(f"获取K线数据失败: {kline_info['error']}")
+                return
+                
+            indicators = kline_info.get('indicators', {})
+            
+        elif index_name:
+            # 大盘指数技术分析
+            from market.market_data_tools import get_market_tools
+            market_tools = get_market_tools()
+            
+            indicators = market_tools.get_index_technical_indicators(index_name)
+        
+        # 显示技术指标
+        if indicators:
+            display_technical_indicators(indicators)
+        else:
+            st.warning("未获取到技术指标数据")
+            
+    except Exception as e:
+        st.error(f"加载技术分析数据失败: {str(e)}")
+        with st.expander("🔍 错误详情", expanded=False):
+            st.code(str(e), language="text")
+
+
+def display_risk_analysis(risk_metrics):
+    """显示风险分析"""
+    if risk_metrics is None or 'error' in risk_metrics:
+        st.error(f"获取风险指标失败: {risk_metrics.get('error', '未知错误')}")
+        return
+    
+    # 尝试使用格式化的风险指标文本
+    formatted_risk_text = format_risk_metrics(risk_metrics, with_header=False)
+    
+    if formatted_risk_text:
+        # 显示格式化的风险分析文本
+        with st.expander("⚠️ 详细风险分析", expanded=True):
+            formatted_risk_text = remove_markdown_format(formatted_risk_text, only_headers=True)
+            st.markdown(formatted_risk_text)
+    
+    # 如果有summary_table，也显示表格形式
+    if risk_metrics and 'summary_table' in risk_metrics:
+        with st.expander("📊 风险分析表格", expanded=False):
+            st.table(risk_metrics['summary_table'])
+    
+    # 如果以上都没有，显示原始数据
+    elif not formatted_risk_text and 'error' not in risk_metrics:
+        with st.expander("📊 风险分析摘要", expanded=True):
+            st.json(risk_metrics)
+
+
+def display_kline_charts(df, chart_type="stock", title_prefix=""):
+    """
+    统一的K线图和成交量图表显示函数
+    
+    Args:
+        df: 包含K线数据的DataFrame，必须包含 datetime, open, high, low, close, volume 列
+        chart_type: 图表类型，"stock"表示股票，"index"表示指数
+        title_prefix: 标题前缀，如股票名称或指数名称
+    """
+    if df is None or df.empty:
+        st.warning("无K线数据可显示")
+        return
+    
+    # 转换日期格式
+    df = df.copy()
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    
+    # 根据类型设置标题和Y轴标签
+    if chart_type == "index":
+        price_title = f"{title_prefix}指数K线图与均线" if title_prefix else "指数K线图与均线"
+        yaxis_title = "指数点位"
+    else:
+        price_title = f"{title_prefix}K线图与均线" if title_prefix else "K线图与均线"
+        yaxis_title = "价格"
+    
+    # K线图与均线
+    fig_price = go.Figure()
+    
+    # 添加K线图
+    fig_price.add_trace(go.Candlestick(
+        x=df['datetime'],
+        open=df['open'], 
+        high=df['high'],
+        low=df['low'], 
+        close=df['close'],
+        name='K线',
+        increasing_line_color="#DA1A10",
+        decreasing_line_color="#14AA06",
+        increasing_fillcolor="#F51D12",
+        decreasing_fillcolor="#1BCC0B"
+    ))
+    
+    # 添加均线（如果存在）
+    ma_lines = [
+        ('MA5', '#D2FF07'),
+        ('MA10', '#FF22DA'), 
+        ('MA20', '#0593F1'),
+        ('MA60', '#FFA500')
+    ]
+    
+    for ma_name, color in ma_lines:
+        if ma_name in df.columns and not df[ma_name].isna().all():
+            fig_price.add_trace(go.Scatter(
+                x=df['datetime'], 
+                y=df[ma_name],
+                mode='lines',
+                name=ma_name,
+                line=dict(color=color, width=1.5)
+            ))
+    
+    # 设置K线图布局
+    fig_price.update_layout(
+        title=price_title,
+        xaxis_title='日期',
+        yaxis_title=yaxis_title,
+        height=500,
+        margin=dict(l=0, r=0, t=40, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(rangeslider=dict(visible=False)),
+        yaxis=dict(fixedrange=True)
+    )
+    
+    st.plotly_chart(fig_price, use_container_width=True)
+    
+    # 成交量图
+    if 'volume' in df.columns and not df['volume'].isna().all():
+        fig_volume = go.Figure()
+        
+        fig_volume.add_trace(go.Bar(
+            x=df['datetime'], 
+            y=df['volume'],
+            name='成交量',
+            marker=dict(color='#90CAF9')
+        ))
+        
+        fig_volume.update_layout(
+            title='成交量',
+            xaxis_title='日期',
+            yaxis_title='成交量',
+            height=250,
+            margin=dict(l=0, r=0, t=40, b=0),
+            xaxis=dict(rangeslider=dict(visible=False)),
+            yaxis=dict(fixedrange=True)
+        )
+        
+        st.plotly_chart(fig_volume, use_container_width=True)
+    else:
+        st.info("暂无成交量数据")
 

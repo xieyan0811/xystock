@@ -10,6 +10,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.append(project_root)
 
 from config_manager import config
+from ui.config import FULL_VERSION
+from stock.analysis_prompts import RISK_PREFERENCE_DESCRIPTIONS, RISK_PREFERENCE_PROMPTS
 
 def save_config(section, key, value):
     """保存单个配置项到配置文件"""
@@ -135,6 +137,43 @@ def main():
 
 
     with st.container():
+        st.subheader("分析偏好设置")
+        
+        # 风险偏好选项
+        risk_preference = st.selectbox(
+            "分析风险偏好",
+            options=list(RISK_PREFERENCE_DESCRIPTIONS.keys()),
+            format_func=lambda x: RISK_PREFERENCE_DESCRIPTIONS[x],
+            index=list(RISK_PREFERENCE_DESCRIPTIONS.keys()).index(config.get('ANALYSIS.RISK_PREFERENCE', 'neutral')),
+            help="选择分析风格，影响AI给出建议的保守程度"
+        )
+        
+        # 显示选中风格的具体提示词内容（不包括自定义）
+        if risk_preference in RISK_PREFERENCE_PROMPTS:
+            #with st.expander(f"查看「{RISK_PREFERENCE_DESCRIPTIONS[risk_preference]}」的具体提示词", expanded=False):
+            st.code(RISK_PREFERENCE_PROMPTS[risk_preference], language="markdown")
+        
+        # 自定义核心原则（仅在选择自定义时显示）
+        custom_principles = ""
+        if risk_preference == 'custom':
+            custom_principles = st.text_area(
+                "自定义核心原则",
+                value=config.get('ANALYSIS.CUSTOM_PRINCIPLES', ''),
+                placeholder="请输入您的分析核心原则，例如：\n核心原则：\n- 风险第一：...\n- 机会把握：...\n- 操作建议：...",
+                height=150,
+                help="请按照Markdown格式输入您的自定义核心原则"
+            )
+        
+        if st.button("💾 保存分析偏好", key="save_analysis_preference", type="primary"):
+            try:
+                save_config('ANALYSIS', 'RISK_PREFERENCE', risk_preference)
+                if risk_preference == 'custom':
+                    save_config('ANALYSIS', 'CUSTOM_PRINCIPLES', custom_principles)
+                st.success("分析偏好已保存！")
+            except Exception as e:
+                st.error(f"保存失败: {str(e)}")
+    
+    with st.container():
         st.subheader("用户画像")
         user_profile = st.text_area(
             "请描述您的用户画像",
@@ -164,9 +203,9 @@ def main():
 
     st.markdown("---")
     st.markdown(
-        """
+        f"""
         <div style='text-align: center; color: #666;'>
-            <small>XY Stock 配置管理 | 重启应用后设置生效</small>
+            <small>{FULL_VERSION} | 配置管理 | 重启应用后设置生效</small>
         </div>
         """,
         unsafe_allow_html=True

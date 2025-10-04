@@ -4,7 +4,6 @@
 
 import sys
 import os
-import datetime
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
@@ -13,13 +12,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from ui.components.page_common import display_technical_indicators
 from utils.format_utils import format_volume, format_market_value, format_price, format_percentage, format_change, format_number, format_large_number
-from providers.stock_data_tools import get_stock_tools
-from providers.stock_report import generate_stock_report
-from providers.report_utils import PDF_SUPPORT_AVAILABLE
+from utils.data_formatters import get_stock_formatter
+from stock.stock_data_tools import get_stock_tools
+from stock.stock_report import generate_stock_report
 
 stock_tools = get_stock_tools()
+formatter = get_stock_formatter()
 
 def get_ai_analysis_status_and_reports(stock_code):
     """检查界面是否已有AI分析报告"""
@@ -35,11 +34,14 @@ def get_ai_analysis_status_and_reports(stock_code):
     has_chip_ai = (hasattr(st, 'session_state') and 
                  hasattr(st.session_state, 'ai_chip_report') and 
                  stock_code in st.session_state.ai_chip_report)
+    has_company_ai = (hasattr(st, 'session_state') and 
+                     hasattr(st.session_state, 'ai_company_report') and 
+                     stock_code in st.session_state.ai_company_report)
     has_comprehensive_ai = (hasattr(st, 'session_state') and 
                            hasattr(st.session_state, 'ai_comprehensive_report') and 
                            stock_code in st.session_state.ai_comprehensive_report)
     
-    return has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai
+    return has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_company_ai, has_comprehensive_ai
 
 
 def display_stock_info(stock_identity):
@@ -57,10 +59,10 @@ def display_stock_info(stock_identity):
                 display_basic_info(stock_identity)
                 
             with tab2:
-                display_market_trend(stock_identity)
+                display_technical_analysis(stock_identity)
                                 
             with tab3:
-                display_news(stock_identity)
+                display_news_analysis(stock_identity)
 
             with tab4:
                 display_chips_analysis(stock_identity)
@@ -68,111 +70,31 @@ def display_stock_info(stock_identity):
             with tab5:
                 display_comprehensive_analysis(stock_identity)
 
-            st.divider()
-            st.subheader("📋 导出完整报告")
-            
-            st.info("💡 可以导出包含所有Tab内容的完整分析报告")
-            
-            support_pdf = PDF_SUPPORT_AVAILABLE
-
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if support_pdf:
-                    format_type = st.selectbox(
-                        "选择导出格式",
-                        ["pdf", "docx", "markdown"],
-                        format_func=lambda x: {"pdf": "📄 PDF格式", "docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                        key=f"format_select_{stock_code}"
-                    )
-                else:
-                    format_type = st.selectbox(
-                        "选择导出格式",
-                        ["docx", "markdown"],
-                        format_func=lambda x: {"docx": "📝 Word文档", "markdown": "📝 Markdown"}[x],
-                        key=f"format_select_{stock_code}"
-                    )
-
-            
-            with col2:
-                if support_pdf:
-                    format_descriptions = {
-                        "pdf": "专业格式，适合打印和正式分享",
-                        "docx": "Word文档，可编辑修改",
-                        "markdown": "Markdown格式，适合程序员和技术人员"
-                    }
-                else:
-                    format_descriptions = {
-                        "docx": "Word文档，可编辑修改",
-                        "markdown": "Markdown格式，适合程序员和技术人员"
-                    }
-                st.caption(format_descriptions[format_type])
-            
-            report_button_key = f"generate_report_{stock_code}"
-            if st.button("🔄 生成报告", key=report_button_key, use_container_width=True):
-                st.session_state[f"generating_report_{stock_code}"] = format_type
-            
-            generating_format = st.session_state.get(f"generating_report_{stock_code}", None)
-            if generating_format:
-                print(f"开始生成{generating_format.upper()}报告...")
-                spinner_text = {
-                    "pdf": "正在收集数据并生成PDF报告...",
-                    "docx": "正在收集数据并生成Word文档...",
-                    "markdown": "正在收集数据并生成Markdown文件..."
-                }
+            # 使用通用的导出功能
+            def generate_stock_report_wrapper(format_type):
+                """包装股票报告生成函数"""
+                has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_company_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                 
-                with st.spinner(spinner_text[generating_format]):
-                    try:
-                        has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
-                        
-                        report_content = generate_stock_report(
-                            stock_identity, generating_format,
-                            has_fundamental_ai=has_fundamental_ai,
-                            has_market_ai=has_market_ai,
-                            has_news_ai=has_news_ai,
-                            has_chip_ai=has_chip_ai,
-                            has_comprehensive_ai=has_comprehensive_ai
-                        )
-                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        
-                        format_info = {
-                            "pdf": {"ext": "pdf", "mime": "application/pdf"},
-                            "docx": {"ext": "docx", "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-                            "markdown": {"ext": "md", "mime": "text/markdown"}
-                        }
-                        
-                        ext = format_info[generating_format]["ext"]
-                        mime = format_info[generating_format]["mime"]
-                        filename = f"{stock_code}_完整分析报告_{timestamp}.{ext}"
-                        
-                        st.session_state[f"report_content_{stock_code}"] = report_content
-                        st.session_state[f"report_filename_{stock_code}"] = filename
-                        st.session_state[f"report_mime_{stock_code}"] = mime
-                        st.session_state[f"report_format_{stock_code}"] = generating_format
-                        st.session_state[f"report_timestamp_{stock_code}"] = timestamp
-                        
-                        st.session_state[f"generating_report_{stock_code}"] = None
-                        
-                        format_names = {"pdf": "PDF", "docx": "Word", "markdown": "Markdown"}
-                        st.success(f"✅ {format_names[generating_format]}报告生成成功！")
-                        
-                    except Exception as e:
-                        st.error(f"❌ 生成{generating_format.upper()}报告失败: {str(e)}")
-                        st.session_state[f"generating_report_{stock_code}"] = None
-            
-            if st.session_state.get(f"report_content_{stock_code}"):
-                format_icons = {"pdf": "📄", "docx": "📝", "markdown": "📝"}
-                current_format = st.session_state.get(f"report_format_{stock_code}", "pdf")
-                
-                st.download_button(
-                    label=f"{format_icons[current_format]} 下载{current_format.upper()}文件",
-                    data=st.session_state[f"report_content_{stock_code}"],
-                    file_name=st.session_state[f"report_filename_{stock_code}"],
-                    mime=st.session_state[f"report_mime_{stock_code}"],
-                    key=f"download_report_{stock_code}",
-                    use_container_width=True,
-                    help=f"点击下载生成的{current_format.upper()}报告文件"
+                return generate_stock_report(
+                    stock_identity, format_type,
+                    has_fundamental_ai=has_fundamental_ai,
+                    has_market_ai=has_market_ai,
+                    has_news_ai=has_news_ai,
+                    has_chip_ai=has_chip_ai,
+                    has_company_ai=has_company_ai,
+                    has_comprehensive_ai=has_comprehensive_ai
                 )
-                st.caption(f"✅ 已生成 {current_format.upper()} | {st.session_state[f'report_timestamp_{stock_code}']}")
+            
+            from ui.components.page_export import display_report_export_section
+            display_report_export_section(
+                entity_id=stock_code,
+                report_type="report",
+                title="📋 导出完整报告",
+                info_text="💡 可以导出包含所有Tab内容的完整分析报告",
+                generate_func=generate_stock_report_wrapper,
+                generate_args=None,
+                filename_prefix=f"分析报告"
+            )
                 
         except Exception as e:
             st.error(f"加载数据失败: {str(e)}")
@@ -180,6 +102,250 @@ def display_stock_info(stock_identity):
             
             with st.expander("🔍 错误详情", expanded=False):
                 st.code(str(e), language="text")
+
+
+def display_more_financial_indicators(basic_info_data, stock_identity):
+    """显示更多财务指标"""
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    with st.expander("更多财务指标", expanded=True):
+        # 检查是否为A股，如果不是则显示简化的提示信息
+        if market_name not in ['A股']:
+            if market_name == 'ETF':
+                st.info("💡 ETF无传统财务指标，请查看基本信息")
+            elif market_name == '港股':
+                st.info("💡 港股财务指标数据有限")
+            else:
+                st.info(f"💡 {market_name}财务指标暂不支持")
+        
+        # 使用格式化器获取所有财务指标（包含股息分红信息）
+        formatted_info = formatter.format_basic_info(basic_info_data, stock_identity, include_dividend=True)
+        
+        # 检查是否有实际的财务指标数据
+        has_financial_data = False
+        sections = formatted_info.split('\n### ')
+        
+        for section in sections:
+            if section.startswith('📊 盈利能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📊 盈利能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('💰 偿债能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("💰 偿债能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('🔄 营运能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("🔄 营运能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('📈 成长能力指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📈 成长能力指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('📋 估值指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("📋 估值指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+            
+            elif section.startswith('💎 每股指标'):
+                lines = section.split('\n')[1:]
+                if any(line.strip() and line.startswith('- ') for line in lines):
+                    has_financial_data = True
+                    st.subheader("💎 每股指标")
+                    for line in lines:
+                        if line.strip() and line.startswith('- '):
+                            st.write(f"**{line[2:]}**")
+                        
+        # 如果没有财务数据，显示相应提示
+        if not has_financial_data:
+            if market_name == 'A股':
+                st.warning("⚠️ 暂无该股票的详细财务指标数据")
+
+
+def display_etf_holdings_info(stock_identity):
+    """显示ETF持仓信息"""
+    stock_code = stock_identity['code']
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    # 判断是否为ETF - 通过代码特征或市场类型判断
+    is_etf = (market_name == 'ETF' or 
+              stock_code.startswith('51') or stock_code.startswith('15') or stock_code.startswith('50') or
+              '基金' in stock_identity.get('name', '') or 'ETF' in stock_identity.get('name', ''))
+    
+    if not is_etf:
+        return
+        
+    with st.expander("📊 ETF持仓信息", expanded=True):
+        try:
+            # 导入ETF持仓获取器
+            from stock.etf_holdings_fetcher import etf_holdings_fetcher
+            
+            # 获取ETF持仓数据
+            holdings_data = etf_holdings_fetcher.get_etf_holdings(stock_code, top_n=10)
+            
+            if 'error' in holdings_data:
+                st.warning(f"⚠️ 获取ETF持仓信息失败: {holdings_data['error']}")
+                st.info("💡 可能原因：该产品不是ETF基金，或暂无持仓数据")
+                return
+            
+            # 显示ETF基本持仓信息
+            # 第一行：最新季度信息
+            latest_quarter = holdings_data.get('latest_quarter', '')
+            if latest_quarter:
+                st.info(f"📅 **最新持仓数据:** {latest_quarter}")
+            
+            # 第二行：关键指标
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("持仓股票总数", f"{holdings_data.get('total_holdings_count', 0)}只")
+            
+            with col2:
+                if 'statistics' in holdings_data and 'concentration_analysis' in holdings_data['statistics']:
+                    conc = holdings_data['statistics']['concentration_analysis']
+                    st.metric("集中度水平", conc.get('concentration_level', '未知'))
+            
+            with col3:
+                if 'statistics' in holdings_data and 'concentration_analysis' in holdings_data['statistics']:
+                    conc = holdings_data['statistics']['concentration_analysis']
+                    st.metric("前10大持仓占比", f"{conc.get('top_10_weight', 0)}%")
+            
+            # 显示主要持仓股票
+            st.subheader("🏆 主要持仓股票 (前10名)")
+            
+            holdings = holdings_data.get('holdings', [])
+            if holdings:
+                # 创建表格数据
+                table_data = []
+                for i, holding in enumerate(holdings[:10]):
+                    table_data.append({
+                        '排名': holding.get('序号', i+1),
+                        '股票代码': holding.get('股票代码', ''),
+                        '股票名称': holding.get('股票名称', ''),
+                        '占净值比例(%)': f"{holding.get('占净值比例', 0):.2f}",
+                        '持仓市值(万元)': f"{holding.get('持仓市值', 0):,.0f}" if holding.get('持仓市值') else '-'
+                    })
+                
+                # 显示表格
+                df_holdings = pd.DataFrame(table_data)
+                st.dataframe(df_holdings, width='stretch', hide_index=True)
+            
+            # 构建完整的数据说明
+            caption_parts = []
+            if holdings_data.get('update_time'):
+                caption_parts.append(f"数据更新时间: {holdings_data['update_time']}")
+            if holdings_data.get('latest_quarter'):
+                caption_parts.append(f"数据季度: {holdings_data['latest_quarter']}")
+            
+            if caption_parts:
+                st.caption(" | ".join(caption_parts))
+            
+        except ImportError:
+            st.error("❌ ETF持仓分析功能未安装，请联系管理员")
+        except Exception as e:
+            st.error(f"❌ 获取ETF持仓信息时出错: {str(e)}")
+
+
+def display_dividend_details(basic_info_data, stock_identity):
+    """显示股息分红详情"""
+    market_name = stock_identity.get('market_name', 'A股')
+    
+    # 单独显示股息分红信息区块
+    dividend_fields = [key for key in basic_info_data.keys() if '分红' in key or '派息' in key or '送股' in key or '转增' in key]
+    
+    # 无论是否有分红数据都显示该区块，以便提供用户提示
+    with st.expander("💰 股息分红详情", expanded=True):
+        # 检查是否为A股，如果不是则显示简化的提示信息
+        if market_name not in ['A股']:
+            if market_name == '港股':
+                st.info("💡 港股分红信息请查看相关港股资讯网站")
+            elif market_name == 'ETF':
+                st.info("💡 ETF通常无现金分红，采用净值增长方式")
+            else:
+                st.info(f"💡 {market_name}分红数据暂不支持")
+        
+        if dividend_fields:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 最新分红信息
+                if basic_info_data.get('最新分红公告日期'):
+                    st.write(f"**最新分红公告日期:** {basic_info_data['最新分红公告日期']}")
+                
+                if basic_info_data.get('最新派息比例') and basic_info_data['最新派息比例'] not in [None, 0]:
+                    st.write(f"**最新派息比例:** {basic_info_data['最新派息比例']:.2f}元/10股")
+                
+                if basic_info_data.get('近年平均派息比例') and basic_info_data['近年平均派息比例'] not in [None, 0]:
+                    st.write(f"**近年平均派息比例:** {basic_info_data['近年平均派息比例']:.2f}元/10股")
+            
+            with col2:
+                if basic_info_data.get('最新分红类型'):
+                    st.write(f"**分红类型:** {basic_info_data['最新分红类型']}")
+                
+                if basic_info_data.get('近年分红次数'):
+                    st.write(f"**近年分红次数:** {basic_info_data['近年分红次数']}次")
+                
+                # 显示送股和转增信息
+                if basic_info_data.get('最新送股比例') and basic_info_data['最新送股比例'] not in [None, 0]:
+                    st.write(f"**最新送股比例:** {basic_info_data['最新送股比例']:.2f}股/10股")
+                
+                if basic_info_data.get('最新转增比例') and basic_info_data['最新转增比例'] not in [None, 0]:
+                    st.write(f"**最新转增比例:** {basic_info_data['最新转增比例']:.2f}股/10股")
+            
+            # 显示近年分红详情
+            if basic_info_data.get('近年分红详情'):
+                st.subheader("📊 近年分红记录")
+                dividend_records = basic_info_data['近年分红详情'][:5]  # 显示最多5条记录
+                
+                # 创建表格数据
+                table_data = []
+                for record in dividend_records:
+                    year = record.get('年份', '')
+                    dividend_type = record.get('分红类型', '')
+                    dividend_ratio = record.get('派息比例', 0)
+                    send_ratio = record.get('送股比例', 0)
+                    bonus_ratio = record.get('转增比例', 0)
+                    
+                    table_data.append({
+                        '年份': year,
+                        '分红类型': dividend_type,
+                        '派息比例(元/10股)': f"{dividend_ratio:.2f}" if dividend_ratio > 0 else "-",
+                        '送股比例(股/10股)': f"{send_ratio:.2f}" if send_ratio > 0 else "-",
+                        '转增比例(股/10股)': f"{bonus_ratio:.2f}" if bonus_ratio > 0 else "-"
+                    })
+                
+                if table_data:
+                    import pandas as pd
+                    df_dividend = pd.DataFrame(table_data)
+                    st.dataframe(df_dividend, width='stretch')
+        else:
+            # 没有分红数据时的提示
+            if market_name == 'A股':
+                st.warning("⚠️ 暂无该股票的分红记录数据")
 
 
 def display_basic_info(stock_identity):
@@ -201,105 +367,134 @@ def display_basic_info(stock_identity):
             col1, col2 = st.columns(2)
             
             with col1:
-                if basic_info_data.get('name'):
-                    st.write(f"**股票名称:** {basic_info_data['name']}")
+                if basic_info_data.get('股票名称'):
+                    st.info(f"**股票名称:** {basic_info_data['股票名称']}")
 
-                if basic_info_data.get('industry'):
-                    st.info(f"所属行业: {basic_info_data['industry']}")
+                if basic_info_data.get('所处行业'):
+                    st.write(f"所属行业: {basic_info_data['所处行业']}")
                 
-                if basic_info_data.get('total_market_value'):
-                    st.write(f"总市值: {format_market_value(basic_info_data['total_market_value'])}")
+                if basic_info_data.get('总市值'):
+                    st.write(f"总市值: {format_market_value(basic_info_data['总市值'])}")
                     
-                if basic_info_data.get('circulating_market_value'):
-                    st.write(f"流通市值: {format_market_value(basic_info_data['circulating_market_value'])}")
+                if basic_info_data.get('流通市值'):
+                    st.write(f"流通市值: {format_market_value(basic_info_data['流通市值'])}")
 
+                if basic_info_data.get('市盈率'):
+                    st.write(f"市盈率(动): {basic_info_data['市盈率']}")
+                
+                if basic_info_data.get('市净率'):
+                    st.write(f"市净率: {basic_info_data['市净率']}")
+                
+                roe_value = basic_info_data.get('净资产收益率(ROE)') or basic_info_data.get('ROE')
+                if roe_value:
+                    st.write(f"ROE: {roe_value}")
+
+            with col2:
                 st.metric(
                     label="当前价格", 
                     value=f"{format_price(basic_info_data.get('current_price', 0))}",
-                    delta=format_change(basic_info_data.get('change', 0), basic_info_data.get('change_percent', 0))
-                )
-                
+                    delta=format_change(basic_info_data.get('change', 0), 
+                                        basic_info_data.get('change_percent', 0)),
+                    delta_color="inverse"
+                )                
                 st.metric("成交量", format_volume(basic_info_data.get('volume', 0)))
-
-            with col2:
-                st.write(f"**开盘价:** {format_price(basic_info_data.get('open', 0))}")
-                st.write(f"**最高价:** {format_price(basic_info_data.get('high', 0))}")
-                st.write(f"**最低价:** {format_price(basic_info_data.get('low', 0))}")
+                st.write(f"开盘价: {format_price(basic_info_data.get('open', 0))}")
+                st.write(f"最高价: {format_price(basic_info_data.get('high', 0))}")
+                st.write(f"最低价: {format_price(basic_info_data.get('low', 0))}")
                 prev_close = basic_info_data.get('prev_close', 0)
                 if prev_close > 0:
-                    st.write(f"**昨收价:** {format_price(prev_close)}")
-
-                if basic_info_data.get('pe_ratio'):
-                    st.write(f"**市盈率(动):** {basic_info_data['pe_ratio']}")
-                
-                if basic_info_data.get('pb_ratio'):
-                    st.write(f"**市净率:** {basic_info_data['pb_ratio']}")
-                
-                if basic_info_data.get('roe'):
-                    st.write(f"**ROE:** {basic_info_data['roe']}")
+                    st.write(f"昨收价: {format_price(prev_close)}")
             
-            with st.expander("更多财务指标", expanded=True):
-                if basic_info_data.get('gross_profit_margin'):
-                    st.write(f"**毛利率:** {format_number(basic_info_data['gross_profit_margin'])}")
-                
-                if basic_info_data.get('net_profit_margin'):
-                    st.write(f"**净利润率:** {format_number(basic_info_data['net_profit_margin'])}")
-                
-                if basic_info_data.get('net_profit'):
-                    st.write(f"**净利润:** {format_large_number(basic_info_data['net_profit'])}")
-
-                if basic_info_data.get('debt_to_asset_ratio'):
-                    st.write(f"**资产负债率:** {format_number(basic_info_data['debt_to_asset_ratio'])}")
+            # 显示ETF持仓信息（如果是ETF）
+            display_etf_holdings_info(stock_identity)
+            
+            # 显示更多财务指标
+            display_more_financial_indicators(basic_info_data, stock_identity)
+            
+            # 显示股息分红详情
+            display_dividend_details(basic_info_data, stock_identity)
 
             st.caption(f"数据更新时间: {basic_info_data.get('timestamp', basic_info_data.get('update_time', ''))}")
         else:
             st.warning(f"未能获取到股票 {stock_code} 的实时数据")
         
-        st.divider()
-        st.subheader("基本面分析")
+        # 显示公司分析
+        display_company_analysis(stock_identity)
         
-        try:
-            use_cache = st.session_state.get('use_cache', True)
-            force_refresh = not use_cache
-            
-            include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
-                                 stock_code not in st.session_state.get('ai_fundamental_report', {}))
-            
-            if include_ai_analysis:
-                with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
-                    fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
-            else:
-                fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
-            
-            if "ai_fundamental_report" not in st.session_state:
-                st.session_state.ai_fundamental_report = {}
-                
-            if 'ai_analysis' in fundamental_data:
-                if 'error' not in fundamental_data['ai_analysis']:
-                    st.session_state.ai_fundamental_report[stock_code] = {
-                        "report": fundamental_data['ai_analysis']['report'],
-                        "timestamp": fundamental_data['ai_analysis']['timestamp']
-                    }
-                else:
-                    st.error(f"AI基本面分析失败: {fundamental_data['ai_analysis']['error']}")
-                    st.info("请稍后再试或联系管理员")
-            
-            if stock_code in st.session_state.ai_fundamental_report:
-                with st.expander("🤖 AI 基本面分析报告", expanded=True):
-                    st.markdown(st.session_state.ai_fundamental_report[stock_code]["report"])
-                    st.caption(f"分析报告生成时间: {st.session_state.ai_fundamental_report[stock_code]['timestamp']}")
-                    
-        except Exception as e:
-            st.error(f"加载基本面分析数据失败: {str(e)}")
+        # 显示基本面分析
+        display_fundamental_analysis(stock_identity)
             
     except Exception as e:
         st.error(f"获取基本信息失败: {str(e)}")
 
 
-def display_market_trend(stock_identity):
-    """显示股票行情走势"""
-    st.subheader("行情走势")
+def display_fundamental_analysis(stock_identity):
+    """显示基本面分析"""
+    st.divider()
+    st.subheader("基本面分析")
+    
     stock_code = stock_identity['code']
+    try:
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
+        include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                             stock_code not in st.session_state.get('ai_fundamental_report', {}))
+        
+        if include_ai_analysis:
+            with st.spinner("🤖 AI正在进行基本面分析，请稍候..."):
+                fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+        else:
+            fundamental_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
+        
+        if "ai_fundamental_report" not in st.session_state:
+            st.session_state.ai_fundamental_report = {}
+            
+        if 'ai_analysis' in fundamental_data:
+            if 'error' not in fundamental_data['ai_analysis']:
+                st.session_state.ai_fundamental_report[stock_code] = {
+                    "report": fundamental_data['ai_analysis']['report'],
+                    "timestamp": fundamental_data['ai_analysis']['timestamp']
+                }
+            else:
+                st.error(f"AI基本面分析失败: {fundamental_data['ai_analysis']['error']}")
+                st.info("请稍后再试或联系管理员")
+        
+        if stock_code in st.session_state.ai_fundamental_report:
+            with st.expander("🤖 AI 基本面分析报告", expanded=True):
+                st.markdown(st.session_state.ai_fundamental_report[stock_code]["report"])
+                st.caption(f"分析报告生成时间: {st.session_state.ai_fundamental_report[stock_code]['timestamp']}")
+                
+    except Exception as e:
+        st.error(f"加载基本面分析数据失败: {str(e)}")
+
+
+def display_ai_market_analysis(kline_info, stock_code):
+    """显示AI行情分析报告"""
+    if "ai_market_report" not in st.session_state:
+        st.session_state.ai_market_report = {}
+        
+    if 'ai_analysis' in kline_info:
+        if 'error' not in kline_info['ai_analysis']:
+            st.session_state.ai_market_report[stock_code] = {
+                "report": kline_info['ai_analysis']['report'],
+                "timestamp": kline_info['ai_analysis']['timestamp']
+            }
+        else:
+            st.error(f"AI行情分析失败: {kline_info['ai_analysis']['error']}")
+            st.info("请稍后再试或联系管理员")
+    
+    if stock_code in st.session_state.ai_market_report:
+        with st.expander("🤖 AI 行情分析报告", expanded=True):
+            st.markdown(st.session_state.ai_market_report[stock_code]["report"])
+            st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
+
+
+def display_technical_analysis(stock_identity):
+    """显示股票技术分析"""
+    st.subheader("技术分析")
+    stock_code = stock_identity['code']
+    
     try:
         use_cache = st.session_state.get('use_cache', True)
         force_refresh = not use_cache
@@ -307,11 +502,23 @@ def display_market_trend(stock_identity):
         include_ai_analysis = (st.session_state.get('include_ai_analysis', False) and 
                              stock_code not in st.session_state.get('ai_market_report', {}))
         
+        # 获取K线数据
         if include_ai_analysis:
             with st.spinner("🤖 AI正在分析股票行情，请稍候..."):
-                kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh, include_ai_analysis=True)
+                kline_info = stock_tools.get_stock_kline_data(
+                    stock_identity, 
+                    period=160, 
+                    use_cache=use_cache, 
+                    force_refresh=force_refresh, 
+                    include_ai_analysis=True
+                )
         else:
-            kline_info = stock_tools.get_stock_kline_data(stock_identity, period=160, use_cache=use_cache, force_refresh=force_refresh)
+            kline_info = stock_tools.get_stock_kline_data(
+                stock_identity, 
+                period=160, 
+                use_cache=use_cache, 
+                force_refresh=force_refresh
+            )
         
         if 'error' in kline_info:
             st.error(f"获取K线数据失败: {kline_info['error']}")
@@ -320,114 +527,22 @@ def display_market_trend(stock_identity):
         if kline_info and kline_info.get('kline_data'):
             df = pd.DataFrame(kline_info['kline_data'])
             
-            if "ai_market_report" not in st.session_state:
-                st.session_state.ai_market_report = {}
-                
-            if 'ai_analysis' in kline_info:
-                if 'error' not in kline_info['ai_analysis']:
-                    st.session_state.ai_market_report[stock_code] = {
-                        "report": kline_info['ai_analysis']['report'],
-                        "timestamp": kline_info['ai_analysis']['timestamp']
-                    }
-                else:
-                    st.error(f"AI行情分析失败: {kline_info['ai_analysis']['error']}")
-                    st.info("请稍后再试或联系管理员")
-            
-            if stock_code in st.session_state.ai_market_report:
-                with st.expander("🤖 AI 行情分析报告", expanded=True):
-                    st.markdown(st.session_state.ai_market_report[stock_code]["report"])
-                    st.caption(f"分析报告生成时间: {st.session_state.ai_market_report[stock_code]['timestamp']}")
-            
-            risk_metrics = kline_info.get('risk_metrics', None)
-            if risk_metrics is None or 'error' in risk_metrics:
-                st.error(f"获取风险指标失败: {risk_metrics['error']}")
-            elif risk_metrics and 'summary_table' in risk_metrics:
-                with st.expander("风险分析", expanded=True):
-                    st.table(risk_metrics['summary_table'])
-            elif 'error' not in risk_metrics:
-                with st.expander("风险分析摘要", expanded=True):
-                    st.json(risk_metrics)
-
-            df['datetime'] = pd.to_datetime(df['datetime'])
+            # 显示AI分析报告
+            display_ai_market_analysis(kline_info, stock_code)
                         
-            fig_price = go.Figure()
+            # 显示K线图和成交量图
+            from ui.components.page_common import display_kline_charts
+            stock_name = stock_identity.get('name', stock_identity.get('code', ''))
+            display_kline_charts(df, chart_type="stock", title_prefix=stock_name)
             
-            fig_price.add_trace(go.Candlestick(
-                x=df['datetime'],
-                open=df['open'], 
-                high=df['high'],
-                low=df['low'], 
-                close=df['close'],
-                name='K线',
-                increasing_line_color="#DA1A10",
-                decreasing_line_color="#14AA06",
-                increasing_fillcolor="#F51D12",
-                decreasing_fillcolor="#1BCC0B"
-            ))
-            
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA5'],
-                mode='lines',
-                name='MA5',
-                line=dict(color="#D2FF07", width=1.5)
-            ))
-            
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA10'],
-                mode='lines',
-                name='MA10',
-                line=dict(color="#FF22DA", width=1.5)
-            ))
-            
-            fig_price.add_trace(go.Scatter(
-                x=df['datetime'], 
-                y=df['MA20'],
-                mode='lines',
-                name='MA20',
-                line=dict(color="#0593F1", width=1.5)
-            ))
-            
-            fig_price.update_layout(
-                title='K线图与均线',
-                xaxis_title='日期',
-                yaxis_title='价格',
-                height=500,
-                margin=dict(l=0, r=0, t=40, b=0),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                xaxis=dict(rangeslider=dict(visible=False)),
-                yaxis=dict(fixedrange=True)
-            )
-            
-            st.plotly_chart(fig_price, use_container_width=True, config={"scrollZoom": False})
-            
-            fig_volume = go.Figure()
-            
-            fig_volume.add_trace(go.Bar(
-                x=df['datetime'], 
-                y=df['volume'],
-                name='成交量',
-                marker=dict(color='#90CAF9')
-            ))
-            
-            fig_volume.update_layout(
-                title='成交量',
-                xaxis_title='日期',
-                yaxis_title='成交量',
-                height=250,
-                margin=dict(l=0, r=0, t=40, b=0),
-                xaxis=dict(rangeslider=dict(visible=False)),
-                yaxis=dict(fixedrange=True)
-            )
-            
-            st.plotly_chart(fig_volume, use_container_width=True, config={"scrollZoom": False})
-            
-            indicators = kline_info.get('indicators', {})
-            if indicators:
-                display_technical_indicators(indicators)
-            else:
-                st.warning("未获取到技术指标数据")
+            # 显示技术指标分析
+            from ui.components.page_common import display_technical_analysis_tab
+            display_technical_analysis_tab(stock_identity=stock_identity)
+
+            # 显示风险分析
+            risk_metrics = kline_info.get('risk_metrics', None)
+            from ui.components.page_common import display_risk_analysis
+            display_risk_analysis(risk_metrics)
 
         else:
             st.warning(f"未获取到 {stock_code} 的K线数据")
@@ -436,7 +551,7 @@ def display_market_trend(stock_identity):
         st.error(f"加载行情数据失败: {str(e)}")
 
 
-def display_news(stock_identity):
+def display_news_analysis(stock_identity):
     """显示股票相关新闻"""
     st.subheader("新闻资讯")
     stock_code = stock_identity['code']
@@ -574,7 +689,7 @@ def display_chips_analysis(stock_identity):
             
             df = pd.DataFrame(data)
             
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
             
             st.subheader("关键价格区间")
             col1, col2, col3 = st.columns(3)
@@ -586,11 +701,16 @@ def display_chips_analysis(stock_identity):
                 st.metric("成本中枢", f"{format_price(chip_data['cost_center'])}元")
         
         try:
-            if 'raw_data' in chip_data and chip_data['raw_data']:
-                if isinstance(chip_data['raw_data'], list):
-                    cyq_data = pd.DataFrame(chip_data['raw_data'])
-                else:
-                    cyq_data = chip_data['raw_data']
+            # 尝试获取筹码原始数据
+            cyq_data = None
+            if chip_data.get('raw_data_cached'):
+                # 从专用缓存获取原始数据
+                from stock.stock_utils import get_chip_raw_data
+                raw_data = get_chip_raw_data(stock_code)
+                if raw_data:
+                    cyq_data = pd.DataFrame(raw_data)
+            
+            if cyq_data is not None and not cyq_data.empty:
                 
                 st.subheader("获利比例变化趋势")
                 fig_profit = go.Figure()
@@ -611,7 +731,7 @@ def display_chips_analysis(stock_identity):
                     yaxis=dict(fixedrange=True)
                 )
                 
-                st.plotly_chart(fig_profit, use_container_width=True, config={"scrollZoom": False})
+                st.plotly_chart(fig_profit, use_container_width=True)
                 st.subheader("平均成本变化趋势")
                 
                 fig_cost = go.Figure()
@@ -632,7 +752,7 @@ def display_chips_analysis(stock_identity):
                     yaxis=dict(fixedrange=True)
                 )
                 
-                st.plotly_chart(fig_cost, use_container_width=True, config={"scrollZoom": False})
+                st.plotly_chart(fig_cost, use_container_width=True)
             else:
                 st.info("未获取到筹码历史数据，无法绘制趋势图表")
         except Exception as e:
@@ -649,8 +769,7 @@ def display_comprehensive_analysis(stock_identity):
     stock_code = stock_identity['code']
 
     try:
-        if (st.session_state.get('include_ai_analysis', False) and 
-            stock_code not in st.session_state.get('ai_comprehensive_report', {})):
+        if st.session_state.get('include_ai_analysis', False):
             use_cache = st.session_state.get('use_cache', True)
             force_refresh = not use_cache
             run_comprehensive_analysis(stock_identity, force_refresh=force_refresh)
@@ -710,4 +829,55 @@ def run_comprehensive_analysis(stock_identity, force_refresh):
             import traceback
             traceback.print_exc()                    
             return False
+
+
+def display_company_analysis(stock_identity):
+    """显示公司分析"""
+    st.divider()
+    st.subheader("🏢 公司分析")
+    
+    stock_code = stock_identity['code']
+    try:
+        use_cache = st.session_state.get('use_cache', True)
+        force_refresh = not use_cache
+        
+        # 检查是否需要生成公司分析
+        include_company_analysis = (st.session_state.get('include_ai_analysis', False) and 
+                                   stock_code not in st.session_state.get('ai_company_report', {}))
+        
+        if include_company_analysis:
+            with st.spinner("🤖 AI正在进行公司分析，请稍候..."):
+                basic_info_data = stock_tools.get_basic_info(
+                    stock_identity, 
+                    use_cache=use_cache, 
+                    force_refresh=force_refresh, 
+                    include_company_analysis=True
+                )
+        else:
+            basic_info_data = stock_tools.get_basic_info(stock_identity, use_cache=use_cache, force_refresh=force_refresh)
+        
+        if "ai_company_report" not in st.session_state:
+            st.session_state.ai_company_report = {}
+            
+        # 处理公司分析结果
+        if 'company_analysis' in basic_info_data:
+            if 'error' not in basic_info_data['company_analysis']:
+                st.session_state.ai_company_report[stock_code] = {
+                    "report": basic_info_data['company_analysis']['report'],
+                    "timestamp": basic_info_data['company_analysis']['timestamp']
+                }
+            else:
+                st.error(f"AI公司分析失败: {basic_info_data['company_analysis']['error']}")
+                st.info("请稍后再试或联系管理员")
+        
+        # 显示公司分析报告
+        if stock_code in st.session_state.ai_company_report:
+            with st.expander("🤖 AI 公司分析报告", expanded=True):
+                st.markdown(st.session_state.ai_company_report[stock_code]["report"])
+                st.caption(f"分析报告生成时间: {st.session_state.ai_company_report[stock_code]['timestamp']}")
+        else:
+            st.info("💡 请在查询时勾选「AI分析」选项，AI将按照「干啥、为啥、靠啥、处哪、谁敌、怎么赚、有啥险」七个要点为您分析该公司")
+                
+    except Exception as e:
+        st.error(f"加载公司分析数据失败: {str(e)}")
 

@@ -10,8 +10,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from providers.stock_report import generate_stock_report
-from providers.stock_code_map import get_stock_identity
+from stock.stock_report import generate_stock_report
+from stock.stock_code_map import get_stock_identity
 
 def test_stock_report(stock_code="600519", stock_name="贵州茅台", market_type="A股", 
                      format_type="markdown", use_ai=False):
