@@ -571,22 +571,25 @@ class StockTools:
             if result.success:
                 report = result.report
                 data_sources = result.data_sources or []
+                
+                analysis_data = {
+                    'report': report,
+                    'data_sources': data_sources,
+                    'analysis_info': {
+                        'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'data_sources_count': len(data_sources),
+                        'user_opinion_included': bool(user_opinion.strip()),
+                        'user_opinion': user_opinion.strip() if user_opinion.strip() else None
+                    },
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'cache_time': datetime.now().isoformat()
+                }
             else:
-                report = result.report
-                data_sources = result.data_sources or []
-            
-            analysis_data = {
-                'report': report,
-                'data_sources': data_sources,
-                'analysis_info': {
-                    'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'data_sources_count': len(data_sources),
-                    'user_opinion_included': bool(user_opinion.strip()),
-                    'user_opinion': user_opinion.strip() if user_opinion.strip() else None
-                },
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'cache_time': datetime.now().isoformat()
-            }
+                # 分析失败，直接返回错误，不缓存
+                return {
+                    'error': result.report,
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
             
             try:
                 cache_data = self.cache_manager.load_cache()

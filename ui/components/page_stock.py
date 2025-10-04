@@ -769,8 +769,7 @@ def display_comprehensive_analysis(stock_identity):
     stock_code = stock_identity['code']
 
     try:
-        if (st.session_state.get('include_ai_analysis', False) and 
-            stock_code not in st.session_state.get('ai_comprehensive_report', {})):
+        if st.session_state.get('include_ai_analysis', False):
             use_cache = st.session_state.get('use_cache', True)
             force_refresh = not use_cache
             run_comprehensive_analysis(stock_identity, force_refresh=force_refresh)

@@ -313,8 +313,8 @@ class BaseAnalysisGenerator:
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         if len(messages) > 1:
-            _save_request_to_cache(messages[1]['content'], config['cache_filename'])
-        
+            _save_request_to_cache(messages[0]['content'] + "\n\n" + "@@@@@@@@" + "\n\n"  + messages[1]['content'], config['cache_filename'])
+
         try:
             response = self.client.chat(
                 messages=messages,
@@ -726,6 +726,19 @@ def generate_comprehensive_analysis_report(
     stock_code = stock_identity['code']
     stock_name = stock_identity.get('name', '')
     
+    # 导入配置管理器和提示词
+    import sys
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(project_root)
+    from config_manager import config
+    from stock.analysis_prompts import get_core_principles
+    
+    # 根据配置获取核心原则
+    risk_preference = config.get('ANALYSIS.RISK_PREFERENCE', 'neutral')
+    custom_principles = config.get('ANALYSIS.CUSTOM_PRINCIPLES', '')
+    core_principles = get_core_principles(risk_preference, custom_principles)
+    
     collector = DataCollector()
     formatter = ReportFormatter()
     all_data_sources = []
@@ -764,12 +777,9 @@ def generate_comprehensive_analysis_report(
         historical_summary = formatter.format_historical_summary(historical_analyses, truncate_data)
         market_summary = formatter.format_market_summary(market_report_text, market_ai_analysis, truncate_data)
         
-        system_message = """你是一位资深的投资顾问和股票分析师，以诚实、直接的分析风格著称。你的任务是基于AI已生成的各类分析和实时数据，对股票当前的投资价值进行高度凝练的综合判断，为投资决策提供明确指导。
+        system_message = f"""你是一位资深的投资顾问和股票分析师，以诚实、直接的分析风格著称。你的任务是基于AI已生成的各类分析和实时数据，对股票当前的投资价值进行高度凝练的综合判断，为投资决策提供明确指导。
 
-**核心原则：**
-- **诚实第一**：如实、直接地指出股票的优缺点，避免任何客套和模糊表述。
-- **客观判断**：全面评估正面和负面信号，既要警惕风险，也要把握机会。
-- **操作明确**：当出现合理买入机会时，应明确给出买入建议及理由；如不建议买入，也要直接说明原因。
+{core_principles}
 
 **分析重点：**
 - 整合技术面、基本面、消息面、筹码面分析，识别核心驱动因素和主要矛盾
