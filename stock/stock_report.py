@@ -159,9 +159,7 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
             report_text = analysis_data['report']
             report_time = analysis_data.get('timestamp', '')
             
-            md_content += f"""## 🤖 AI综合分析报告
-
-{report_text}
+            md_content += f"""{report_text}
 
 *分析生成时间: {report_time}*
 
@@ -173,8 +171,11 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
         md_content += """
 ---
         
-# 📊 基本信息
+# 参考数据
 
+## 公司信息
+
+### 基本信息
 """
         
         # 使用统一格式化器
@@ -182,8 +183,6 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
         basic_info_text = formatter.format_basic_info(basic_info, stock_identity)
 
         md_content += basic_info_text + "\n\n"
-        
-        md_content += "\n"
         
         if 'company' in report_data['ai_reports']:
             company_report = report_data['ai_reports']['company']

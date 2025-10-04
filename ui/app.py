@@ -149,6 +149,8 @@ def display_analysis_page():
                     st.session_state[report_type] = {}
         else:
             st.session_state['include_ai_analysis'] = False
+    else:
+        st.session_state['use_cache'] = True # 避免在不使用缓存时由于刷新控件导致重复查询
     
     if clear_btn:
         # 标记为刚刚重置，防止意外触发查询

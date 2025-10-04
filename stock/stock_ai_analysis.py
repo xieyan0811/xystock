@@ -198,7 +198,7 @@ class DataCollector:
             # 用户画像
             user_profile_raw = config.get('USER_PROFILE.RAW', '').strip()
             if user_profile_raw:
-                user_profile_section = f"\n# 用户画像\n{user_profile_raw}\n"
+                user_profile_section = f"## 用户画像\n{user_profile_raw}\n"
                 data_sources.append({
                     'type': '用户画像',
                     'description': '用户的投资偏好、风险承受能力等信息',
@@ -208,7 +208,7 @@ class DataCollector:
             # 用户常犯错误
             user_mistakes = config.get('USER_PROFILE.MISTAKES', '')
             if user_mistakes:
-                user_mistakes_section = f"\n# 用户常犯错误\n{user_mistakes}\n"
+                user_mistakes_section = f"## 用户常犯错误\n{user_mistakes}\n"
                 data_sources.append({
                     'type': '用户常犯错误',
                     'description': '用户在投资过程中常犯的错误和误区',
@@ -236,7 +236,7 @@ class ReportFormatter:
             'chip': '筹码分析'
         }
         
-        historical_summary = "\n\n# 📊 历史分析摘要\n"
+        historical_summary = ""
         for analysis_type, report in historical_analyses.items():
             if truncate_data:
                 summary = report[:300] + "..." if len(report) > 300 else report
@@ -253,7 +253,7 @@ class ReportFormatter:
         if not market_report_text and not market_ai_analysis:
             return "\n\n## 🌐 市场环境分析\n暂无市场环境数据。\n\n"
         
-        market_summary = "\n\n# 🌐 市场环境分析\n"
+        market_summary = ""
         
         if market_report_text:
             market_text_summary = market_report_text[:500] + "..." if truncate_data and len(market_report_text) > 500 else market_report_text
@@ -261,7 +261,7 @@ class ReportFormatter:
         
         if market_ai_analysis:
             ai_summary = market_ai_analysis[:300] + "..." if truncate_data and len(market_ai_analysis) > 300 else market_ai_analysis
-            market_summary += f"\n### AI大盘分析:\n\n{ai_summary}\n\n"
+            market_summary += f"\n{ai_summary}\n\n"
         
         return market_summary
     
@@ -272,7 +272,7 @@ class ReportFormatter:
         data_sources = []
         
         if user_opinion.strip():
-            user_opinion_section = f"\n# 用户观点\n{user_opinion.strip()}\n"
+            user_opinion_section = f"## 用户观点\n{user_opinion.strip()}\n\n"
             data_sources.append({
                 'type': '用户观点',
                 'description': '用户提供的投资观点和看法',
@@ -280,7 +280,7 @@ class ReportFormatter:
             })
         
         if user_position and user_position.strip() and user_position.strip() != "不确定":
-            user_opinion_section += f"\n# 用户当前持仓状态\n{user_position.strip()}\n"
+            user_opinion_section += f"## 用户当前持仓状态\n{user_position.strip()}\n\n"
             data_sources.append({
                 'type': '用户持仓',
                 'description': f'用户当前持仓状态：{user_position.strip()}',
@@ -809,21 +809,26 @@ def generate_comprehensive_analysis_report(
         
         user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
 
-**股票基本信息：**
+# 股票基本信息：
+
 - 公司名称：{stock_name}
 - 股票代码：{stock_code}
 - 市场：{stock_identity.get('market_name', '未知')}
 
-**当前行情数据：**
+# 当前行情数据：
+
 {basic_info_section}
 
-**历史分析数据：**
+# 已有分析数据：
+
 {historical_summary}
 
-**市场环境数据：**
+# 市场环境数据：
+
 {market_summary}
 
-**用户配置信息：**
+# 用户配置信息：
+
 {user_profile_section}
 {user_mistakes_section}
 {user_opinion_section}"""

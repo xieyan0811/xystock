@@ -656,8 +656,6 @@ class MarketTextFormatter:
         lines.append("")
         lines.append("# 参考数据")
         lines.append("")
-        lines.append("## 📊 市场指数概览")
-        lines.append("")
         
         indices_dict = current_indices.get('indices_dict', {})
         if indices_dict:
@@ -811,8 +809,8 @@ class MarketTextFormatter:
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             header = f"""# 📊 {index_name} 市场分析报告
 
-**📅 报告生成时间:** {current_time}  
-**🔧 生成工具:** {version_info}  
+**报告生成时间:** {current_time}  
+**生成工具:** {version_info}  
 
 """
             sections.append(header)
