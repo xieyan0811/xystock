@@ -17,7 +17,9 @@ def generate_stock_report(stock_identity: Dict[str, Any],
                           format_type="pdf",
                           has_fundamental_ai=False, has_market_ai=False,
                           has_news_ai=False, has_chip_ai=False,
-                          has_company_ai=False, has_comprehensive_ai=False):
+                          has_company_ai=False, has_comprehensive_ai=False,
+                          user_opinion="", user_position="不确定", 
+                          investment_timeframe="不确定"):
     """生成完整的股票分析报告（安全版本，完全独立于Streamlit）"""
     try:
         stock_tools = get_stock_tools()
@@ -59,7 +61,9 @@ def generate_stock_report(stock_identity: Dict[str, Any],
         # 收集综合分析
         if has_comprehensive_ai:
             try:
-                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(stock_identity, use_cache=True)
+                comprehensive_analysis = stock_tools.get_comprehensive_ai_analysis(
+                    stock_identity, user_opinion, user_position, investment_timeframe, use_cache=True
+                )
                 if 'error' not in comprehensive_analysis:
                     report_data['comprehensive_analysis'] = comprehensive_analysis
             except Exception as e:
@@ -94,7 +98,7 @@ def generate_stock_report(stock_identity: Dict[str, Any],
         
         report_data['ai_reports'] = final_ai_reports
         
-        md_content = generate_markdown_report(stock_identity, report_data)
+        md_content = generate_markdown_report(stock_identity, report_data, user_opinion, user_position, investment_timeframe)
         
         if format_type == "pdf":
             return generate_pdf_report(md_content)
@@ -121,7 +125,8 @@ def generate_stock_report(stock_identity: Dict[str, Any],
             return f"# 错误\n\n{error_msg}"
 
 
-def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[str, Any]) -> str:
+def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[str, Any], 
+                            user_opinion="", user_position="不确定", investment_timeframe="不确定") -> str:
     """生成Markdown格式报告"""
     stock_code = stock_identity['code']
     stock_name = stock_identity['name']
@@ -135,6 +140,19 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
 **生成工具**: {get_full_version()}
 
 """
+
+    # 添加用户配置信息
+    user_info_parts = []
+    if user_opinion.strip():
+        user_info_parts.append(f"**用户观点**: {user_opinion.strip()}")
+    if user_position and user_position != "不确定":
+        user_info_parts.append(f"**持仓状态**: {user_position}")
+    if investment_timeframe and investment_timeframe != "不确定":
+        user_info_parts.append(f"**投资时间维度**: {investment_timeframe}")
+    
+    if user_info_parts:
+        md_content += "## 👤 用户配置信息\n\n"
+        md_content += "\n".join(user_info_parts) + "\n\n"
 
     # 综合分析部分
     if 'comprehensive' in report_data['ai_reports']:
@@ -306,6 +324,8 @@ def generate_markdown_report(stock_identity: Dict[str, Any], report_data: Dict[s
     md_content += """---
 
 *本报告由XYStock股票分析系统自动生成，仅供参考，不构成任何投资建议*
+
+*XYStock工具已开源，可以在 https://github.com/xieyan0811/xystock 下载安装*
 """
     
     return md_content

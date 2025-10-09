@@ -514,8 +514,8 @@ class StockTools:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return error_msg, timestamp
 
-    def get_comprehensive_ai_analysis(self, stock_identity: Dict[str, Any], user_opinion: str = "", user_position: str="不确定",
-                                     use_cache: bool = True, force_refresh: bool = False) -> Dict:
+    def get_comprehensive_ai_analysis(self, stock_identity: Dict[str, Any], user_opinion: str = "", user_position: str="不确定", 
+                                     investment_timeframe: str = "不确定", use_cache: bool = True, force_refresh: bool = False) -> Dict:
         """获取综合AI分析数据"""
         data_type = 'ai_analysis'
         analysis_type = 'comprehensive'
@@ -532,16 +532,20 @@ class StockTools:
                     cache_time = datetime.fromisoformat(cache_meta['timestamp'])
                     expire_time = cache_time + timedelta(minutes=self.cache_manager.cache_configs[data_type]['expire_minutes'])
                     
-                    # 获取缓存中的用户观点和当前用户观点进行比较
+                    # 获取缓存中的用户观点和投资时间维度进行比较
                     cached_user_opinion = cache_meta.get('user_opinion', '')
+                    cached_investment_timeframe = cache_meta.get('investment_timeframe', '不确定')
                     current_user_opinion = user_opinion.strip()
+                    current_investment_timeframe = investment_timeframe
                     
-                    # 只有在缓存未过期且用户观点相同时才使用缓存
-                    if datetime.now() < expire_time and cached_user_opinion == current_user_opinion:
-                        print(f"📋 使用缓存的 {stock_code} 综合分析 (用户观点: {'有' if current_user_opinion else '无'})")
+                    # 只有在缓存未过期且用户观点和投资时间维度都相同时才使用缓存
+                    if (datetime.now() < expire_time and 
+                        cached_user_opinion == current_user_opinion and 
+                        cached_investment_timeframe == current_investment_timeframe):
+                        print(f"📋 使用缓存的 {stock_code} 综合分析 (用户观点: {'有' if current_user_opinion else '无'}, 时间维度: {current_investment_timeframe})")
                         return cache_data[cache_key].get('data', {})
-                    elif cached_user_opinion != current_user_opinion:
-                        print(f"🔄 用户观点已变化，重新生成 {stock_code} 综合分析")
+                    elif cached_user_opinion != current_user_opinion or cached_investment_timeframe != current_investment_timeframe:
+                        print(f"🔄 用户观点或时间维度已变化，重新生成 {stock_code} 综合分析")
             except Exception:
                 pass
         
@@ -564,6 +568,7 @@ class StockTools:
                 stock_identity=stock_identity,
                 user_opinion=user_opinion,
                 user_position=user_position,
+                investment_timeframe=investment_timeframe,
                 stock_tools=self,
                 market_tools=market_tools
             )
@@ -579,7 +584,8 @@ class StockTools:
                         'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'data_sources_count': len(data_sources),
                         'user_opinion_included': bool(user_opinion.strip()),
-                        'user_opinion': user_opinion.strip() if user_opinion.strip() else None
+                        'user_opinion': user_opinion.strip() if user_opinion.strip() else None,
+                        'investment_timeframe': investment_timeframe
                     },
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'cache_time': datetime.now().isoformat()
@@ -601,12 +607,13 @@ class StockTools:
                         'analysis_type': analysis_type,
                         'expire_minutes': self.cache_manager.cache_configs[data_type]['expire_minutes'],
                         'user_opinion': user_opinion.strip(),  # 存储用户观点到缓存元数据
-                        'user_position': user_position
+                        'user_position': user_position,
+                        'investment_timeframe': investment_timeframe
                     },
                     'data': analysis_data
                 }
                 self.cache_manager.save_cache(cache_data)
-                print(f"💾 {stock_code} 综合分析已缓存 (用户观点: {'有' if user_opinion.strip() else '无'})")
+                print(f"💾 {stock_code} 综合分析已缓存 (用户观点: {'有' if user_opinion.strip() else '无'}, 时间维度: {investment_timeframe})")
             except Exception as e:
                 print(f"❌ 缓存综合分析失败: {e}")
             

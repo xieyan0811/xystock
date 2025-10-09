@@ -905,6 +905,8 @@ class MarketTextFormatter:
 **报告生成时间**: {current_time}
 
 *本报告由XYStock市场分析系统自动生成，仅供参考，不构成任何投资建议*
+
+*XYStock工具已开源，可以在 https://github.com/xieyan0811/xystock 下载安装*
 """
             sections.append(footer)
         

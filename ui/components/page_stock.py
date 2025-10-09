@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+from datetime import datetime
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -16,6 +17,8 @@ from utils.format_utils import format_volume, format_market_value, format_price,
 from utils.data_formatters import get_stock_formatter
 from stock.stock_data_tools import get_stock_tools
 from stock.stock_report import generate_stock_report
+from ui.config import MARKET_TYPES, STOCK_CODE_EXAMPLES
+from stock.stock_code_map import get_stock_identity
 
 stock_tools = get_stock_tools()
 formatter = get_stock_formatter()
@@ -75,6 +78,11 @@ def display_stock_info(stock_identity):
                 """包装股票报告生成函数"""
                 has_fundamental_ai, has_market_ai, has_news_ai, has_chip_ai, has_company_ai, has_comprehensive_ai = get_ai_analysis_status_and_reports(stock_code)
                 
+                # 获取用户输入的参数
+                user_opinion = st.session_state.get('user_opinion', '')
+                user_position = st.session_state.get('user_position', '不确定')
+                investment_timeframe = st.session_state.get('investment_timeframe', '不确定')
+                
                 return generate_stock_report(
                     stock_identity, format_type,
                     has_fundamental_ai=has_fundamental_ai,
@@ -82,7 +90,10 @@ def display_stock_info(stock_identity):
                     has_news_ai=has_news_ai,
                     has_chip_ai=has_chip_ai,
                     has_company_ai=has_company_ai,
-                    has_comprehensive_ai=has_comprehensive_ai
+                    has_comprehensive_ai=has_comprehensive_ai,
+                    user_opinion=user_opinion,
+                    user_position=user_position,
+                    investment_timeframe=investment_timeframe
                 )
             
             from ui.components.page_export import display_report_export_section
@@ -426,6 +437,8 @@ def display_basic_info(stock_identity):
             
     except Exception as e:
         st.error(f"获取基本信息失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 def display_fundamental_analysis(stock_identity):
@@ -760,6 +773,8 @@ def display_chips_analysis(stock_identity):
     
     except Exception as e:
         st.error(f"加载筹码分析数据失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 def display_comprehensive_analysis(stock_identity):
@@ -813,8 +828,9 @@ def run_comprehensive_analysis(stock_identity, force_refresh):
             use_cache = st.session_state.get('use_cache', True)
             user_opinion = st.session_state.get('user_opinion', '')
             user_position = st.session_state.get('user_position', '不确定')
+            investment_timeframe = st.session_state.get('investment_timeframe', '不确定')
 
-            analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_identity, user_opinion, user_position, use_cache=use_cache, force_refresh=force_refresh)
+            analysis_data = stock_tools.get_comprehensive_ai_analysis(stock_identity, user_opinion, user_position, investment_timeframe, use_cache=use_cache, force_refresh=force_refresh)
             
             if 'error' in analysis_data:
                 st.error(f"获取综合分析失败: {analysis_data['error']}")
@@ -880,4 +896,157 @@ def display_company_analysis(stock_identity):
                 
     except Exception as e:
         st.error(f"加载公司分析数据失败: {str(e)}")
+
+
+def display_analysis_page():
+    """显示股票分析页面"""
+    st.header("🏢 股票查询")
+    
+    market_type = st.selectbox(
+        "选择市场类型:",
+        MARKET_TYPES,
+        index=0,
+        help="选择要查询的股票市场类型"
+    )
+    
+    if market_type in STOCK_CODE_EXAMPLES:
+        examples = ", ".join(STOCK_CODE_EXAMPLES[market_type])
+        st.caption(f"示例代码: {examples}")
+    
+    stock_code = st.text_input(
+        "代码/名称:",
+        placeholder=f"请输入{market_type}代码",
+        help=f"输入{market_type}代码进行查询"
+    )
+    
+    use_ai_analysis = st.checkbox("🤖 AI智能分析", value=False, help="选中后将使用AI对股票进行全面分析，包括行情、新闻、筹码、基本面等")
+    use_cache = st.checkbox("💾 使用缓存数据", value=True, help="使用缓存数据可以加快查询速度，取消勾选将强制获取最新数据")
+    
+    # 用户观点输入框（仅在选择AI分析时显示）
+    user_opinion = ""
+    user_position = "不确定"
+    investment_timeframe = "不确定"
+    if use_ai_analysis:
+        user_opinion = st.text_area(
+            "补充观点（可选）:",
+            placeholder="请输入您对该股票的观点、看法或关注的重点...",
+            help="输入您的投资观点或关注的重点，AI将结合多维度分析给出综合建议",
+            height=100
+        )
+        
+        col_position, col_timeframe = st.columns(2)
+        with col_position:
+            user_position = st.selectbox(
+                "当前持仓状态:",
+                options=["不确定", "空仓", "低仓位", "中仓位", "重仓", "满仓"],
+                index=0,
+                help="请选择您当前的大致持仓状态"
+            )
+        with col_timeframe:
+            investment_timeframe = st.selectbox(
+                "投资时间维度:",
+                options=["不确定", "短线", "中线", "长线"],
+                index=0,
+                help="短线注重技术面和市场情绪；中线关注基本面和行业趋势；长线重视价值投资和长期增长"
+            )
+    
+    col1, col2, col3 = st.columns([1, 1, 4])
+    with col1:
+        query_btn = st.button("🔍 查询", type="primary")
+    with col2:
+        clear_btn = st.button("🗑️ 重置")
+    
+    # 处理按钮逻辑 - 使用session_state保持状态
+    if query_btn and stock_code.strip():
+        # 只有在明确点击查询按钮时才设置显示状态
+        st.session_state['show_stock_info'] = True
+        st.session_state['current_stock_code'] = stock_code.strip()
+        st.session_state['current_market_type'] = market_type
+        st.session_state['query_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        st.session_state['use_cache'] = use_cache
+        st.session_state['just_reset'] = False  # 标记非重置状态
+        
+        if use_ai_analysis:
+            st.session_state['include_ai_analysis'] = True
+            st.session_state['user_opinion'] = user_opinion
+            st.session_state['user_position'] = user_position
+            st.session_state['investment_timeframe'] = investment_timeframe
+            
+            for report_type in ['ai_market_report', 'ai_news_report', 'ai_chip_report', 
+                               'ai_fundamental_report', 'ai_comprehensive_report']:
+                if report_type not in st.session_state:
+                    st.session_state[report_type] = {}
+        else:
+            st.session_state['include_ai_analysis'] = False
+    
+    if clear_btn:
+        # 标记为刚刚重置，防止意外触发查询
+        st.session_state['just_reset'] = True
+        
+        # 清除所有相关的session state
+        keys_to_clear = [
+            'show_stock_info', 'current_stock_code', 'current_market_type', 
+            'query_time', 'include_ai_analysis', 'user_opinion', 'user_position', 'investment_timeframe',
+            'use_cache', 'ai_market_report', 'ai_news_report', 'ai_chip_report',
+            'ai_fundamental_report', 'ai_comprehensive_report', 'ai_company_report'
+        ]
+        
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        st.rerun()
+    
+    st.subheader("查询结果")
+    
+    result_container = st.container()
+    
+    # 只有在没有刚刚重置的情况下才显示股票信息
+    if st.session_state.get('show_stock_info', False) and not st.session_state.get('just_reset', False):
+        current_stock_code = st.session_state.get('current_stock_code', '')
+        current_market_type = st.session_state.get('current_market_type', '')
+        query_time = st.session_state.get('query_time', '')
+        
+        with result_container:
+            with st.spinner("正在查询数据..."):
+                try:
+                    stock_identity = get_stock_identity(current_stock_code, current_market_type)
+                    if stock_identity is None or stock_identity.get('error'):
+                        st.error(f"获取股票代码失败")
+                    else:
+                        display_stock_info(stock_identity)
+                        with st.expander("📊 详细信息", expanded=False):
+                            st.write(f"**查询时间:** {query_time}")
+                            st.write(f"**市场类型:** {current_market_type}")
+                            st.write(f"**股票代码:** {stock_identity['code']}")
+                            st.write(f"**股票名称:** {stock_identity['name']}")
+                        
+                except Exception as e:
+                    st.error(f"查询失败: {str(e)}")
+                    st.write("请检查股票代码是否正确，或稍后重试。")
+                    
+                    with st.expander("🔍 错误详情", expanded=False):
+                        st.code(str(e), language="text")
+    else:
+        # 清除重置标志，避免影响后续操作
+        if 'just_reset' in st.session_state:
+            del st.session_state['just_reset']
+            
+        if query_btn:
+            if not stock_code.strip():
+                with result_container:
+                    st.warning("请输入股票代码")
+        else:
+            with result_container:
+                st.info("请输入股票代码并点击查询按钮")
+    
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: #666;'>
+            <small>XY Stock 股票分析系统 | 数据仅供参考，不构成任何投资建议</small>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 

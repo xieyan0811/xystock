@@ -266,7 +266,7 @@ class ReportFormatter:
         return market_summary
     
     @staticmethod
-    def format_user_opinion_section(user_opinion: str, user_position: str) -> Tuple[str, List[Dict]]:
+    def format_user_opinion_section(user_opinion: str, user_position: str, investment_timeframe: str = "不确定") -> Tuple[str, List[Dict]]:
         """格式化用户观点部分"""
         user_opinion_section = ""
         data_sources = []
@@ -284,6 +284,14 @@ class ReportFormatter:
             data_sources.append({
                 'type': '用户持仓',
                 'description': f'用户当前持仓状态：{user_position.strip()}',
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        if investment_timeframe and investment_timeframe.strip() and investment_timeframe.strip() != "不确定":
+            user_opinion_section += f"\n# 用户投资时间维度\n{investment_timeframe.strip()}\n"
+            data_sources.append({
+                'type': '投资时间维度',
+                'description': f'用户投资时间维度：{investment_timeframe.strip()}',
                 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             })
         
@@ -485,7 +493,10 @@ def generate_company_analysis_report(
 - 市场：{market_name}
 
 请严格按照以下要点进行分析：
-主营业务、市场需求、核心优势、产业地位、竞争格局、盈利模式、风险挑战"""
+主营业务、市场需求、核心优势、产业地位、竞争格局、盈利模式、风险挑战
+
+---
+**提示用户：以下内容由AI大模型自动生成，仅供参考，可能存在信息更新不及时或不准确的情况，请结合最新公告和实际情况判断。**"""
 
     messages = [
         {"role": "system", "content": system_message},
@@ -718,6 +729,7 @@ def generate_comprehensive_analysis_report(
     stock_identity: Dict[str, Any],
     user_opinion: str = "",
     user_position: str = "不确定",
+    investment_timeframe: str = "不确定",
     stock_tools=None,
     market_tools=None,
     truncate_data: bool = False
@@ -770,7 +782,7 @@ def generate_comprehensive_analysis_report(
         all_data_sources.extend(user_sources)
         
         # 5. 格式化用户观点和持仓信息
-        user_opinion_section, user_opinion_sources = formatter.format_user_opinion_section(user_opinion, user_position)
+        user_opinion_section, user_opinion_sources = formatter.format_user_opinion_section(user_opinion, user_position, investment_timeframe)
         all_data_sources.extend(user_opinion_sources)
         
         # 6. 格式化各部分内容
@@ -789,6 +801,7 @@ def generate_comprehensive_analysis_report(
 - 评估用户观点的合理性，如果用户看好但数据显示风险很大，要明确提醒
 - 结合用户持仓状态、投资特点和易错倾向，提供个性化操作建议
 - 识别当前最需警惕的风险点和最值得关注的机会点
+- 根据用户的投资时间维度调整分析重点：短线操作更关注技术面、市场情绪和资金流向；中线投资侧重基本面、行业趋势和政策影响；长线投资重视价值投资逻辑、护城河和长期增长潜力
 
 **输出格式：**
 ## 📄 综合分析报告
@@ -805,7 +818,8 @@ def generate_comprehensive_analysis_report(
 - 预测和建议必须具体量化，避免模糊表述
 - 所有判断基于数据分析，结论要有明确的可操作性
 - **对于不值得买的股票要直接说出来，不要给投资者虚假希望**
-- 针对用户特点给出差异化的风险提醒和操作建议"""
+- 针对用户特点给出差异化的风险提醒和操作建议
+- 如用户选择了投资时间维度，需要针对性调整分析角度：短线重技术面和情绪，中线重基本面和趋势，长线重价值和成长性"""
         
         user_message = f"""请对{stock_name}（{stock_code}）进行综合分析：
 
