@@ -713,20 +713,40 @@ def get_chip_cache_status(stock_code: str = None) -> Dict:
     chip_cache = get_chip_cache_manager()
     return chip_cache.get_cache_status(stock_code)
 
-def get_previous_trading_day() -> str:
-    """计算前一个交易日"""
+def get_valid_trading_day() -> str:
+    """获取有效交易日数据
+    
+    如果当前时间是下午5点前，返回前一个交易日
+    如果当前时间是下午5点及以后，返回当前交易日（但需要考虑周末）
+    """
     today = datetime.now()
+    current_time = today.time()
+    market_close_time = datetime.strptime("17:00:00", "%H:%M:%S").time()  # 下午5点
     weekday = today.weekday()  # 0=Monday, 1=Tuesday, ..., 6=Sunday
     
-    if weekday == 0:
-        # 周一，前一个交易日是上周五
-        prev_trading_day = today - timedelta(days=3)
-    elif weekday == 6:
-        # 周日，前一个交易日是上周五
-        prev_trading_day = today - timedelta(days=2)
+    # 判断是否在下午5点前
+    if current_time < market_close_time:
+        # 下午5点前：返回前一个交易日
+        if weekday == 0:
+            # 周一，前一个交易日是上周五
+            trading_day = today - timedelta(days=3)
+        elif weekday == 6:
+            # 周日，前一个交易日是上周五
+            trading_day = today - timedelta(days=2)
+        else:
+            # 周二到周六，前一个交易日是前一天
+            trading_day = today - timedelta(days=1)
     else:
-        # 周二到周六，前一个交易日是前一天
-        prev_trading_day = today - timedelta(days=1)
+        # 下午5点及以后：返回当前交易日（考虑周末）
+        if weekday == 5:
+            # 周六，当前交易日是周五（今天不是交易日，返回昨天周五）
+            trading_day = today - timedelta(days=1)
+        elif weekday == 6:
+            # 周日，当前交易日是周五（今天不是交易日，返回前两天周五）
+            trading_day = today - timedelta(days=2)
+        else:
+            # 周一到周五，返回当前日期
+            trading_day = today
     
-    return prev_trading_day.strftime("%Y-%m-%d")
+    return trading_day.strftime("%Y-%m-%d")
 

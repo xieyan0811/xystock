@@ -181,8 +181,8 @@ class KLineCacheManager:
             
             # 检查是否包含前一个交易日的数据（仅对日线和指数日线进行检查）
             if kline_type in [KLineType.DAY, KLineType.INDEX_DAY]:
-                from stock.stock_data_tools import get_previous_trading_day
-                previous_trading_day = get_previous_trading_day()
+                from stock.stock_data_tools import get_valid_trading_day
+                previous_trading_day = get_valid_trading_day()
                 has_previous_trading_day_data = any(
                     kline.datetime.startswith(previous_trading_day) for kline in kline_data
                 )

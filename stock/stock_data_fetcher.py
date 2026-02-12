@@ -131,8 +131,8 @@ class StockDataFetcher:
         cached_data = cache_manager.get_cached_kline(symbol, kline_type, count)
         if cached_data:
             # 检查是否包含前一个交易日的数据
-            from stock.stock_data_tools import get_previous_trading_day
-            previous_trading_day = get_previous_trading_day()
+            from stock.stock_data_tools import get_valid_trading_day
+            previous_trading_day = get_valid_trading_day()
             has_previous_trading_day_data = any(
                 kline.datetime.startswith(previous_trading_day) for kline in cached_data
             )
