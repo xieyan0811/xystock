@@ -55,10 +55,12 @@ def write_market_report(index_name="上证指数", format_type="pdf", has_ai_ana
         }
         
         from market.market_formatters import MarketTextFormatter
+        
         md_content = MarketTextFormatter.format_data_for_report(
             index_name, 
             report_data, 
-            get_full_version()
+            get_full_version(),
+            use_gray_section=(format_type == "markdown")
         )
         
         if format_type == "pdf":

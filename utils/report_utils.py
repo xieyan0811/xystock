@@ -3,13 +3,16 @@ import tempfile
 import subprocess
 import shutil
 
+
 try:
+    PANDOC_AVAILABLE = False
     import pypandoc
     try:
         pypandoc.get_pandoc_version()
         PANDOC_AVAILABLE = True
         print("✅ pandoc可用")
     except OSError:
+        """
         print("⚠️ 未找到pandoc，正在尝试自动下载...")
         try:
             pypandoc.download_pandoc()
@@ -17,9 +20,9 @@ try:
             print("✅ pandoc下载成功！")
         except Exception as download_error:
             print(f"❌ pandoc下载失败: {download_error}")
-            PANDOC_AVAILABLE = False
+        """
+        print("❌ pandoc不可用，PDF和Word功能将受限")
 except ImportError:
-    PANDOC_AVAILABLE = False
     print("❌ pypandoc未安装，PDF功能不可用")
 
 def check_weasyprint_available():

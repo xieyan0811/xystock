@@ -652,10 +652,6 @@ class MarketTextFormatter:
             return ""
         
         lines = []
-        lines.append("---")
-        lines.append("")
-        lines.append("# 参考数据")
-        lines.append("")
         
         indices_dict = current_indices.get('indices_dict', {})
         if indices_dict:
@@ -791,6 +787,7 @@ class MarketTextFormatter:
             format_type: 格式化类型，'ai_analysis' 或 'report'
             **kwargs: 额外参数
                 - version_info: 报告生成工具版本信息（仅report模式需要）
+                - use_gray_section: 是否使用灰色背景区域（仅report模式需要）
         
         Returns:
             str: 格式化后的完整文本
@@ -802,6 +799,7 @@ class MarketTextFormatter:
                 data['focus_index'] = index_name
         
         sections = []
+        use_gray_section = kwargs.get('use_gray_section', False)
         
         # 1. 头部处理
         if format_type == 'report':
@@ -822,6 +820,13 @@ class MarketTextFormatter:
             
             # 指数概览部分（仅报告模式）
             from ui.config import FOCUS_INDICES
+            
+            if use_gray_section:
+                sections.append("<!-- gray-section-start -->")
+            
+            sections.append("---")
+            sections.append("# 参考数据")
+            
             indices_section = MarketTextFormatter.format_indices_overview(
                 data.get('current_indices', {}), 
                 FOCUS_INDICES
@@ -894,6 +899,10 @@ class MarketTextFormatter:
                 except Exception as e:
                     sections.append(f"## 当前市场指数情况\n\n获取指数数据失败: {str(e)}")
         
+        # 结束灰色背景区域
+        if format_type == 'report' and use_gray_section:
+            sections.append("<!-- gray-section-end -->")
+        
         # 5. 尾部处理（仅报告模式）
         if format_type == 'report':
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -915,23 +924,20 @@ class MarketTextFormatter:
             return '\n\n'.join(sections)
 
     @staticmethod
-    def format_data_for_report(index_name: str, report_data: Dict, version_info: str) -> str:
-        """格式化完整的市场报告为Markdown，用于导出文件
-        
-        已重构为调用统一的format_market_data方法
+    def format_data_for_report(index_name: str, report_data: Dict, version_info: str, use_gray_section: bool = False) -> str:
+        """格式化完整的市场报告为Markdown，用于导出文件     
         """
         return MarketTextFormatter.format_market_data(
             report_data, 
             index_name, 
             format_type='report', 
-            version_info=version_info
+            version_info=version_info,
+            use_gray_section=use_gray_section
         )
 
     @staticmethod
     def format_data_for_ai_analysis(report: Dict, index_name: str) -> str:
-        """将核心市场数据格式化为AI分析所需的文本格式
-        
-        已重构为调用统一的format_market_data方法
+        """将核心市场数据格式化为AI分析所需的文本格式        
         """
         return MarketTextFormatter.format_market_data(
             report, 
