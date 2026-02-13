@@ -171,12 +171,24 @@ class KLineDataManager:
         if use_cache and not force_refresh:
             cached_data = cache_manager.get_cached_index_kline(index_name, period)
             if cached_data and len(cached_data) >= min(period, 30):
-                print(f"📋 使用缓存的K线数据: {index_name} ({len(cached_data)}条)")
-                df = self.convert_from_kline_data_list(cached_data, for_technical_analysis)
-                # 确保数据量符合要求
-                df = df.tail(period)
-                from_cache = True
-                return df, from_cache
+                # 检查缓存数据的最后日期
+                last_kline = cached_data[-1]
+                last_date_str = last_kline.datetime.split()[0] if isinstance(last_kline.datetime, str) else last_kline.datetime.strftime('%Y-%m-%d')
+                today_str = datetime.now().strftime('%Y-%m-%d')
+                current_hour = datetime.now().hour
+                
+                # 如果是交易日（简单判断非周末）且已过16点，但缓存中没有今日数据，则强制刷新
+                is_weekday = datetime.now().weekday() < 5
+                if is_weekday and current_hour >= 17 and last_date_str != today_str:
+                    print(f"⚠️ 缓存最后日期为 {last_date_str}，当前已过17点，尝试获取今日({today_str})数据")
+                    # 不返回，继续执行网络获取
+                else:
+                    print(f"📋 使用缓存的K线数据: {index_name} ({len(cached_data)}条, 最后日期: {last_date_str})")
+                    df = self.convert_from_kline_data_list(cached_data, for_technical_analysis)
+                    # 确保数据量符合要求
+                    df = df.tail(period)
+                    from_cache = True
+                    return df, from_cache
         
         # 从网络获取最新数据
         print(f"📡 获取最新K线数据: {index_name}")
