@@ -3,6 +3,7 @@
 """
 
 import akshare as ak
+import re
 from datetime import datetime, timedelta
 from collections import Counter
 import json
@@ -186,16 +187,17 @@ def analyze_news_sentiment(news_base, stock_name, start_date=None, end_date=None
     return ret_array
 
 
-def get_market_news_caixin(limit=10, debug=False):
+def get_market_news_caixin_deprecated(limit=10, debug=False):
     """
-    获取财新网宏观经济和市场新闻（政策面、大盘相关）
+    [已失效] 获取财新网宏观经济和市场新闻
+    原接口 ak.stock_news_main_cx() 返回 404
     """
-    print("📊 获取财新网宏观经济新闻...")
+    print("⚠️ (已弃用) 获取财新网宏观经济新闻...")
     result = {
         'market_news': [],
         'news_summary': {}
     }
-    ret = True
+    ret = False
     
     try:
         # 获取财新网数据
@@ -249,6 +251,103 @@ def get_market_news_caixin(limit=10, debug=False):
         
     except Exception as e:
         print(f"   ⚠️ 获取财新网新闻失败: {e}")
+        ret = False
+        result['error'] = str(e)
+    
+    return ret, result
+
+
+def get_market_news_cls(limit=10, debug=False):
+    """
+    获取财联社全球财经快讯（大盘异动、宏观消息）
+    替代失效的财新网接口
+    """
+    print("📊 获取财联社全球财经快讯...")
+    result = {
+        'market_news': [],
+        'news_summary': {}
+    }
+    ret = True
+    
+    try:
+        # 获取财联社数据
+        # ak.stock_info_global_cls() 返回列: 标题, 内容, 发布日期, 发布时间
+        cls_data = ak.stock_info_global_cls()
+        
+        if not cls_data.empty:
+            market_news = cls_data.to_dict('records')
+            
+            filtered_news = []
+            for news in market_news:
+                content = news.get('内容', '') or ''
+                title = news.get('标题', '') or ''
+                
+                # 如果没有标题，取正文前两句
+                if not title.strip() and content:
+                    # 使用正则分割句子，保留标点
+                    sentences = re.split(r'([。！？])', content)
+                    # sentences 类似 ['第一句', '。', '第二句', '！', '剩余...']
+                    if len(sentences) >= 4:
+                        title = ''.join(sentences[:4])
+                    elif len(sentences) >= 2:
+                        title = ''.join(sentences[:2])
+                    else:
+                        title = content
+                    
+                    if len(title) > 50: # 如果生成的标题太长，截断
+                        title = title[:50] + "..."
+
+                publish_date = news.get('发布日期', '')
+                publish_time = news.get('发布时间', '')
+                full_time_str = f"{publish_date} {publish_time}".strip()
+                
+                # 尝试解析时间以计算相对时间
+                interval_time = ''
+                try:
+                    if full_time_str:
+                        news_dt = datetime.strptime(full_time_str, '%Y-%m-%d %H:%M:%S')
+                        now = datetime.now()
+                        diff = now - news_dt
+                        if diff.days > 0:
+                            interval_time = f"{diff.days}天前"
+                        elif diff.seconds > 3600:
+                            interval_time = f"{diff.seconds // 3600}小时前"
+                        else:
+                            interval_time = f"{diff.seconds // 60}分钟前"
+                except:
+                    pass
+
+                formatted_news = {
+                    '新闻标题': title,
+                    '新闻内容': content,
+                    '发布时间': full_time_str,
+                    '相对时间': interval_time,
+                    '新闻链接': '', # 财联社接口暂无链接
+                    '新闻类型': '全球财经快讯'
+                }
+                filtered_news.append(formatted_news)
+            
+            result['market_news'] = filtered_news[:limit]
+            
+            if debug:
+                print(f"   ✓ 成功获取 {len(result['market_news'])} 条快讯")
+                for i, news in enumerate(result['market_news'][:3]):
+                    print(f"   {i+1}. {news['新闻标题']}")
+                    print(f"      时间: {news['发布时间']} ({news['相对时间']})")
+                    print(f"      内容: {news['新闻内容'][:50]}...")
+                    print()
+        
+        result['news_summary'] = {
+            'total_market_news_count': len(result['market_news']),
+            'data_source': '财联社',
+            'data_freshness': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'news_type': '宏观经济、大盘异动'
+        }
+        
+        print(f"   ✅ 财联社新闻获取完成，共 {result['news_summary']['total_market_news_count']} 条信息")
+        
+    except Exception as e:
+        print(f"   ⚠️ 获取财联社新闻失败: {e}")
         ret = False
         result['error'] = str(e)
     

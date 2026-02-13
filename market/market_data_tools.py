@@ -23,7 +23,7 @@ from market.market_data_fetcher import (
 )
 from market.market_data_cache import get_cache_manager
 from market.market_formatters import MarketTextFormatter
-from utils.news_tools import get_market_news_caixin
+from utils.news_tools import get_market_news_cls
 from config_manager import config
 
 
@@ -262,7 +262,7 @@ class MarketTools:
         
         print(f"📡 获取市场新闻数据...")
         try:
-            ret, data = get_market_news_caixin(debug=debug)
+            ret, data = get_market_news_cls(debug=debug)
             if use_cache and ret:
                 self.cache_manager.save_cached_data(data_type, data)
             return data

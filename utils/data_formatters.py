@@ -57,7 +57,7 @@ def format_technical_indicators(tech_indicators):
     md_content = """---
 
 ## 📈 技术指标分析
-（注意：使用的 K线数据截至上一交易日）
+（注意：交易日17:00前数据截至上一交易日，17:00后包含当日数据）
 
 """
     
@@ -113,11 +113,11 @@ def format_risk_metrics(risk_metrics, with_header = True):
         md_content = """---
 
 ## ⚠️ 风险指标分析
-（注意：使用的 K线数据截至上一交易日）
+（注意：交易日17:00前数据截至上一交易日，17:00后包含当日数据）
 
 """
     else:
-        md_content = """（注意：使用的 K线数据截至上一交易日）
+        md_content = """（注意：交易日17:00前数据截至上一交易日，17:00后包含当日数据）
 
 """
     

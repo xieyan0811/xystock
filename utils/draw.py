@@ -14,7 +14,7 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 
-def plot_kline(df, title="K线图", figsize=(15, 8)):
+def plot_kline(df, title="K线图", figsize=(15, 8), save_path=None):
     """
     绘制K线图
     
@@ -22,6 +22,7 @@ def plot_kline(df, title="K线图", figsize=(15, 8)):
         df: DataFrame，包含股票数据，需要有 open, high, low, close, volume 列
         title: str，图表标题
         figsize: tuple，图表大小
+        save_path: str, 图片保存路径，如果有值则保存图片而不显示
     """
     # 创建数据副本，避免修改原数据
     df = df.copy()
@@ -78,4 +79,9 @@ def plot_kline(df, title="K线图", figsize=(15, 8)):
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.show()
+    
+    if save_path:
+        plt.savefig(save_path)
+        plt.close()
+    else:
+        plt.show()
