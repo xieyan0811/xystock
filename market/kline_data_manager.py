@@ -59,7 +59,32 @@ class KLineDataManager:
         # 确保date列是日期时间格式
         if 'date' in df_raw.columns:
             df_raw['date'] = pd.to_datetime(df_raw['date'])
-        
+
+        # stock_zh_index_daily 只含历史数据，不含当日。若市场已收盘（15:00后）且缺今日数据，
+        # 则从实时行情接口补入当日一条记录。
+        today = datetime.now().date()
+        is_weekday = datetime.now().weekday() < 5
+        market_closed = datetime.now().hour >= 15
+        last_date = df_raw['date'].iloc[-1].date() if not df_raw.empty else None
+        if is_weekday and market_closed and last_date != today:
+            try:
+                spot_df = ak.stock_zh_index_spot_sina()
+                row = spot_df[spot_df['代码'] == symbol]
+                if not row.empty:
+                    r = row.iloc[0]
+                    today_row = pd.DataFrame([{
+                        'date': pd.Timestamp(today),
+                        'open': float(r['今开']),
+                        'high': float(r['最高']),
+                        'low': float(r['最低']),
+                        'close': float(r['最新价']),
+                        'volume': float(r['成交量']),
+                    }])
+                    df_raw = pd.concat([df_raw, today_row], ignore_index=True)
+                    print(f"✅ 已从实时行情补入今日({today})数据: close={r['最新价']}")
+            except Exception as e:
+                print(f"⚠️ 补入今日数据失败，仍使用历史数据: {e}")
+
         return df_raw
     
     def convert_to_kline_data_list(self, df: pd.DataFrame, index_name: str) -> List[KLineData]:
